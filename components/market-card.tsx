@@ -22,7 +22,7 @@ export function MarketCard({
   return (
     <Link
       href={`/market/${market.id}`}
-      className="block rounded-lg border border-line bg-surface p-4 shadow-[0_1px_0_rgba(33,38,31,0.06)] transition-transform hover:-translate-y-0.5"
+      className="block rounded-lg border border-line bg-surface p-4 shadow-[0_1px_0_rgba(33,38,31,0.06)] transition-[transform,box-shadow] hover:-translate-y-0.5 hover:shadow-[0_8px_18px_-10px_rgba(20,48,36,0.4)]"
     >
       <div className="flex items-center justify-between gap-2">
         <StatusChip status={market.status} />

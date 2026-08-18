@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { Logo } from "@/components/logo";
 import { createSession, getSession, googleConfigured } from "@/lib/auth";
 import { ensureMember } from "@/lib/data";
 import { env } from "@/lib/env";
@@ -13,86 +14,92 @@ export default async function SignInPage({
   const { error } = await searchParams;
 
   return (
-    <div className="mx-auto mt-10 max-w-sm rounded-lg border border-line bg-surface p-8 text-center shadow-[0_2px_0_rgba(33,38,31,0.08)]">
-      <p className="display text-5xl font-extrabold uppercase leading-none tracking-wide">
-        Chiang
-        <br />
-        Pai
-      </p>
-      <p className="mt-3 text-sm text-soft">
-        A private prediction game. Virtual units, real reputations.
-      </p>
-
-      {error === "AccessDenied" && (
-        <p className="mt-4 rounded-md bg-no-tint px-3 py-2 text-sm font-semibold text-no-deep">
-          That Google account isn't on the invite list. Ask a founding member to add you.
+    <div className="mx-auto mt-10 max-w-sm overflow-hidden rounded-lg border border-line bg-surface text-center shadow-[0_2px_0_rgba(33,38,31,0.08)]">
+      <div aria-hidden className="zari" />
+      <div className="p-8">
+        <Logo size={64} className="mx-auto rounded-2xl" />
+        <p className="eyebrow mt-5">Ee sala cup namde?</p>
+        <p className="display mt-1 text-5xl font-extrabold uppercase leading-none tracking-wide">
+          Chiang
+          <br />
+          Pai
         </p>
-      )}
-      {error && error !== "AccessDenied" && (
-        <p className="mt-4 rounded-md bg-no-tint px-3 py-2 text-sm font-semibold text-no-deep">
-          Sign-in failed. Try again.
+        <p className="mt-3 text-sm text-soft">
+          Namma private prediction adda. Virtual units, real reputations.
         </p>
-      )}
 
-      {googleConfigured && (
-        <a
-          href="/api/auth/google"
-          className="mt-6 block w-full rounded-md bg-felt py-3 font-semibold text-white hover:bg-felt-deep"
-        >
-          Continue with Google
-        </a>
-      )}
-
-      {env.AUTH_DEV_LOGIN && (
-        <form
-          className="mt-4 space-y-2 border-t border-line pt-4 text-left"
-          action={async (formData: FormData) => {
-            "use server";
-            // Re-checked on the server: the flag is the only thing standing
-            // between this form and a passwordless login in production.
-            if (!env.AUTH_DEV_LOGIN) redirect("/signin");
-            const email = String(formData.get("email") ?? "")
-              .trim()
-              .toLowerCase();
-            if (!email.includes("@")) redirect("/signin?error=DevLogin");
-            const name = String(formData.get("name") ?? "").trim() || email.split("@")[0];
-            const member = await ensureMember(email, name, null, { bypassAllowlist: true });
-            if (!member) redirect("/signin?error=DevLogin");
-            await createSession(member.id);
-            redirect("/");
-          }}
-        >
-          <p className="text-[11px] font-semibold uppercase tracking-wider text-gold">
-            Dev login — local only
+        {error === "AccessDenied" && (
+          <p className="mt-4 rounded-md bg-no-tint px-3 py-2 text-sm font-semibold text-no-deep">
+            Aiyo — that Google account isn't on the list. This adda is invite-only; ask a founding
+            member to add you.
           </p>
-          <input
-            name="email"
-            type="email"
-            required
-            placeholder="you@example.com"
-            className="w-full rounded-md border border-line bg-paper px-3 py-2 text-sm"
-          />
-          <input
-            name="name"
-            type="text"
-            placeholder="Display name"
-            className="w-full rounded-md border border-line bg-paper px-3 py-2 text-sm"
-          />
-          <button
-            type="submit"
-            className="w-full rounded-md border border-line py-2 text-sm font-semibold hover:bg-paper"
-          >
-            Sign in as this person
-          </button>
-        </form>
-      )}
+        )}
+        {error && error !== "AccessDenied" && (
+          <p className="mt-4 rounded-md bg-no-tint px-3 py-2 text-sm font-semibold text-no-deep">
+            Aiyo, sign-in failed. Try once more.
+          </p>
+        )}
 
-      {!googleConfigured && !env.AUTH_DEV_LOGIN && (
-        <p className="mt-6 text-sm text-soft">
-          No sign-in method configured. Set AUTH_GOOGLE_ID and AUTH_GOOGLE_SECRET in the
-          environment.
-        </p>
-      )}
+        {googleConfigured && (
+          <a
+            href="/api/auth/google"
+            className="mt-6 block w-full rounded-md bg-felt py-3 font-semibold text-white hover:bg-felt-deep"
+          >
+            Continue with Google
+          </a>
+        )}
+
+        {env.AUTH_DEV_LOGIN && (
+          <form
+            className="mt-4 space-y-2 border-t border-line pt-4 text-left"
+            action={async (formData: FormData) => {
+              "use server";
+              // Re-checked on the server: the flag is the only thing standing
+              // between this form and a passwordless login in production.
+              if (!env.AUTH_DEV_LOGIN) redirect("/signin");
+              const email = String(formData.get("email") ?? "")
+                .trim()
+                .toLowerCase();
+              if (!email.includes("@")) redirect("/signin?error=DevLogin");
+              const name = String(formData.get("name") ?? "").trim() || email.split("@")[0];
+              const member = await ensureMember(email, name, null, { bypassAllowlist: true });
+              if (!member) redirect("/signin?error=DevLogin");
+              await createSession(member.id);
+              redirect("/");
+            }}
+          >
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-gold">
+              Dev login — local only
+            </p>
+            <input
+              name="email"
+              type="email"
+              required
+              placeholder="you@example.com"
+              className="w-full rounded-md border border-line bg-paper px-3 py-2 text-sm"
+            />
+            <input
+              name="name"
+              type="text"
+              placeholder="Display name"
+              className="w-full rounded-md border border-line bg-paper px-3 py-2 text-sm"
+            />
+            <button
+              type="submit"
+              className="w-full rounded-md border border-line py-2 text-sm font-semibold hover:bg-paper"
+            >
+              Sign in as this person
+            </button>
+          </form>
+        )}
+
+        {!googleConfigured && !env.AUTH_DEV_LOGIN && (
+          <p className="mt-6 text-sm text-soft">
+            No sign-in method configured. Set AUTH_GOOGLE_ID and AUTH_GOOGLE_SECRET in the
+            environment.
+          </p>
+        )}
+      </div>
     </div>
   );
 }

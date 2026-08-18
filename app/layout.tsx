@@ -3,6 +3,7 @@ import { Big_Shoulders, Instrument_Sans, Spline_Sans_Mono } from "next/font/goog
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Avatar } from "@/components/avatar";
+import { Logo } from "@/components/logo";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Units } from "@/components/units";
 import { destroySession, getSession } from "@/lib/auth";
@@ -25,7 +26,8 @@ const mono = Spline_Sans_Mono({
 
 export const metadata: Metadata = {
   title: "Chiang Pai",
-  description: "A private prediction game for friends. Zero-sum, all bragging rights.",
+  description:
+    "Namma private prediction adda. Zero-sum, full bragging rights, yella on the record.",
 };
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
@@ -51,8 +53,11 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       >
         <header className="bg-felt-deep text-[#f1eee4]">
           <div className="mx-auto flex max-w-5xl flex-wrap items-center gap-x-4 gap-y-1 px-4 py-3">
-            <Link href="/" className="display text-2xl font-extrabold uppercase tracking-wide">
-              Chiang&nbsp;Pai
+            <Link href="/" className="flex items-center gap-2.5">
+              <Logo size={30} className="rounded-[22%] ring-1 ring-white/20" />
+              <span className="display text-2xl font-extrabold uppercase tracking-wide">
+                Chiang&nbsp;Pai
+              </span>
             </Link>
             {member && (
               <nav className="order-last -mx-4 flex w-screen items-center gap-1 overflow-x-auto px-4 text-sm sm:order-none sm:mx-0 sm:w-auto sm:px-0">
@@ -110,9 +115,11 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             </div>
           </div>
         </header>
+        <div aria-hidden className="zari" />
         <main className="mx-auto max-w-5xl px-4 py-6">{children}</main>
         <footer className="mx-auto max-w-5xl px-4 pb-8 pt-4 text-xs text-soft">
-          Virtual units ({UNIT}) only. Zero-sum. Every outcome is on the record.
+          Virtual units ({UNIT}) only — no money, only maryaade. Zero-sum: winners split exactly
+          what losers put in. Yella on the record.
         </footer>
       </body>
     </html>

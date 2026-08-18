@@ -16,8 +16,11 @@ export default async function MembersPage() {
 
   return (
     <div className="mx-auto max-w-2xl">
-      <h1 className="display text-4xl font-extrabold uppercase tracking-wide">The group</h1>
-      <p className="mt-1 text-sm text-soft">One private table. Everyone sees everything.</p>
+      <p className="eyebrow">Members</p>
+      <h1 className="display text-4xl font-extrabold uppercase tracking-wide">The adda</h1>
+      <p className="mt-1 text-sm text-soft">
+        One private table. Everyone sees everything — the neighbourhood aunties would approve.
+      </p>
 
       <ul className="mt-5 divide-y divide-line rounded-lg border border-line bg-surface">
         {all.map((m, i) => (
@@ -42,7 +45,7 @@ export default async function MembersPage() {
       {pending.length > 0 && (
         <section className="mt-6">
           <h2 className="display text-lg font-bold uppercase tracking-wide text-soft">
-            Invited, not yet in
+            Invited, not yet at the table
           </h2>
           <ul className="mt-2 space-y-1 text-sm text-soft">
             {pending.map((i) => (

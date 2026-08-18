@@ -13,7 +13,7 @@ const OPTIONS: { value: Outcome; label: string; hint: string }[] = [
   {
     value: "refunded",
     label: "Void",
-    hint: "Ambiguous or unresolvable — everyone gets their bet back",
+    hint: "Ambiguous or unresolvable — swalpa adjust maadi, everyone gets their bet back",
   },
 ];
 
@@ -31,7 +31,7 @@ export function ResolvePanel({ marketId }: { marketId: string }) {
       setError(null);
       const res = await resolveAction(marketId, outcome, note);
       if (!res.ok) {
-        setError(res.error ?? "That didn't work.");
+        setError(res.error ?? "Aiyo, that didn't work.");
         setConfirming(false);
       } else {
         router.refresh();

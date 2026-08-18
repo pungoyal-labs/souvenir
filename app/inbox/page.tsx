@@ -22,9 +22,9 @@ export default async function InboxPage() {
 
       {items.length === 0 ? (
         <div className="mt-5 rounded-lg border border-dashed border-line bg-surface p-8 text-center">
-          <p className="display text-2xl font-bold">All quiet.</p>
+          <p className="display text-2xl font-bold uppercase tracking-wide">Full silence.</p>
           <p className="mt-1 text-sm text-soft">
-            When friends open predictions or bet against you, it shows up here.
+            When friends open predictions or bet against you, the scene shows up here.
           </p>
         </div>
       ) : (

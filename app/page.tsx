@@ -35,7 +35,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ v
             sub={
               committedC > 0
                 ? `across ${committedCount} prediction${committedCount === 1 ? "" : "s"}`
-                : "nothing yet"
+                : "khaali for now"
             }
           />
           <StatTile
@@ -44,7 +44,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ v
             sub={
               myStats.resolvedCount > 0
                 ? `${fmtUnits(myStats.profitC, { sign: true })}${UNIT} lifetime`
-                : "nothing resolved yet"
+                : "no verdicts yet"
             }
           />
         </div>
@@ -84,23 +84,21 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ v
 
         {!showSettled && open.length === 0 && (
           <div className="mt-4 rounded-lg border border-dashed border-line bg-surface p-8 text-center">
-            <p className="display text-2xl font-bold">No open predictions.</p>
+            <p className="display text-2xl font-bold uppercase tracking-wide">Scene illa.</p>
             <p className="mt-1 text-sm text-soft">
-              Someone has to stick their neck out first — why not you?
+              No open predictions. Somebody has to say "ee sala cup namde" first — why not you?
             </p>
           </div>
         )}
         {showSettled && resolved.length === 0 && (
           <p className="mt-4 text-sm text-soft">
-            Nothing resolved yet. History starts with the first verdict.
+            No verdicts yet. History starts with the first one.
           </p>
         )}
       </div>
 
       <aside>
-        <h2 className="display text-lg font-bold uppercase tracking-wide text-soft">
-          Recent action
-        </h2>
+        <h2 className="display text-lg font-bold uppercase tracking-wide text-soft">The scene</h2>
         <div className="mt-3">
           <ActivityFeed items={activity} showMarket />
         </div>

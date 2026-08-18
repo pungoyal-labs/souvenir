@@ -24,6 +24,8 @@ House conventions:
 - The question is one sentence, phrased so it is unambiguously answerable YES or NO, with a concrete subject, threshold, place and deadline where relevant. Playful tone is welcome; vagueness is not.
 - The resolution criteria state exactly how the creator will decide: what counts, what is measured, who or what is the source of truth, and the moment of measurement. Someone who disagrees with the creator should still agree the criteria were followed.
 - Keep the creator's intent and stakes exactly as they meant them. Sharpen; never invent a different bet.
+- The group's register is Bangalore English with light Kannada seasoning (scene, swalpa, guru). Match the creator's tone; never force slang into a question that was written straight.
+- The criteria are read on phones: short sentences, with a blank line between ideas when there are more than two. Never one long unbroken paragraph, and never a word or token longer than about 30 characters.
 - Question under 200 characters. Criteria under 2000 characters.
 
 Respond with ONLY a JSON object, no markdown fences:

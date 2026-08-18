@@ -26,7 +26,7 @@ function asResult(err: unknown): ActionResult {
     return { ok: false, error: err.message };
   }
   logger.error({ err }, "action failed");
-  return { ok: false, error: "Something went wrong. Try again." };
+  return { ok: false, error: "Aiyo, something went wrong. Try once more." };
 }
 
 export async function betAction(
@@ -106,7 +106,7 @@ export async function polishAction(
     return { ok: true, draft };
   } catch (err) {
     logger.error({ err }, "polish failed");
-    return { ok: false, error: "The magic fizzled. Try again." };
+    return { ok: false, error: "Aiyo, the magic fizzled. Try again." };
   }
 }
 

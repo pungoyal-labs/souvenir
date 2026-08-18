@@ -12,12 +12,13 @@ export default async function LeaderboardPage() {
 
   return (
     <div className="mx-auto max-w-3xl">
+      <p className="eyebrow">Leaderboard</p>
       <h1 className="display text-4xl font-extrabold uppercase tracking-wide">
-        Who can actually predict things
+        Ee sala cup yaardu?
       </h1>
       <p className="mt-1 text-sm text-soft">
         Ranked by return on units bet, over at least {env.RANKED_MIN_RESOLVED} resolved predictions.
-        One lucky bet won't get you on the board — a track record will.
+        One lucky bet won't get you on the board — seventeen years of RCB taught us that much.
       </p>
 
       {ranked.length > 0 ? (
@@ -43,7 +44,7 @@ export default async function LeaderboardPage() {
         </div>
       ) : (
         <div className="mt-5 rounded-lg border border-dashed border-line bg-surface p-8 text-center">
-          <p className="display text-2xl font-bold">The board is empty.</p>
+          <p className="display text-2xl font-bold uppercase tracking-wide">Board khaali.</p>
           <p className="mt-1 text-sm text-soft">
             Nobody has {env.RANKED_MIN_RESOLVED} resolved predictions yet. Reputations are made
             early — get betting.
@@ -56,7 +57,9 @@ export default async function LeaderboardPage() {
           <h2 className="display text-xl font-bold uppercase tracking-wide text-soft">
             Calibrating
           </h2>
-          <p className="text-xs text-soft">Not enough resolved predictions to rank yet.</p>
+          <p className="text-xs text-soft">
+            Not enough resolved predictions to rank yet. Swalpa time kodi.
+          </p>
           <ul className="mt-3 divide-y divide-line rounded-lg border border-line bg-surface">
             {unranked.map((s) => (
               <li key={s.member.id} className="flex items-center gap-3 px-4 py-2.5 text-sm">

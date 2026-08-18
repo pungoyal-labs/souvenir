@@ -16,7 +16,7 @@ function phrase(item: ActivityItem): string {
     case "refund":
       return `was refunded ${amount}`;
     case "grant":
-      return "joined the game";
+      return "joined the adda";
   }
 }
 
@@ -28,7 +28,7 @@ export function ActivityFeed({
   showMarket?: boolean;
 }) {
   if (items.length === 0) {
-    return <p className="text-sm text-soft">Nothing yet. Quiet before the action.</p>;
+    return <p className="text-sm text-soft">Scene illa. Quiet before the action.</p>;
   }
   return (
     <ul className="space-y-2.5">

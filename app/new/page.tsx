@@ -7,9 +7,8 @@ export default async function NewMarketPage() {
   await requireMember();
   return (
     <div className="mx-auto max-w-2xl">
-      <h1 className="display text-4xl font-extrabold uppercase tracking-wide">
-        Stick your neck out
-      </h1>
+      <p className="eyebrow">New prediction</p>
+      <h1 className="display text-4xl font-extrabold uppercase tracking-wide">Create a scene</h1>
       <p className="mt-1 text-sm text-soft">
         One binary question. Say exactly how you'll decide YES or NO — you're the one who resolves
         it, and the criteria go on the permanent record. Everyone can bet up to{" "}

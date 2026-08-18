@@ -47,7 +47,7 @@ export default async function MemberPage({ params }: { params: Promise<{ id: str
         <div>
           <h1 className="display text-4xl font-extrabold">{member.name}</h1>
           <p className="text-sm text-soft">
-            In the game since {fmtDate(member.joinedAt)}
+            At the table since {fmtDate(member.joinedAt)}
             {isMe && " · this is you"}
           </p>
         </div>
@@ -202,7 +202,7 @@ export default async function MemberPage({ params }: { params: Promise<{ id: str
 function describe(kind: string, side: string | null): string {
   switch (kind) {
     case "grant":
-      return "Joined the game";
+      return "Joined the adda";
     case "bet":
       return `Backed ${side?.toUpperCase()}`;
     case "switch":

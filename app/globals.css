@@ -120,6 +120,29 @@ body {
   outline-offset: 2px;
 }
 
+/* Signature trim: a Mysore-silk zari border — a solid gold band with the
+   classic temple-border triangles hanging off it. Sits under the header and
+   on the sign-in slip. Fixed gold: it always trims the dark felt band, and
+   the darker dark-mode gold reads fine on light paper too. */
+.zari {
+  height: 7px;
+  background-image: linear-gradient(to bottom, #c9a04a, #c9a04a),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='5'%3E%3Cpath d='M0 0h10L5 5Z' fill='%23c9a04a'/%3E%3C/svg%3E");
+  background-repeat: no-repeat, repeat-x;
+  background-size: 100% 2px, 10px 5px;
+  background-position: 0 0, 0 2px;
+}
+
+/* Gold section eyebrow: the small functional label above a personality H1,
+   so navigation words stay findable while headings have fun. */
+.eyebrow {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--color-gold);
+}
+
 .pool-fill {
   transition: width 500ms cubic-bezier(0.22, 1, 0.36, 1);
 }

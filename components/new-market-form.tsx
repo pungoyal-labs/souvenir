@@ -21,7 +21,7 @@ export function NewMarketForm({ polishAvailable }: { polishAvailable: boolean })
       setError(null);
       const res = await polishAction(question, criteria, feedback);
       if (!res.ok || !res.draft) {
-        setError(res.error ?? "The magic fizzled. Try again.");
+        setError(res.error ?? "Aiyo, the magic fizzled. Try again.");
       } else {
         setSuggestion(res.draft);
         setFeedback("");
@@ -51,7 +51,7 @@ export function NewMarketForm({ polishAvailable }: { polishAvailable: boolean })
           value={question}
           onChange={(e) => setQuestion(e.target.value)}
           maxLength={200}
-          placeholder="Will there be more than 5 leaves in the swimming pool at 8 PM?"
+          placeholder="Will it rain in Jayanagar before 6 PM tomorrow?"
           className="mt-1 w-full rounded-md border border-line bg-surface px-3 py-2.5 text-lg"
         />
       </label>
@@ -65,14 +65,14 @@ export function NewMarketForm({ polishAvailable }: { polishAvailable: boolean })
           onChange={(e) => setCriteria(e.target.value)}
           maxLength={2000}
           rows={4}
-          placeholder="I'll count the leaves floating on the surface at 8:00 PM tonight, photo as evidence. 6 or more resolves YES; 5 or fewer resolves NO. If the pool gets cleaned before then, I'll void it."
+          placeholder="I'll check from my terrace in 4th Block at 6:00 PM sharp — a wet road counts as rain, photo as evidence. Rain resolves YES; dry resolves NO. If I'm out of Bangalore by then, I'll void it."
           className="mt-1 w-full rounded-md border border-line bg-surface px-3 py-2.5 text-sm"
         />
       </label>
 
       {polishAvailable && (
         <div className="rounded-lg border border-dashed border-felt/40 bg-felt-tint/40 p-4">
-          <div className="flex items-center justify-between gap-3">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-sm">
               <span className="font-semibold">✨ Sprinkle some AI magic?</span>{" "}
               <span className="text-soft">
@@ -90,10 +90,12 @@ export function NewMarketForm({ polishAvailable }: { polishAvailable: boolean })
           </div>
 
           {suggestion && (
-            <div className="mt-3 rounded-md border border-line bg-surface p-3">
-              <p className="display text-lg font-bold leading-snug">{suggestion.question}</p>
-              <p className="mt-2 whitespace-pre-wrap text-sm">{suggestion.criteria}</p>
-              <p className="mt-2 text-xs italic text-soft">{suggestion.rationale}</p>
+            <div className="mt-3 min-w-0 rounded-md border border-line bg-surface p-3">
+              <p className="display break-words text-lg font-bold leading-snug">
+                {suggestion.question}
+              </p>
+              <p className="mt-2 whitespace-pre-wrap break-words text-sm">{suggestion.criteria}</p>
+              <p className="mt-2 break-words text-xs italic text-soft">{suggestion.rationale}</p>
               <div className="mt-3 flex flex-wrap items-center gap-2">
                 <button
                   type="button"

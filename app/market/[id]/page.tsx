@@ -40,7 +40,7 @@ export default async function MarketPage({ params }: { params: Promise<{ id: str
 
       <div className="mt-3 rounded-lg border border-line bg-surface p-4">
         <p className="text-[11px] font-semibold uppercase tracking-wider text-soft">Resolves how</p>
-        <p className="mt-1 whitespace-pre-wrap text-sm">{market.criteria}</p>
+        <p className="mt-1 whitespace-pre-wrap break-words text-sm">{market.criteria}</p>
       </div>
 
       {!isOpen && (
@@ -59,7 +59,7 @@ export default async function MarketPage({ params }: { params: Promise<{ id: str
             {market.resolvedAt && <> on {fmtDate(market.resolvedAt)}</>}
           </p>
           {market.resolutionNote && (
-            <p className="mt-2 whitespace-pre-wrap text-sm">{market.resolutionNote}</p>
+            <p className="mt-2 whitespace-pre-wrap break-words text-sm">{market.resolutionNote}</p>
           )}
           {settlements.length > 0 && (
             <div className="mt-3 border-t border-line pt-3">
@@ -98,7 +98,9 @@ export default async function MarketPage({ params }: { params: Promise<{ id: str
       <section className="mt-5">
         <h2 className="display text-lg font-bold uppercase tracking-wide text-soft">Bets</h2>
         {view.participants.length === 0 ? (
-          <p className="mt-2 text-sm text-soft">Nobody has bet yet. First in sets the tone.</p>
+          <p className="mt-2 text-sm text-soft">
+            Khaali table — nobody has bet yet. First in sets the tone.
+          </p>
         ) : (
           <ul className="mt-2 divide-y divide-line rounded-lg border border-line bg-surface">
             {view.participants.map((p) => (
@@ -134,7 +136,7 @@ export default async function MarketPage({ params }: { params: Promise<{ id: str
 
       <section className="mt-7">
         <h2 className="display text-lg font-bold uppercase tracking-wide text-soft">
-          Action so far
+          Scene so far
         </h2>
         <div className="mt-3">
           <ActivityFeed items={activity} />
