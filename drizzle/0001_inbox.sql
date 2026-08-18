@@ -1,0 +1,1 @@
+ALTER TABLE "members" ADD COLUMN "inbox_seen_at" timestamp with time zone;

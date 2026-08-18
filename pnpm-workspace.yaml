@@ -1,0 +1,13 @@
+packages:
+  - "."
+
+allowBuilds:
+  esbuild: true
+
+onlyBuiltDependencies:
+  - esbuild
+
+# npm-style flat node_modules. Next.js standalone output traces files from
+# node_modules; the hoisted layout keeps that working identically in local
+# dev and the Docker image, with no image-only install flags.
+nodeLinker: hoisted

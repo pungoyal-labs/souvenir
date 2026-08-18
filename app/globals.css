@@ -1,26 +1,64 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
+  /* Betting-slip paper + card-table felt, with a colorblind-safe duality:
+     YES = ultramarine (believe), NO = burnt orange (doubt). */
+  --color-paper: #f1eee4;
+  --color-surface: #fbfaf4;
+  --color-ink: #21261f;
+  --color-soft: #6b7365;
+  --color-line: #d9d4c2;
+  --color-felt: #1f4a38;
+  --color-felt-deep: #143024;
+  --color-felt-tint: #e2eae2;
+  --color-yes: #2b57a5;
+  --color-yes-deep: #1d3f7c;
+  --color-yes-tint: #e4ebf8;
+  --color-no: #bd521c;
+  --color-no-deep: #93400f;
+  --color-no-tint: #f8eadd;
+  --color-gold: #a97e22;
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --font-display: var(--font-big-shoulders), "Arial Narrow", sans-serif;
+  --font-sans: var(--font-instrument), system-ui, sans-serif;
+  --font-mono: var(--font-spline-mono), ui-monospace, monospace;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background-color: var(--color-paper);
+  color: var(--color-ink);
+  font-family: var(--font-instrument), system-ui, sans-serif;
+  /* Faint ledger grain: fine horizontal ruling, like a paper betting book. */
+  background-image: repeating-linear-gradient(
+    to bottom,
+    transparent 0,
+    transparent 31px,
+    rgba(33, 38, 31, 0.035) 31px,
+    rgba(33, 38, 31, 0.035) 32px
+  );
+}
+
+.display {
+  font-family: var(--font-big-shoulders), "Arial Narrow", sans-serif;
+  letter-spacing: 0.01em;
+}
+
+.mono {
+  font-family: var(--font-spline-mono), ui-monospace, monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-felt);
+  outline-offset: 2px;
+}
+
+.pool-fill {
+  transition: width 500ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pool-fill {
+    transition: none;
+  }
 }

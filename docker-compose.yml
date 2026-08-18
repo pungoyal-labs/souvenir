@@ -1,0 +1,65 @@
+# One compose file for dev and prod.
+#
+#   Dev:   docker compose up -d db        (then `pnpm dev`)
+#          docker compose up -d --build   (full stack, built locally)
+#   Prod:  export APP_IMAGE=...   (GHCR tag; CI does this)
+#          docker compose pull app && docker compose up -d --no-build app
+#
+# All knobs come from .env (see .env.example): POSTGRES_PASSWORD, DB_PORT,
+# APP_PORT, APP_BIND, and the app's own settings.
+
+services:
+  db:
+    image: postgres:18-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: chiangpai
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-chiangpai}
+      POSTGRES_DB: chiangpai
+    volumes:
+      - pgdata:/var/lib/postgresql
+    # Loopback only — never expose Postgres to the network.
+    ports:
+      - "127.0.0.1:${DB_PORT:-5433}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U chiangpai -d chiangpai"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  # Runs pending migrations and exits. The app only starts after this succeeds.
+  # Same image as the app — the standalone build bundles the migrate script.
+  migrate:
+    image: ${APP_IMAGE:-chiang-pai:local}
+    build:
+      context: .
+    command: ["node", "scripts/migrate.ts"]
+    environment:
+      DATABASE_URL: postgres://chiangpai:${POSTGRES_PASSWORD:-chiangpai}@db:5432/chiangpai
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
+
+  app:
+    image: ${APP_IMAGE:-chiang-pai:local}
+    build:
+      context: .
+    restart: unless-stopped
+    # Default loopback bind assumes a reverse proxy terminates TLS in prod;
+    # set APP_BIND=0.0.0.0 to expose directly.
+    ports:
+      - "${APP_BIND:-127.0.0.1}:${APP_PORT:-3000}:3000"
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      DATABASE_URL: postgres://chiangpai:${POSTGRES_PASSWORD:-chiangpai}@db:5432/chiangpai
+    depends_on:
+      db:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+
+volumes:
+  pgdata:
