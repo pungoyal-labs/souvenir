@@ -89,6 +89,7 @@ jobs:
         uses: appleboy/ssh-action@v1
         env:
           APP_IMAGE: ${{ needs.image.outputs.image }}:${{ github.sha }}
+          APP_PORT: ${{ vars.APP_PORT }}
           DEPLOY_DIR: ${{ vars.DEPLOY_DIR }}
           GHCR_USER: ${{ github.actor }}
           GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -99,7 +100,7 @@ jobs:
           username: ${{ vars.OCI_USER }}
           port: ${{ vars.OCI_SSH_PORT || 22 }}
           key: ${{ secrets.OCI_SSH_KEY }}
-          envs: APP_IMAGE,DEPLOY_DIR,GHCR_USER,GHCR_TOKEN,REPO,SHA
+          envs: APP_IMAGE,APP_PORT,DEPLOY_DIR,GHCR_USER,GHCR_TOKEN,REPO,SHA
           script: |
             set -euo pipefail
 
@@ -149,5 +150,25 @@ jobs:
             export APP_IMAGE
             docker compose pull app
             docker compose up -d --no-build app
+
+            # `up -d` returns once the container has STARTED, which is not the
+            # same as serving: an app that boots and crashes (bad env, failed
+            # DB connect) would otherwise deploy green. Poll until it answers,
+            # and fail the run with its logs if it never does. /signin is the
+            # one page that needs no session.
+            probe="http://127.0.0.1:${APP_PORT:-3000}/signin"
+            for attempt in $(seq 1 30); do
+              if curl -fsS --max-time 5 -o /dev/null "$probe"; then
+                echo "app is serving ($probe)"
+                break
+              fi
+              if [ "$attempt" -eq 30 ]; then
+                echo "app never served $probe after 60s; last 50 log lines:" >&2
+                docker compose logs --tail=50 app >&2
+                exit 1
+              fi
+              sleep 2
+            done
+
             docker image prune -f
             docker compose ps

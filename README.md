@@ -45,7 +45,7 @@ Anthropic-compatible API (configured for MiniMax M3).
 
 ```sh
 cp .env.example .env          # fill in FOUNDING_MEMBERS at minimum
-docker compose up -d db       # Postgres on 127.0.0.1:${DB_PORT:-5433}
+docker compose up -d db       # Postgres on 127.0.0.1:${DB_PORT:-5566}
 pnpm install
 pnpm db:migrate
 pnpm seed                     # optional demo data
