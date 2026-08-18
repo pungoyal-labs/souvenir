@@ -1,7 +1,8 @@
 # Chiang Pai — agent notes
 
 Private zero-sum prediction game for one friend group. Next.js 16 App Router +
-server actions, Postgres via Drizzle, Auth.js v5 (Google + invite allowlist).
+server actions, Postgres via Drizzle, dependency-free Google OAuth + invite
+allowlist (`lib/auth.ts`).
 
 ## Commands (pnpm 11)
 

@@ -14,6 +14,11 @@ const envSchema = z.object({
   LOG_LEVEL: z.enum(["fatal", "error", "warn", "info", "debug", "trace", "silent"]).optional(),
 
   AUTH_SECRET: z.string().default("dev-only-secret-change-in-production"),
+  /** Public base URL. Google callbacks and cookie `secure` both derive from it. */
+  AUTH_URL: z
+    .url()
+    .default("http://localhost:3000")
+    .transform((u) => u.replace(/\/+$/, "")),
   AUTH_GOOGLE_ID: z.string().optional(),
   AUTH_GOOGLE_SECRET: z.string().optional(),
 

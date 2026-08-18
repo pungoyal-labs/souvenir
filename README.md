@@ -37,7 +37,7 @@ settlement math and `lib/engine.test.ts` fuzz-tests the invariant.
 ## Stack
 
 Next.js 16 (App Router, server actions) · React 19 · TypeScript 7 ·
-Tailwind CSS 4 · Auth.js v5 (Google) · Postgres 18 · Drizzle ORM ·
+Tailwind CSS 4 · Google OAuth (no auth library) · Postgres 18 · Drizzle ORM ·
 Biome · Vitest · pnpm 11 · Docker. Optional LLM polish of market drafts via any
 Anthropic-compatible API (configured for MiniMax M3).
 

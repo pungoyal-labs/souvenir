@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { auth } from "@/lib/auth";
+import { getSession } from "@/lib/auth";
 import { createMarket, DataError, invite, placeBet, resolveMarket, switchSides } from "@/lib/data";
 import type { Side } from "@/lib/engine";
 import { llmEnabled, type PolishedDraft, polishMarketDraft } from "@/lib/llm";
@@ -14,8 +14,8 @@ export interface ActionResult {
 }
 
 async function requireMemberId(): Promise<string> {
-  const session = await auth();
-  if (!session?.memberId) redirect("/signin");
+  const session = await getSession();
+  if (!session) redirect("/signin");
   return session.memberId;
 }
 

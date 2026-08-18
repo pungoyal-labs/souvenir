@@ -1,10 +1,11 @@
 import type { Metadata } from "next";
 import { Big_Shoulders, Instrument_Sans, Spline_Sans_Mono } from "next/font/google";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { Avatar } from "@/components/avatar";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Units } from "@/components/units";
-import { auth, signOut } from "@/lib/auth";
+import { destroySession, getSession } from "@/lib/auth";
 import { getMember, inbox, netOf } from "@/lib/data";
 import { UNIT } from "@/lib/units";
 import "./globals.css";
@@ -28,8 +29,8 @@ export const metadata: Metadata = {
 };
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
-  const session = await auth();
-  const member = session?.memberId ? await getMember(session.memberId) : null;
+  const session = await getSession();
+  const member = session ? await getMember(session.memberId) : null;
   const netC = member ? await netOf(member.id) : 0;
   const hasUnread = member ? (await inbox(member.id)).unreadCount > 0 : false;
 
@@ -91,7 +92,8 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                   <form
                     action={async () => {
                       "use server";
-                      await signOut({ redirectTo: "/signin" });
+                      await destroySession();
+                      redirect("/signin");
                     }}
                   >
                     <button

@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
-import { auth, signIn } from "@/lib/auth";
+import { createSession, getSession, googleConfigured } from "@/lib/auth";
+import { ensureMember } from "@/lib/data";
 import { env } from "@/lib/env";
 
 export default async function SignInPage({
@@ -7,10 +8,9 @@ export default async function SignInPage({
 }: {
   searchParams: Promise<{ error?: string }>;
 }) {
-  const session = await auth();
-  if (session?.memberId) redirect("/");
+  const session = await getSession();
+  if (session) redirect("/");
   const { error } = await searchParams;
-  const googleConfigured = Boolean(env.AUTH_GOOGLE_ID && env.AUTH_GOOGLE_SECRET);
 
   return (
     <div className="mx-auto mt-10 max-w-sm rounded-lg border border-line bg-surface p-8 text-center shadow-[0_2px_0_rgba(33,38,31,0.08)]">
@@ -35,20 +35,12 @@ export default async function SignInPage({
       )}
 
       {googleConfigured && (
-        <form
-          className="mt-6"
-          action={async () => {
-            "use server";
-            await signIn("google", { redirectTo: "/" });
-          }}
+        <a
+          href="/api/auth/google"
+          className="mt-6 block w-full rounded-md bg-felt py-3 font-semibold text-white hover:bg-felt-deep"
         >
-          <button
-            type="submit"
-            className="w-full rounded-md bg-felt py-3 font-semibold text-white hover:bg-felt-deep"
-          >
-            Continue with Google
-          </button>
-        </form>
+          Continue with Google
+        </a>
       )}
 
       {env.AUTH_DEV_LOGIN && (
@@ -56,11 +48,18 @@ export default async function SignInPage({
           className="mt-4 space-y-2 border-t border-line pt-4 text-left"
           action={async (formData: FormData) => {
             "use server";
-            await signIn("dev", {
-              email: String(formData.get("email") ?? ""),
-              name: String(formData.get("name") ?? ""),
-              redirectTo: "/",
-            });
+            // Re-checked on the server: the flag is the only thing standing
+            // between this form and a passwordless login in production.
+            if (!env.AUTH_DEV_LOGIN) redirect("/signin");
+            const email = String(formData.get("email") ?? "")
+              .trim()
+              .toLowerCase();
+            if (!email.includes("@")) redirect("/signin?error=DevLogin");
+            const name = String(formData.get("name") ?? "").trim() || email.split("@")[0];
+            const member = await ensureMember(email, name, null, { bypassAllowlist: true });
+            if (!member) redirect("/signin?error=DevLogin");
+            await createSession(member.id);
+            redirect("/");
           }}
         >
           <p className="text-[11px] font-semibold uppercase tracking-wider text-gold">
