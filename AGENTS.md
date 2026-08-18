@@ -34,8 +34,9 @@ Pre-commit (husky): biome on staged files, tsc, engine tests.
 - The inbox is derived from markets + ledger at read time; the only stored
   notification state is `members.inbox_seen_at`.
 - Every flavored string lives in `lingo.yaml` (edited by hand), never in a
-  component. `lib/lingo.data.ts` is generated from it and committed; `english`
-  is the reference — the generator rejects a lingo whose fields don't match it.
+  component. `lib/lingo.data.ts` is generated from it and gitignored
+  (`postinstall`, `dev`, and `build` all regenerate it); `english` is the
+  reference — the generator rejects a lingo whose fields don't match it.
 - Addresses are canonicalized through `normalizeEmail` (`lib/email.ts`) before
   any lookup or write: Gmail ignores dots, so the allowlist, `members.email`,
   and `FOUNDING_MEMBERS` all key off the dotless spelling.

@@ -40,3 +40,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# generated from lingo.yaml (postinstall, dev, and build all regenerate it)
+/lib/lingo.data.ts

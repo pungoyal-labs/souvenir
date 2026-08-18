@@ -8,6 +8,7 @@
     "lingo:gen": "node scripts/gen-lingo.ts",
     "start": "next start",
     "lint": "biome check .",
+    "postinstall": "if [ -f scripts/gen-lingo.ts ]; then node scripts/gen-lingo.ts; fi",
     "test": "vitest run",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "node --env-file-if-exists=.env scripts/migrate.ts",
