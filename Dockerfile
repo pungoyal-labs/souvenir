@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 
-FROM node:26-alpine AS deps
+FROM node:24-alpine AS deps
 WORKDIR /app
 RUN npm i -g pnpm@11
 # HUSKY=0 skips git-hook installation (there is no .git in the image).
@@ -8,7 +8,7 @@ ENV HUSKY=0
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 RUN pnpm install --frozen-lockfile
 
-FROM node:26-alpine AS build
+FROM node:24-alpine AS build
 WORKDIR /app
 RUN npm i -g pnpm@11
 COPY --from=deps /app/node_modules ./node_modules
@@ -19,7 +19,7 @@ RUN pnpm build
 # The single runtime image. Serves the app, and also runs the one-shot
 # `migrate` compose service: next.config.ts bundles the migrate script,
 # migration SQL, and their dependencies into the standalone output.
-FROM node:26-alpine AS runner
+FROM node:24-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 ENV HOSTNAME=0.0.0.0
