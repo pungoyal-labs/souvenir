@@ -6,7 +6,12 @@
 import { z } from "zod";
 
 const envSchema = z.object({
+  NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
+
   DATABASE_URL: z.string().default("postgres://chiangpai:chiangpai@localhost:5433/chiangpai"),
+
+  /** Pino level. Defaults to info in production, debug otherwise (lib/logger.ts). */
+  LOG_LEVEL: z.enum(["fatal", "error", "warn", "info", "debug", "trace", "silent"]).optional(),
 
   AUTH_SECRET: z.string().default("dev-only-secret-change-in-production"),
   AUTH_GOOGLE_ID: z.string().optional(),

@@ -1,6 +1,8 @@
 @import "tailwindcss";
 
-@theme inline {
+/* Colors live in a plain @theme (not inline) so utilities reference the
+   variables and the dark blocks below can swap the whole palette. */
+@theme {
   /* Betting-slip paper + card-table felt, with a colorblind-safe duality:
      YES = ultramarine (believe), NO = burnt orange (doubt). */
   --color-paper: #f1eee4;
@@ -14,14 +16,73 @@
   --color-yes: #2b57a5;
   --color-yes-deep: #1d3f7c;
   --color-yes-tint: #e4ebf8;
+  --color-yes-press: #1d3f7c;
   --color-no: #bd521c;
   --color-no-deep: #93400f;
   --color-no-tint: #f8eadd;
+  --color-no-press: #93400f;
   --color-gold: #a97e22;
+}
 
+/* Fonts stay inline: they reference next/font variables set on <body>,
+   which don't exist at :root. */
+@theme inline {
   --font-display: var(--font-big-shoulders), "Arial Narrow", sans-serif;
   --font-sans: var(--font-instrument), system-ui, sans-serif;
   --font-mono: var(--font-spline-mono), ui-monospace, monospace;
+}
+
+:root {
+  --grain: rgba(33, 38, 31, 0.035);
+}
+
+/* Night felt. Applied when the user picked dark, or (below) when the OS
+   prefers it and no explicit choice overrides that. The -deep and -tint
+   roles keep their jobs: deep text colors lighten, tint backgrounds darken. */
+:root[data-theme="dark"] {
+  --color-paper: #161a15;
+  --color-surface: #20251e;
+  --color-ink: #e9e6d8;
+  --color-soft: #97a08e;
+  --color-line: #3a4135;
+  --color-felt: #3f8a64;
+  --color-felt-deep: #0e2018;
+  --color-felt-tint: #203126;
+  --color-yes: #3d6cb8;
+  --color-yes-deep: #9db9e8;
+  --color-yes-tint: #1f2c44;
+  --color-yes-press: #315a9e;
+  --color-no: #c05a20;
+  --color-no-deep: #eda06d;
+  --color-no-tint: #3b2413;
+  --color-no-press: #a04a18;
+  --color-gold: #c9a04a;
+  --grain: rgba(233, 230, 216, 0.03);
+  color-scheme: dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --color-paper: #161a15;
+    --color-surface: #20251e;
+    --color-ink: #e9e6d8;
+    --color-soft: #97a08e;
+    --color-line: #3a4135;
+    --color-felt: #3f8a64;
+    --color-felt-deep: #0e2018;
+    --color-felt-tint: #203126;
+    --color-yes: #3d6cb8;
+    --color-yes-deep: #9db9e8;
+    --color-yes-tint: #1f2c44;
+    --color-yes-press: #315a9e;
+    --color-no: #c05a20;
+    --color-no-deep: #eda06d;
+    --color-no-tint: #3b2413;
+    --color-no-press: #a04a18;
+    --color-gold: #c9a04a;
+    --grain: rgba(233, 230, 216, 0.03);
+    color-scheme: dark;
+  }
 }
 
 body {
@@ -33,8 +94,8 @@ body {
     to bottom,
     transparent 0,
     transparent 31px,
-    rgba(33, 38, 31, 0.035) 31px,
-    rgba(33, 38, 31, 0.035) 32px
+    var(--grain) 31px,
+    var(--grain) 32px
   );
 }
 
@@ -46,6 +107,12 @@ body {
 .mono {
   font-family: var(--font-spline-mono), ui-monospace, monospace;
   font-variant-numeric: tabular-nums;
+}
+
+/* The π unit symbol always keeps the sans face — the display and mono
+   faces draw π like a capital Π. */
+.unit {
+  font-family: var(--font-instrument), system-ui, sans-serif;
 }
 
 :focus-visible {
@@ -60,5 +127,25 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .pool-fill {
     transition: none;
+  }
+}
+
+/* Theme-dependent visibility, used by the header's theme toggle so the
+   right icon shows without any client state. */
+.dark-only {
+  display: none;
+}
+:root[data-theme="dark"] .dark-only {
+  display: inline;
+}
+:root[data-theme="dark"] .light-only {
+  display: none;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .dark-only {
+    display: inline;
+  }
+  :root:not([data-theme="light"]) .light-only {
+    display: none;
   }
 }

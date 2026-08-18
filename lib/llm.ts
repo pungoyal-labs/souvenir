@@ -5,6 +5,7 @@
 
 import Anthropic from "@anthropic-ai/sdk";
 import { env } from "./env.ts";
+import { logger } from "./logger.ts";
 
 export const llmEnabled = Boolean(env.LLM_BASE_URL && env.LLM_API_KEY);
 
@@ -47,12 +48,17 @@ export async function polishMarketDraft(
     userParts.push(`Creator's notes on the previous suggestion: ${feedback.trim()}`);
   }
 
+  const startedAt = Date.now();
   const response = await client.messages.create({
     model: env.LLM_MODEL,
     max_tokens: 2000,
     system: SYSTEM_PROMPT,
     messages: [{ role: "user", content: userParts.join("\n\n") }],
   });
+  logger.info(
+    { model: env.LLM_MODEL, ms: Date.now() - startedAt, usage: response.usage },
+    "market draft polished",
+  );
 
   const text = response.content
     .filter((block): block is Anthropic.TextBlock => block.type === "text")

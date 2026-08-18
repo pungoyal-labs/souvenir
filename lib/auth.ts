@@ -3,6 +3,7 @@ import Credentials from "next-auth/providers/credentials";
 import Google from "next-auth/providers/google";
 import { ensureMember } from "./data.ts";
 import { env } from "./env.ts";
+import { logger } from "./logger.ts";
 
 declare module "next-auth" {
   interface Session {
@@ -56,7 +57,15 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       const member = await ensureMember(user.email, user.name ?? null, user.image ?? null, {
         bypassAllowlist: account?.provider === "dev",
       });
-      return Boolean(member);
+      if (!member) {
+        logger.warn(
+          { email: user.email, provider: account?.provider },
+          "sign-in denied: not on the invite list",
+        );
+        return false;
+      }
+      logger.info({ memberId: member.id, provider: account?.provider }, "member signed in");
+      return true;
     },
     async jwt({ token, user, account }) {
       if (user?.email) {

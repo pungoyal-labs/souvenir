@@ -1,9 +1,10 @@
 import Link from "next/link";
 import { Avatar } from "@/components/avatar";
+import { Units } from "@/components/units";
 import { type InboxItem, inbox, markInboxSeen } from "@/lib/data";
 import { timeAgo } from "@/lib/format";
 import { requireMember } from "@/lib/session";
-import { fmtUnits } from "@/lib/units";
+import { fmtUnits, UNIT } from "@/lib/units";
 
 export default async function InboxPage() {
   const me = await requireMember();
@@ -75,7 +76,7 @@ function Line({ item }: { item: InboxItem }) {
           {name}{" "}
           {item.row.kind === "switch"
             ? `switched to ${item.row.side?.toUpperCase()}`
-            : `put ${fmtUnits(item.row.amountC)}u on ${item.row.side?.toUpperCase()}`}
+            : `put ${fmtUnits(item.row.amountC)}${UNIT} on ${item.row.side?.toUpperCase()}`}
         </>
       );
     case "resolved":
@@ -91,9 +92,13 @@ function Line({ item }: { item: InboxItem }) {
                 item.myProfitC > 0 ? "text-felt" : item.myProfitC < 0 ? "text-no-deep" : "text-soft"
               }`}
             >
-              {item.myProfitC === 0
-                ? "(stake returned)"
-                : `(you ${item.myProfitC > 0 ? "won" : "lost"} ${fmtUnits(Math.abs(item.myProfitC))}u)`}
+              {item.myProfitC === 0 ? (
+                "(stake returned)"
+              ) : (
+                <>
+                  (you {item.myProfitC > 0 ? "won" : "lost"} <Units c={Math.abs(item.myProfitC)} />)
+                </>
+              )}
             </span>
           )}
         </>

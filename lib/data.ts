@@ -24,6 +24,7 @@ import {
   settle,
 } from "./engine.ts";
 import { env } from "./env.ts";
+import { logger } from "./logger.ts";
 import { toCents } from "./units.ts";
 
 /** User-facing failures (insufficient units, market closed, …). */
@@ -173,9 +174,11 @@ export async function ensureMember(
       .insert(members)
       .values({ id: randomUUID(), email: normalized, name: name ?? normalized, image })
       .returning();
+    logger.info({ memberId: created.id, email: normalized }, "member joined");
     return created;
   } catch {
     // Concurrent first sign-in: the unique email constraint fired; re-read.
+    logger.debug({ email: normalized }, "concurrent first sign-in, re-reading member");
     const [raced] = await db.select().from(members).where(eq(members.email, normalized));
     return raced ?? null;
   }
@@ -208,6 +211,7 @@ export async function invite(email: string, invitedBy: string): Promise<void> {
     throw new DataError("That doesn't look like an email address.");
   }
   await db.insert(allowlist).values({ email: normalized, invitedBy }).onConflictDoNothing();
+  logger.info({ email: normalized, invitedBy }, "member invited");
 }
 
 // ---------- markets: reads ----------
@@ -312,6 +316,7 @@ export async function createMarket(
   if (c.length > 2000) throw new DataError("Keep resolution criteria under 2000 characters.");
   const id = randomUUID();
   await db.insert(markets).values({ id, creatorId, question: q, criteria: c });
+  logger.info({ marketId: id, creatorId }, "market created");
   return id;
 }
 
@@ -359,9 +364,11 @@ export async function placeBet(
       balanceDeltaC: -amountC,
     });
   });
+  logger.info({ memberId, marketId, side, amountC }, "bet placed");
 }
 
 export async function switchSides(memberId: string, marketId: string): Promise<void> {
+  let switched: { from: Side; stakeC: number } | undefined;
   await db.transaction(async (tx) => {
     const [market] = await tx.select().from(markets).where(eq(markets.id, marketId)).for("update");
     if (!market) throw new DataError("Market not found.");
@@ -386,7 +393,20 @@ export async function switchSides(memberId: string, marketId: string): Promise<v
       balanceDeltaC: 0,
       note: `Switched ${from.toUpperCase()} → ${otherSide(from).toUpperCase()}`,
     });
+    switched = { from, stakeC };
   });
+  if (switched) {
+    logger.info(
+      {
+        memberId,
+        marketId,
+        from: switched.from,
+        to: otherSide(switched.from),
+        stakeC: switched.stakeC,
+      },
+      "sides switched",
+    );
+  }
 }
 
 export async function resolveMarket(
@@ -395,6 +415,7 @@ export async function resolveMarket(
   outcome: Side | "refunded",
   note: string,
 ): Promise<void> {
+  let settled: { rows: number; totalC: number; autoRefunded: boolean } | undefined;
   await db.transaction(async (tx) => {
     const [market] = await tx.select().from(markets).where(eq(markets.id, marketId)).for("update");
     if (!market) throw new DataError("Market not found.");
@@ -414,6 +435,11 @@ export async function resolveMarket(
 
     if (outcome === "refunded") {
       const refunds = refundAll(positions);
+      settled = {
+        rows: refunds.size,
+        totalC: [...refunds.values()].reduce((s, c) => s + c, 0),
+        autoRefunded: false,
+      };
       for (const [mid, amountC] of refunds) {
         await tx.insert(ledger).values({
           memberId: mid,
@@ -426,6 +452,11 @@ export async function resolveMarket(
       }
     } else {
       const result = settle(positions, outcome);
+      settled = {
+        rows: result.payoutsC.size,
+        totalC: result.totalPoolC,
+        autoRefunded: result.autoRefunded,
+      };
       if (result.autoRefunded) {
         resolutionNote = [
           resolutionNote,
@@ -467,6 +498,17 @@ export async function resolveMarket(
       })
       .where(eq(markets.id, marketId));
   });
+  logger.info(
+    {
+      marketId,
+      resolverId,
+      outcome,
+      poolC: settled?.totalC ?? 0,
+      ledgerRows: settled?.rows ?? 0,
+      autoRefunded: settled?.autoRefunded ?? false,
+    },
+    "market resolved",
+  );
 }
 
 // ---------- member accounting ----------

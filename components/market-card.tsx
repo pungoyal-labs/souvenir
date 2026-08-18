@@ -1,10 +1,11 @@
 import Link from "next/link";
 import type { MarketView } from "@/lib/data";
 import { timeAgo } from "@/lib/format";
-import { fmtUnits } from "@/lib/units";
+import { fmtUnits, UNIT } from "@/lib/units";
 import { Avatar } from "./avatar";
 import { PoolBar } from "./pool-bar";
 import { SideChip, StatusChip } from "./side-chip";
+import { Units } from "./units";
 
 export function MarketCard({
   view,
@@ -43,7 +44,7 @@ export function MarketCard({
               <span
                 key={p.member.id}
                 className="rounded-full ring-2 ring-yes-tint"
-                title={`${p.member.name}: ${fmtUnits(p.stakeC)}u on YES`}
+                title={`${p.member.name}: ${fmtUnits(p.stakeC)}${UNIT} on YES`}
               >
                 <Avatar name={p.member.name} image={p.member.image} size={22} />
               </span>
@@ -54,7 +55,7 @@ export function MarketCard({
               <span
                 key={p.member.id}
                 className="rounded-full ring-2 ring-no-tint"
-                title={`${p.member.name}: ${fmtUnits(p.stakeC)}u on NO`}
+                title={`${p.member.name}: ${fmtUnits(p.stakeC)}${UNIT} on NO`}
               >
                 <Avatar name={p.member.name} image={p.member.image} size={22} />
               </span>
@@ -65,8 +66,11 @@ export function MarketCard({
 
       {view.mySide && market.status === "open" && (
         <p className="mt-2 flex items-center gap-1.5 text-sm font-semibold">
-          You: <span className="mono">{fmtUnits(view.myStakeC)}u</span> on{" "}
-          <SideChip side={view.mySide} small />
+          You:{" "}
+          <span className="mono">
+            <Units c={view.myStakeC} />
+          </span>{" "}
+          on <SideChip side={view.mySide} small />
         </p>
       )}
       {market.status !== "open" && myProfitC !== undefined && (
@@ -75,9 +79,13 @@ export function MarketCard({
             myProfitC > 0 ? "text-felt" : myProfitC < 0 ? "text-no-deep" : "text-soft"
           }`}
         >
-          {myProfitC === 0
-            ? "You broke even"
-            : `You ${myProfitC > 0 ? "won" : "lost"} ${fmtUnits(Math.abs(myProfitC))}u`}
+          {myProfitC === 0 ? (
+            "You broke even"
+          ) : (
+            <>
+              You {myProfitC > 0 ? "won" : "lost"} <Units c={Math.abs(myProfitC)} />
+            </>
+          )}
         </p>
       )}
     </Link>

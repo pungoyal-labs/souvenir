@@ -1,10 +1,10 @@
 import Link from "next/link";
 import { Avatar } from "@/components/avatar";
 import { InviteForm } from "@/components/invite-form";
+import { Units } from "@/components/units";
 import { isFounder, listInvites, listMembers, netOf } from "@/lib/data";
 import { fmtDate } from "@/lib/format";
 import { requireMember } from "@/lib/session";
-import { fmtUnits } from "@/lib/units";
 
 export default async function MembersPage() {
   const me = await requireMember();
@@ -32,7 +32,9 @@ export default async function MembersPage() {
                 {m.email} · joined {fmtDate(m.joinedAt)}
               </p>
             </div>
-            <span className="mono ml-auto font-bold">{fmtUnits(balances[i], { sign: true })}u</span>
+            <span className="mono ml-auto font-bold">
+              <Units c={balances[i]} sign />
+            </span>
           </li>
         ))}
       </ul>

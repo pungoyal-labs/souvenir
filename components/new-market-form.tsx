@@ -125,7 +125,7 @@ export function NewMarketForm({
                   value={feedback}
                   onChange={(e) => setFeedback(e.target.value)}
                   placeholder="Tell it what to change, then polish again"
-                  className="min-w-0 flex-1 rounded-md border border-line bg-white px-3 py-1.5 text-sm"
+                  className="min-w-0 flex-1 rounded-md border border-line bg-paper px-3 py-1.5 text-sm"
                 />
               </div>
             </div>

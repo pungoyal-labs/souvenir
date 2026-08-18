@@ -1,4 +1,4 @@
-import { fmtUnits } from "@/lib/units";
+import { Units } from "./units";
 
 /**
  * The signature element: a tug-of-war between YES and NO.
@@ -31,11 +31,17 @@ export function PoolBar({
       {!compact && (
         <div className="mt-1 flex justify-between text-xs font-semibold">
           <span className="text-yes-deep">
-            YES <span className="mono">{fmtUnits(yesPoolC)}u</span>
+            YES{" "}
+            <span className="mono">
+              <Units c={yesPoolC} />
+            </span>
           </span>
           {total === 0 && <span className="text-soft">no positions yet</span>}
           <span className="text-no-deep">
-            <span className="mono">{fmtUnits(noPoolC)}u</span> NO
+            <span className="mono">
+              <Units c={noPoolC} />
+            </span>{" "}
+            NO
           </span>
         </div>
       )}

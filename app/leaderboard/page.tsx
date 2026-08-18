@@ -1,9 +1,10 @@
 import Link from "next/link";
 import { Avatar } from "@/components/avatar";
+import { Units } from "@/components/units";
 import { leaderboard, type MemberStats } from "@/lib/data";
 import { env } from "@/lib/env";
 import { requireMember } from "@/lib/session";
-import { fmtPct, fmtUnits } from "@/lib/units";
+import { fmtPct } from "@/lib/units";
 
 export default async function LeaderboardPage() {
   const me = await requireMember();
@@ -68,7 +69,7 @@ export default async function LeaderboardPage() {
                   {s.resolvedCount}/{env.RANKED_MIN_RESOLVED} resolved
                 </span>
                 <span className="mono w-20 text-right font-semibold">
-                  {fmtUnits(s.netC, { sign: true })}u
+                  <Units c={s.netC} sign />
                 </span>
               </li>
             ))}
@@ -101,13 +102,17 @@ function Row({ s, rank, isMe }: { s: MemberStats; rank: number; isMe: boolean })
       >
         {s.roi === null ? "—" : fmtPct(s.roi)}
       </td>
-      <td className="mono px-2 py-2.5 text-right">{fmtUnits(s.profitC, { sign: true })}u</td>
+      <td className="mono px-2 py-2.5 text-right">
+        <Units c={s.profitC} sign />
+      </td>
       <td className="mono px-2 py-2.5 text-right">
         {s.wins}–{s.losses}
       </td>
-      <td className="mono px-2 py-2.5 text-right">{fmtUnits(s.wageredC)}u</td>
+      <td className="mono px-2 py-2.5 text-right">
+        <Units c={s.wageredC} />
+      </td>
       <td className="mono px-4 py-2.5 text-right font-semibold">
-        {fmtUnits(s.netC, { sign: true })}u
+        <Units c={s.netC} sign />
       </td>
     </tr>
   );

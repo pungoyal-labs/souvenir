@@ -5,16 +5,17 @@
 import path from "node:path";
 import { migrate } from "drizzle-orm/node-postgres/migrator";
 import { db } from "../lib/db/index.ts";
+import { logger } from "../lib/logger.ts";
 
 async function main() {
   await migrate(db, {
     migrationsFolder: path.join(process.cwd(), "drizzle"),
   });
-  console.log("migrations applied");
+  logger.info("migrations applied");
   process.exit(0);
 }
 
 main().catch((err) => {
-  console.error("migration failed:", err);
+  logger.error({ err }, "migration failed");
   process.exit(1);
 });

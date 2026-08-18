@@ -6,11 +6,12 @@ import { BetPanel } from "@/components/bet-panel";
 import { PoolBar } from "@/components/pool-bar";
 import { ResolvePanel } from "@/components/resolve-panel";
 import { SideChip, StatusChip } from "@/components/side-chip";
-import { getMarketView, netOf } from "@/lib/data";
+import { Units } from "@/components/units";
+import { getMarketView } from "@/lib/data";
 import { env } from "@/lib/env";
 import { fmtDate, timeAgo } from "@/lib/format";
 import { requireMember } from "@/lib/session";
-import { fmtUnits, toCents } from "@/lib/units";
+import { toCents } from "@/lib/units";
 
 export default async function MarketPage({ params }: { params: Promise<{ id: string }> }) {
   const me = await requireMember();
@@ -19,7 +20,6 @@ export default async function MarketPage({ params }: { params: Promise<{ id: str
   if (!data) notFound();
   const { view, activity, settlements } = data;
   const { market, creator } = view;
-  const netC = await netOf(me.id);
   const isOpen = market.status === "open";
   const totalPoolC = view.yesPoolC + view.noPoolC;
 
@@ -64,7 +64,7 @@ export default async function MarketPage({ params }: { params: Promise<{ id: str
           {settlements.length > 0 && (
             <div className="mt-3 border-t border-line pt-3">
               <p className="text-[11px] font-semibold uppercase tracking-wider text-soft">
-                Where the {fmtUnits(totalPoolC)}u pool went
+                Where the <Units c={totalPoolC} /> pool went
               </p>
               <ul className="mt-2 space-y-1.5">
                 {settlements.map((s) => (
@@ -74,7 +74,9 @@ export default async function MarketPage({ params }: { params: Promise<{ id: str
                     <span className="text-soft">
                       {s.row.kind === "payout" ? "collected" : "refunded"}
                     </span>
-                    <span className="mono ml-auto font-bold">{fmtUnits(s.row.amountC)}u</span>
+                    <span className="mono ml-auto font-bold">
+                      <Units c={s.row.amountC} />
+                    </span>
                   </li>
                 ))}
               </ul>
@@ -87,7 +89,7 @@ export default async function MarketPage({ params }: { params: Promise<{ id: str
         <PoolBar yesPoolC={view.yesPoolC} noPoolC={view.noPoolC} />
         {totalPoolC > 0 && (
           <p className="mono mt-1 text-center text-xs text-soft">
-            {fmtUnits(totalPoolC)}u in the pot
+            <Units c={totalPoolC} /> in the pot
           </p>
         )}
       </div>
@@ -109,7 +111,9 @@ export default async function MarketPage({ params }: { params: Promise<{ id: str
                   {p.member.id === me.id && <span className="text-soft"> (you)</span>}
                 </Link>
                 <span className="ml-auto flex items-center gap-2">
-                  <span className="mono font-bold">{fmtUnits(p.stakeC)}u</span>
+                  <span className="mono font-bold">
+                    <Units c={p.stakeC} />
+                  </span>
                   <SideChip side={p.side} small />
                 </span>
               </li>
@@ -125,7 +129,6 @@ export default async function MarketPage({ params }: { params: Promise<{ id: str
             mySide={view.mySide}
             myStakeC={view.myStakeC}
             maxStakeC={toCents(env.MAX_STAKE_UNITS)}
-            netC={netC}
           />
           {market.creatorId === me.id && <ResolvePanel marketId={market.id} />}
         </div>

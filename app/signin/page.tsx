@@ -71,13 +71,13 @@ export default async function SignInPage({
             type="email"
             required
             placeholder="you@example.com"
-            className="w-full rounded-md border border-line bg-white px-3 py-2 text-sm"
+            className="w-full rounded-md border border-line bg-paper px-3 py-2 text-sm"
           />
           <input
             name="name"
             type="text"
             placeholder="Display name"
-            className="w-full rounded-md border border-line bg-white px-3 py-2 text-sm"
+            className="w-full rounded-md border border-line bg-paper px-3 py-2 text-sm"
           />
           <button
             type="submit"

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Avatar } from "@/components/avatar";
 import { SideChip } from "@/components/side-chip";
+import { Units } from "@/components/units";
 import {
   getMember,
   listMarkets,
@@ -53,10 +54,10 @@ export default async function MemberPage({ params }: { params: Promise<{ id: str
       </div>
 
       <div className="mt-5 grid grid-cols-2 gap-2 sm:grid-cols-5 sm:gap-3">
-        <Stat label="Net units" value={`${fmtUnits(netC, { sign: true })}u`} />
+        <Stat label="Net units" value={<Units c={netC} sign />} />
         <Stat
           label="Lifetime P/L"
-          value={`${fmtUnits(stats.profitC, { sign: true })}u`}
+          value={<Units c={stats.profitC} sign />}
           tone={stats.profitC > 0 ? "up" : stats.profitC < 0 ? "down" : undefined}
         />
         <Stat label="Return" value={stats.roi == null ? "—" : fmtPct(stats.roi)} />
@@ -74,7 +75,7 @@ export default async function MemberPage({ params }: { params: Promise<{ id: str
       {openPositions.length > 0 && (
         <section className="mt-7">
           <h2 className="display text-xl font-bold uppercase tracking-wide text-soft">
-            Currently at stake — {fmtUnits(openPositions.reduce((s, v) => s + v.myStakeC, 0))}u
+            Currently at stake — <Units c={openPositions.reduce((s, v) => s + v.myStakeC, 0)} />
           </h2>
           <ul className="mt-3 divide-y divide-line rounded-lg border border-line bg-surface">
             {openPositions.map((v) => (
@@ -85,7 +86,9 @@ export default async function MemberPage({ params }: { params: Promise<{ id: str
                 >
                   {v.market.question}
                 </Link>
-                <span className="mono font-bold">{fmtUnits(v.myStakeC)}u</span>
+                <span className="mono font-bold">
+                  <Units c={v.myStakeC} />
+                </span>
                 <SideChip side={v.mySide!} small />
               </li>
             ))}
@@ -110,7 +113,7 @@ export default async function MemberPage({ params }: { params: Promise<{ id: str
                   {r.market.question}
                 </Link>
                 <span className="hidden items-center gap-1.5 text-xs text-soft sm:flex">
-                  {fmtUnits(r.stakeC)}u on <SideChip side={r.side} small />
+                  <Units c={r.stakeC} /> on <SideChip side={r.side} small />
                 </span>
                 <span
                   className={`mono w-20 text-right font-bold ${
@@ -123,7 +126,7 @@ export default async function MemberPage({ params }: { params: Promise<{ id: str
                           : "text-soft"
                   }`}
                 >
-                  {r.noContest ? "void" : `${fmtUnits(r.profitC, { sign: true })}u`}
+                  {r.noContest ? "void" : <Units c={r.profitC} sign />}
                 </span>
               </li>
             ))}
@@ -213,7 +216,15 @@ function describe(kind: string, side: string | null): string {
   }
 }
 
-function Stat({ label, value, tone }: { label: string; value: string; tone?: "up" | "down" }) {
+function Stat({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: React.ReactNode;
+  tone?: "up" | "down";
+}) {
   return (
     <div className="rounded-lg border border-line bg-surface px-3 py-2">
       <p className="text-[10px] font-semibold uppercase tracking-wider text-soft">{label}</p>

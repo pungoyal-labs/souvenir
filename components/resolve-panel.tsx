@@ -63,7 +63,7 @@ export function ResolvePanel({ marketId }: { marketId: string }) {
                   ? "border-yes bg-yes text-white"
                   : opt.value === "no"
                     ? "border-no bg-no text-white"
-                    : "border-ink bg-ink text-white"
+                    : "border-ink bg-ink text-paper"
                 : "border-line hover:bg-paper"
             }`}
           >
@@ -77,7 +77,7 @@ export function ResolvePanel({ marketId }: { marketId: string }) {
         onChange={(e) => setNote(e.target.value)}
         placeholder="How you decided (goes on the permanent record)"
         rows={2}
-        className="mt-3 w-full rounded-md border border-line bg-white px-3 py-2 text-sm"
+        className="mt-3 w-full rounded-md border border-line bg-paper px-3 py-2 text-sm"
       />
 
       {!confirming ? (

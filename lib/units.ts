@@ -3,6 +3,9 @@
 
 export const CENTS = 100;
 
+/** The unit symbol shown after amounts — π, for (Chiang) Pai. */
+export const UNIT = "π";
+
 export function toCents(units: number): number {
   return Math.round(units * CENTS);
 }

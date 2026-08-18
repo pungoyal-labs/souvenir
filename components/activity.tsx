@@ -1,11 +1,11 @@
 import Link from "next/link";
 import type { ActivityItem } from "@/lib/data";
 import { timeAgo } from "@/lib/format";
-import { fmtUnits } from "@/lib/units";
+import { fmtUnits, UNIT } from "@/lib/units";
 import { Avatar } from "./avatar";
 
 function phrase(item: ActivityItem): string {
-  const amount = `${fmtUnits(item.row.amountC)}u`;
+  const amount = `${fmtUnits(item.row.amountC)}${UNIT}`;
   switch (item.row.kind) {
     case "bet":
       return `put ${amount} on ${item.row.side?.toUpperCase()}`;

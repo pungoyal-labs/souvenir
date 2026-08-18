@@ -2,9 +2,11 @@ import type { Metadata } from "next";
 import { Big_Shoulders, Instrument_Sans, Spline_Sans_Mono } from "next/font/google";
 import Link from "next/link";
 import { Avatar } from "@/components/avatar";
+import { ThemeToggle } from "@/components/theme-toggle";
+import { Units } from "@/components/units";
 import { auth, signOut } from "@/lib/auth";
 import { getMember, inbox, netOf } from "@/lib/data";
-import { fmtUnits } from "@/lib/units";
+import { UNIT } from "@/lib/units";
 import "./globals.css";
 
 const display = Big_Shoulders({
@@ -32,7 +34,17 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const hasUnread = member ? (await inbox(member.id)).unreadCount > 0 : false;
 
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
+      <head>
+        {/* Apply the saved theme before first paint (system preference is
+            pure CSS); suppressHydrationWarning covers the attribute change. */}
+        <script
+          // biome-ignore lint/security/noDangerouslySetInnerHtml: static theme bootstrap, no user input
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var t=localStorage.getItem("theme");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}})()`,
+          }}
+        />
+      </head>
       <body
         className={`${display.variable} ${body.variable} ${mono.variable} min-h-screen antialiased`}
       >
@@ -42,35 +54,37 @@ export default async function RootLayout({ children }: { children: React.ReactNo
               Chiang&nbsp;Pai
             </Link>
             {member && (
-              <>
-                <nav className="order-last -mx-4 flex w-screen items-center gap-1 overflow-x-auto px-4 text-sm sm:order-none sm:mx-0 sm:w-auto sm:px-0">
-                  <Link href="/" className="rounded px-2 py-1 hover:bg-white/10">
-                    Markets
-                  </Link>
-                  <Link href="/leaderboard" className="rounded px-2 py-1 hover:bg-white/10">
-                    Leaderboard
-                  </Link>
-                  <Link href="/members" className="rounded px-2 py-1 hover:bg-white/10">
-                    Members
-                  </Link>
-                  <Link href="/inbox" className="relative rounded px-2 py-1 hover:bg-white/10">
-                    Inbox
-                    {hasUnread && (
-                      <span
-                        className="absolute right-0 top-0.5 h-2 w-2 rounded-full bg-no"
-                        title="Unread activity"
-                      />
-                    )}
-                  </Link>
-                </nav>
-                <div className="ml-auto flex items-center gap-3">
+              <nav className="order-last -mx-4 flex w-screen items-center gap-1 overflow-x-auto px-4 text-sm sm:order-none sm:mx-0 sm:w-auto sm:px-0">
+                <Link href="/" className="rounded px-2 py-1 hover:bg-white/10">
+                  Markets
+                </Link>
+                <Link href="/leaderboard" className="rounded px-2 py-1 hover:bg-white/10">
+                  Leaderboard
+                </Link>
+                <Link href="/members" className="rounded px-2 py-1 hover:bg-white/10">
+                  Members
+                </Link>
+                <Link href="/inbox" className="relative rounded px-2 py-1 hover:bg-white/10">
+                  Inbox
+                  {hasUnread && (
+                    <span
+                      className="absolute right-0 top-0.5 h-2 w-2 rounded-full bg-no"
+                      title="Unread activity"
+                    />
+                  )}
+                </Link>
+              </nav>
+            )}
+            <div className="ml-auto flex items-center gap-3">
+              {member && (
+                <>
                   <Link
                     href={`/member/${member.id}`}
                     className="flex items-center gap-2 rounded-full bg-white/10 py-1 pl-3 pr-1 hover:bg-white/20"
                     title="Your net and history"
                   >
                     <span className="mono text-sm font-semibold text-[#e8c46a]">
-                      {fmtUnits(netC, { sign: true })}u
+                      <Units c={netC} sign />
                     </span>
                     <Avatar name={member.name} image={member.image} size={26} />
                   </Link>
@@ -88,14 +102,15 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                       Sign out
                     </button>
                   </form>
-                </div>
-              </>
-            )}
+                </>
+              )}
+              <ThemeToggle />
+            </div>
           </div>
         </header>
         <main className="mx-auto max-w-5xl px-4 py-6">{children}</main>
         <footer className="mx-auto max-w-5xl px-4 pb-8 pt-4 text-xs text-soft">
-          Virtual units only. Zero-sum. Every outcome is on the record.
+          Virtual units ({UNIT}) only. Zero-sum. Every outcome is on the record.
         </footer>
       </body>
     </html>

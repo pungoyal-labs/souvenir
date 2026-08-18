@@ -6,6 +6,7 @@ import { auth } from "@/lib/auth";
 import { createMarket, DataError, invite, placeBet, resolveMarket, switchSides } from "@/lib/data";
 import type { Side } from "@/lib/engine";
 import { llmEnabled, type PolishedDraft, polishMarketDraft } from "@/lib/llm";
+import { logger } from "@/lib/logger";
 
 export interface ActionResult {
   ok: boolean;
@@ -19,8 +20,12 @@ async function requireMemberId(): Promise<string> {
 }
 
 function asResult(err: unknown): ActionResult {
-  if (err instanceof DataError) return { ok: false, error: err.message };
-  console.error(err);
+  if (err instanceof DataError) {
+    // Expected rule violations (stake caps, closed markets, …), not faults.
+    logger.debug({ reason: err.message }, "action rejected");
+    return { ok: false, error: err.message };
+  }
+  logger.error({ err }, "action failed");
   return { ok: false, error: "Something went wrong. Try again." };
 }
 
@@ -97,7 +102,7 @@ export async function polishAction(
     const draft = await polishMarketDraft({ question, criteria }, feedback);
     return { ok: true, draft };
   } catch (err) {
-    console.error("polish failed:", err);
+    logger.error({ err }, "polish failed");
     return { ok: false, error: "The polish model didn't answer. Try again." };
   }
 }

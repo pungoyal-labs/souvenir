@@ -4,27 +4,27 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { betAction, switchAction } from "@/app/actions";
 import type { Side } from "@/lib/engine";
-import { fmtUnits } from "@/lib/units";
+import { Units } from "./units";
 
 export function BetPanel({
   marketId,
   mySide,
   myStakeC,
   maxStakeC,
-  netC,
 }: {
   marketId: string;
   mySide: Side | null;
   myStakeC: number;
   maxStakeC: number;
-  netC: number;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [units, setUnits] = useState(1);
   const [error, setError] = useState<string | null>(null);
 
-  const roomC = Math.min(maxStakeC - myStakeC, netC);
+  // Infinite bank: net going negative is fine, so the only ceiling is the
+  // per-market exposure cap.
+  const roomC = maxStakeC - myStakeC;
   const maxUnits = Math.floor(roomC / 100);
   const clamped = Math.min(Math.max(units, 1), Math.max(maxUnits, 1));
 
@@ -53,11 +53,7 @@ export function BetPanel({
       </h3>
 
       {maxUnits < 1 ? (
-        <p className="mt-2 text-sm text-soft">
-          {netC < 100
-            ? "You're out of spare units — wait for a market to pay out."
-            : "You've hit the exposure limit on this market."}
-        </p>
+        <p className="mt-2 text-sm text-soft">You've hit the exposure limit on this market.</p>
       ) : (
         <>
           <div className="mt-3 flex items-center gap-3">
@@ -82,7 +78,9 @@ export function BetPanel({
                 +
               </button>
             </div>
-            <span className="text-xs text-soft">units · room for {fmtUnits(roomC)}u more here</span>
+            <span className="text-xs text-soft">
+              units · room for <Units c={roomC} /> more here
+            </span>
           </div>
 
           <div className="mt-3 grid grid-cols-2 gap-2">
@@ -90,7 +88,7 @@ export function BetPanel({
               type="button"
               disabled={pending || mySide === "no"}
               onClick={() => bet("yes")}
-              className="display rounded-md bg-yes py-2.5 text-lg font-bold uppercase text-white hover:bg-yes-deep disabled:cursor-not-allowed disabled:opacity-40"
+              className="display rounded-md bg-yes py-2.5 text-lg font-bold uppercase text-white hover:bg-yes-press disabled:cursor-not-allowed disabled:opacity-40"
             >
               Back yes
             </button>
@@ -98,7 +96,7 @@ export function BetPanel({
               type="button"
               disabled={pending || mySide === "yes"}
               onClick={() => bet("no")}
-              className="display rounded-md bg-no py-2.5 text-lg font-bold uppercase text-white hover:bg-no-deep disabled:cursor-not-allowed disabled:opacity-40"
+              className="display rounded-md bg-no py-2.5 text-lg font-bold uppercase text-white hover:bg-no-press disabled:cursor-not-allowed disabled:opacity-40"
             >
               Back no
             </button>
@@ -109,8 +107,11 @@ export function BetPanel({
       {mySide && (
         <div className="mt-3 border-t border-line pt-3 text-sm">
           <p>
-            You have <span className="mono font-bold">{fmtUnits(myStakeC)}u</span> on{" "}
-            <span className="font-bold uppercase">{mySide}</span>.
+            You have{" "}
+            <span className="mono font-bold">
+              <Units c={myStakeC} />
+            </span>{" "}
+            on <span className="font-bold uppercase">{mySide}</span>.
           </p>
           <button
             type="button"

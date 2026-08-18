@@ -1,9 +1,10 @@
 import Link from "next/link";
 import { ActivityFeed } from "@/components/activity";
 import { MarketCard } from "@/components/market-card";
+import { Units } from "@/components/units";
 import { listMarkets, memberResults, netOf, recentActivity, summarizeResults } from "@/lib/data";
 import { requireMember } from "@/lib/session";
-import { fmtUnits } from "@/lib/units";
+import { fmtUnits, UNIT } from "@/lib/units";
 
 export default async function Home({ searchParams }: { searchParams: Promise<{ view?: string }> }) {
   const me = await requireMember();
@@ -26,10 +27,10 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ v
       <div>
         {/* What do I have, what's at stake, how am I doing */}
         <div className="grid grid-cols-3 gap-2 sm:gap-3">
-          <StatTile label="Net units" value={`${fmtUnits(netC, { sign: true })}u`} />
+          <StatTile label="Net units" value={<Units c={netC} sign />} />
           <StatTile
             label="At stake"
-            value={`${fmtUnits(committedC)}u`}
+            value={<Units c={committedC} />}
             sub={
               committedC > 0
                 ? `across ${open.filter((v) => v.myStakeC > 0).length} open`
@@ -41,7 +42,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ v
             value={`${myStats.wins}–${myStats.losses}`}
             sub={
               myStats.resolvedCount > 0
-                ? `${fmtUnits(myStats.profitC, { sign: true })}u lifetime`
+                ? `${fmtUnits(myStats.profitC, { sign: true })}${UNIT} lifetime`
                 : "no calls settled"
             }
           />
@@ -107,7 +108,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ v
   );
 }
 
-function StatTile({ label, value, sub }: { label: string; value: string; sub?: string }) {
+function StatTile({ label, value, sub }: { label: string; value: React.ReactNode; sub?: string }) {
   return (
     <div className="rounded-lg border border-line bg-surface px-3 py-2.5 sm:px-4">
       <p className="text-[11px] font-semibold uppercase tracking-wider text-soft">{label}</p>
