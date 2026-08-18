@@ -109,7 +109,7 @@ export default async function MemberPage({ params }: { params: Promise<{ id: str
           Resolved predictions
         </h2>
         {results.length === 0 ? (
-          <p className="mt-2 text-sm text-soft">Nothing resolved yet.</p>
+          <p className="mt-2 text-sm text-soft">{t.resolvedEmpty}</p>
         ) : (
           <ul className="mt-3 divide-y divide-line rounded-lg border border-line bg-surface">
             {results.map((r) => (

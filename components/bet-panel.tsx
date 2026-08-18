@@ -127,7 +127,7 @@ export function BetPanel({
       )}
 
       {error && <p className="mt-3 text-sm font-semibold text-no-deep">{error}</p>}
-      {pending && <p className="mt-3 text-sm text-soft">Recording…</p>}
+      {pending && <p className="mt-3 text-sm text-soft">{t.recording}</p>}
     </div>
   );
 }

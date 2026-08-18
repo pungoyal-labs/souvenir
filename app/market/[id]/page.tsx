@@ -88,7 +88,7 @@ export default async function MarketPage({ params }: { params: Promise<{ id: str
       )}
 
       <div className="mt-5">
-        <PoolBar yesPoolC={view.yesPoolC} noPoolC={view.noPoolC} />
+        <PoolBar yesPoolC={view.yesPoolC} noPoolC={view.noPoolC} lingo={me.lingo} />
         {totalPoolC > 0 && (
           <p className="mono mt-1 text-center text-xs text-soft">
             <Units c={totalPoolC} /> in the pool

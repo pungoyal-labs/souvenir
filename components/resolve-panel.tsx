@@ -48,9 +48,7 @@ export function ResolvePanel({
       <h3 className="display text-lg font-bold uppercase tracking-wide text-gold">
         Resolve — your call
       </h3>
-      <p className="mt-1 text-xs text-soft">
-        You created this prediction, so you resolve it. Resolution is final.
-      </p>
+      <p className="mt-1 text-xs text-soft">{t.resolveSub}</p>
 
       <div className="mt-3 grid grid-cols-3 gap-2">
         {OPTIONS.map((opt) => (

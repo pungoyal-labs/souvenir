@@ -83,9 +83,7 @@ export function NewMarketForm({
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-sm">
               <span className="font-semibold">✨ Sprinkle some AI magic?</span>{" "}
-              <span className="text-soft">
-                It'll sharpen the wording and close the loopholes before your friends see it.
-              </span>
+              <span className="text-soft">{t.magicPitch}</span>
             </p>
             <button
               type="button"

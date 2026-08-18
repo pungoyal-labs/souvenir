@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { MarketView } from "@/lib/data";
 import { timeAgo } from "@/lib/format";
+import { lingoOf } from "@/lib/lingo";
 import { fmtUnits, UNIT } from "@/lib/units";
 import { Avatar } from "./avatar";
 import { PoolBar } from "./pool-bar";
@@ -10,11 +11,14 @@ import { Units } from "./units";
 export function MarketCard({
   view,
   myProfitC,
+  lingo = "english",
 }: {
   view: MarketView;
   /** For resolved predictions: the viewer's net result, if they took part. */
   myProfitC?: number;
+  lingo?: string;
 }) {
+  const t = lingoOf(lingo);
   const { market, creator, participants } = view;
   const yesBackers = participants.filter((p) => p.side === "yes");
   const noBackers = participants.filter((p) => p.side === "no");
@@ -34,7 +38,7 @@ export function MarketCard({
       <h3 className="display mt-2 text-2xl font-bold leading-tight">{market.question}</h3>
 
       <div className="mt-3">
-        <PoolBar yesPoolC={view.yesPoolC} noPoolC={view.noPoolC} />
+        <PoolBar yesPoolC={view.yesPoolC} noPoolC={view.noPoolC} lingo={lingo} />
       </div>
 
       {participants.length > 0 && (
@@ -79,13 +83,9 @@ export function MarketCard({
             myProfitC > 0 ? "text-felt" : myProfitC < 0 ? "text-no-deep" : "text-soft"
           }`}
         >
-          {myProfitC === 0 ? (
-            "You broke even"
-          ) : (
-            <>
-              You {myProfitC > 0 ? "won" : "lost"} <Units c={Math.abs(myProfitC)} />
-            </>
-          )}
+          {myProfitC === 0
+            ? t.brokeEven
+            : (myProfitC > 0 ? t.youWon : t.youLost)(`${fmtUnits(Math.abs(myProfitC))}${UNIT}`)}
         </p>
       )}
     </Link>

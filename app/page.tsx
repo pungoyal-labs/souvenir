@@ -80,6 +80,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ v
               key={v.market.id}
               view={v}
               myProfitC={showSettled ? profitByMarket.get(v.market.id) : undefined}
+              lingo={me.lingo}
             />
           ))}
         </div>
