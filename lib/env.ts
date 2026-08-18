@@ -58,4 +58,10 @@ const envSchema = z.object({
 
 export const env = envSchema.parse(process.env);
 
+// The default secret is committed to a public repo; a production instance
+// signing sessions with it would accept forged cookies.
+if (env.NODE_ENV === "production" && env.AUTH_SECRET === "dev-only-secret-change-in-production") {
+  throw new Error("AUTH_SECRET must be set in production (see .env.example)");
+}
+
 export type Env = typeof env;

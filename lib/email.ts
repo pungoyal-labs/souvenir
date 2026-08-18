@@ -1,4 +1,4 @@
-// Gmail ignores dots in the local part: pun.goy@gmail.com and pungoy@gmail.com
+// Gmail ignores dots in the local part: j.doe@gmail.com and jdoe@gmail.com
 // are the same mailbox and the same Google account, which returns exactly one
 // spelling in its ID token. Everything that keys off an address — the invite
 // allowlist, the members table, FOUNDING_MEMBERS — stores and looks up this
