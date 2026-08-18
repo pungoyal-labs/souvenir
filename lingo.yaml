@@ -11,364 +11,399 @@
 #
 # Buttons, nav, and rule errors stay plain everywhere — personality lives in
 # headings, empty states, asides, result lines, and placeholders.
-
 english:
-  name: Plain English
-  register: plain English
+  name: "Plain English"
+  register: "plain English"
   footer: "Virtual pies (π) only. Zero-sum: winners split exactly what losers put in. Every outcome is on the record."
-  activityHeading: Recent action
-  activitySoFarHeading: Action so far
-  activityEmpty: Nothing yet. Quiet before the action.
-  joinedFeed: joined the game
-  joinedLedger: Joined the game
-  openEmptyTitle: No open predictions.
-  openEmptySub: Someone has to stick their neck out first — why not you?
-  resolvedEmpty: Nothing resolved yet. History starts with the first verdict.
-  openBetsEmpty: nothing yet
-  betsEmpty: Nobody has bet yet. First in sets the tone.
-  poolEmpty: no positions yet
-  leaderboardTitle: Who can actually predict things
-  leaderboardSub: Ranked by return on pies bet, over at least {min} resolved predictions. One lucky bet won't get you on the board — a track record will.
-  leaderboardEmptyTitle: The board is empty.
-  calibratingSub: Not enough resolved predictions to rank yet.
-  membersTitle: The group
-  membersSub: One private table. Everyone sees everything.
-  newTitle: Stick your neck out
-  magicPitch: It'll sharpen the wording and close the loopholes before your friends see it.
-  inboxSub: New predictions, bets on the ones you're in, and verdicts when they resolve.
-  inboxEmptyTitle: All quiet.
-  inboxEmptySub: When friends open predictions or bet against you, it shows up here.
-  stakeLimit: You've hit the stake limit on this prediction.
-  voidHint: Ambiguous or unresolvable — everyone gets their bet back
-  resolveSub: You created this prediction, so you resolve it. Resolution is final.
-  recording: Recording…
-  oops: That didn't work.
-  youWon: You won {amount}
-  youLost: You lost {amount}
-  brokeEven: You broke even
-  questionPlaceholder: Will it rain before 6 PM tomorrow?
-  criteriaPlaceholder: I'll check at 6:00 PM sharp — a wet road counts as rain, photo as evidence. Rain resolves YES; dry resolves NO. If I can't check, I'll void it.
+  activityHeading: "Recent action"
+  activitySoFarHeading: "Action so far"
+  activityEmpty: "Nothing yet. Quiet before the action."
+  joinedFeed: "joined the game"
+  joinedLedger: "Joined the game"
+  openEmptyTitle: "No open predictions."
+  openEmptySub: "Someone has to put a stake in the ground first. Apparently it won't be you."
+  resolvedEmpty: "Nothing resolved yet. History starts with the first verdict."
+  openBetsEmpty: "nothing yet"
+  betsEmpty: "Nobody has bet yet. Plenty of opinions, apparently."
+  poolEmpty: "no positions yet"
+  leaderboardTitle: "Who can actually predict things"
+  leaderboardSub: "Ranked by return on pies bet, over at least {min} resolved predictions. One lucky bet is noise; a track record is evidence."
+  leaderboardEmptyTitle: "The board is empty."
+  calibratingSub: "Not enough resolved predictions to rank yet."
+  membersTitle: "The group"
+  membersSub: "One private table. Everyone sees everything."
+  newTitle: "Put a claim on the record"
+  magicPitch: "It'll tighten the wording and close the loopholes before your friends get a chance to exploit them."
+  inboxSub: "New predictions, bets on the ones you're in, and verdicts when they resolve."
+  inboxEmptyTitle: "All quiet."
+  inboxEmptySub: "When friends open predictions or bet against you, it shows up here."
+  stakeLimit: "You've hit the stake limit on this prediction."
+  voidHint: "Ambiguous or unresolvable — everyone gets their bet back."
+  resolveSub: "You created this prediction, so you resolve it. Resolution is final."
+  recording: "Recording…"
+  oops: "That didn't work."
+  youWon: "You won {amount}."
+  youLost: "You lost {amount}."
+  brokeEven: "You broke even."
+  questionPlaceholder: "Will it rain before 6 PM tomorrow?"
+  criteriaPlaceholder: "I'll check at 6:00 PM sharp — a wet road counts as rain, photo as evidence. Rain resolves YES; dry resolves NO. If I can't check, I'll void it."
 bangalore:
-  name: South Bangalore
-  register: Bangalore English with Kannada seasoning (scene, swalpa, guru, khaali, aiyo); the group roasts each other freely, so cheeky banter is welcome
-  footer: "Virtual pies (π) only — no money, only maryaade, and some of you have neither. Zero-sum: winners split exactly what losers put in. Yella on the record, no crying later."
-  activityHeading: The scene
-  activitySoFarHeading: Scene so far
-  activityEmpty: Scene illa. Full sombeari gang, I swear.
-  joinedFeed: joined the adda
-  joinedLedger: Joined the adda
-  openEmptyTitle: Scene illa.
-  openEmptySub: No open predictions. Somebody say "ee sala cup namde" — or is everyone scared, guru?
-  resolvedEmpty: No verdicts yet. Losers' names will appear here shortly.
-  openBetsEmpty: khaali — no guts, no glory
-  betsEmpty: Khaali table. What guru, all talk and no bet-a?
-  poolEmpty: khaali pool — cowards, all of you
-  leaderboardTitle: Ee sala cup yaardu?
-  leaderboardSub: Ranked by return on pies bet, over at least {min} resolved predictions. One lucky bet won't make you a legend — RCB fans said "ee sala" for seventeen years, don't be like them.
-  leaderboardEmptyTitle: Board khaali.
-  calibratingSub: "Not enough verdicts to rank. Translation: scared to bet, full safe game."
-  membersTitle: The adda
-  membersSub: One private table. Everyone sees everything — your losses, your L's, your worst takes. Adjust maadi.
-  newTitle: Create a scene
-  magicPitch: Your wording is a mess, guru. Let the machine clean it before the adda roasts you.
-  inboxSub: Who did what, who bet against you, and who lost their maryaade.
-  inboxEmptyTitle: Full silence.
-  inboxEmptySub: Nobody is betting against you. Even your enemies got bored.
-  stakeLimit: Saaku nilsi, guru — stake limit hit. So much confidence, where was it during exams?
-  voidHint: Ambiguous or unresolvable — swalpa adjust maadi, everyone gets their bet back
-  resolveSub: Your prediction, your call. Resolution is final — don't do 420 scene, everyone is watching.
-  recording: Writing it in the book. No backing out now, guru.
-  oops: Aiyo. That didn't work — like most of your predictions.
-  youWon: You won {amount}. Ee sala cup nimde, guru.
-  youLost: You lost {amount}. Sakkath waste fellow.
-  brokeEven: Broke even. Neither scene nor shame.
-  questionPlaceholder: Will it rain in Jayanagar before 6 PM tomorrow?
-  criteriaPlaceholder: I'll check from my terrace in 4th Block at 6:00 PM sharp — a wet road counts as rain, photo as evidence. Rain resolves YES; dry resolves NO. If I'm out of Bangalore by then, I'll void it.
+  name: "South Bangalore"
+  register: "Bangalore English with natural Kannada seasoning and dry friend-group banter. Conversational, understated, locally recognisable — not a caricature."
+  footer: "Virtual pies (π) only — no money, just maryaade. Zero-sum: winners split exactly what losers put in. Everything is on record, guru."
+  activityHeading: "The scene"
+  activitySoFarHeading: "Scene so far"
+  activityEmpty: "Scene illa. Everyone has opinions and apparently no intention of writing them down."
+  joinedFeed: "joined the adda"
+  joinedLedger: "Joined the adda"
+  openEmptyTitle: "Scene illa."
+  openEmptySub: "Nobody has made a call yet. Guru, say something you can actually be held to."
+  resolvedEmpty: "Nothing resolved yet. The first person's wrong take will set the tone."
+  openBetsEmpty: "khaali for now"
+  betsEmpty: "Khaali table. What guru — all discussion, no conviction?"
+  poolEmpty: "Khaali pool. Big claims have gone missing."
+  leaderboardTitle: "Ee sala cup yaardu?"
+  leaderboardSub: "Ranked by return on pies bet over at least {min} resolved predictions. One lucky call won't make you a legend. Swalpa track record beku."
+  leaderboardEmptyTitle: "Board khaali."
+  calibratingSub: "Not enough verdicts yet. Swalpa patience."
+  membersTitle: "The adda"
+  membersSub: "One private table. Everyone sees everything — especially the calls you were very confident about."
+  newTitle: "Create a scene"
+  magicPitch: "Your wording is doing too much, guru. Let the machine clean it up before the adda finds the loophole."
+  inboxSub: "Who opened what, who bet against whom, and who is now pretending they saw it coming."
+  inboxEmptyTitle: "Full silence."
+  inboxEmptySub: "Nobody has done anything interesting yet. Sad scene."
+  stakeLimit: "Saaku, guru. Stake limit hit. Confidence tumba ide."
+  voidHint: "Ambiguous or unresolvable — swalpa adjust maadi, everyone gets their bet back."
+  resolveSub: "Your prediction, your call. Resolution is final. Don't turn it into a 420 scene afterwards."
+  recording: "Going into the book. No backing out now, guru."
+  oops: "Aiyo. That didn't work. Strong resemblance to your last prediction."
+  youWon: "You won {amount}. Sakkath. Enjoy it quietly."
+  youLost: "You lost {amount}. Yen guru, this was the plan?"
+  brokeEven: "Broke even. No glory, no damage."
+  questionPlaceholder: "Will it rain in Jayanagar before 6 PM tomorrow?"
+  criteriaPlaceholder: "I'll check from my terrace in 4th Block at 6:00 PM sharp — a wet road counts as rain, photo as evidence. Rain resolves YES; dry resolves NO. If I'm out of Bangalore by then, I'll void it."
 hyderabad:
-  name: Hyderabadi
-  register: Hyderabadi English with Deccani seasoning (miyan, kya toh bhi, haule haule, lite lo); the group roasts each other freely, so cheeky banter is welcome
-  footer: "Virtual pies (π) only — no paise, sirf izzat, aur woh bhi kam logo ke paas hai. Zero-sum: winners split exactly what losers put in. Sab kuch record pe, miyan."
-  activityHeading: Halchal
-  activitySoFarHeading: Halchal so far
-  activityEmpty: Koi halchal nahi. Sab ke sab nikamme, kasam se.
-  joinedFeed: joined the mehfil
-  joinedLedger: Joined the mehfil
-  openEmptyTitle: Ekdum khaali, miyan.
-  openEmptySub: No open predictions. Kya re, sab ke sab dar gaye kya?
-  resolvedEmpty: No verdicts yet. Haarne waalon ke naam jaldich aayenge.
-  openBetsEmpty: khaali — himmat bhi khaali
-  betsEmpty: Khaali table. Baatan bahut, bet ek nahi. Kya toh bhi log ho tum.
-  poolEmpty: pool khaali — sab phisaddi
-  leaderboardTitle: Baap kaun hai?
-  leaderboardSub: Ranked by return on pies bet, over at least {min} resolved predictions. Ek lucky bet se baap nahi bante — haule aao, aukat dikhao.
-  leaderboardEmptyTitle: Board ekdum khaali.
-  calibratingSub: "Not enough verdicts to rank. Matlab: dar ke maare bet ich nahi kiye."
-  membersTitle: The mehfil
-  membersSub: One private table. Sab ko sab dikhta — tumhaari haar bhi, tumhaara nautanki bhi.
-  newTitle: Kya toh bhi bolo
-  magicPitch: Tumhaari writing ekdum bakwaas hai, miyan. Machine se saaf karwa lo, warna mehfil hasegi.
-  inboxSub: Kaun kya kiya, kaun tumhaare khilaaf khela, aur kaun kitna dooba.
-  inboxEmptyTitle: Ekdum shaanti.
-  inboxEmptySub: Koi tumhaare khilaaf bhi nahi khel raha. Itne bore ho tum.
-  stakeLimit: Bas kar miyan, stake limit aa gaya. Itna hero banne ka nahi.
-  voidHint: Ambiguous or unresolvable — lite lo, sab ki bet wapas
-  resolveSub: Tumhaara sawaal, tumhaara faisla. Final hai — cheating kiye toh mehfil se bahar.
-  recording: Likh re… ab peeche nahi hatne ka.
-  oops: Arre, kya toh bhi ho gaya. Tumhaare jaisa ich.
-  youWon: You won {amount}. Baap ka game, miyan.
-  youLost: You lost {amount}. Kya toh bhi khele tum.
-  brokeEven: Break even. Na izzat gayi, na aayi.
-  questionPlaceholder: Will the biryani line at Shadab cross the gate by 1 PM on Sunday?
-  criteriaPlaceholder: I'll be at Shadab at 1:00 PM sharp and count the line, photo as evidence. Line past the gate resolves YES; shorter resolves NO. If it's closed, I'll void it.
+  name: "Hyderabadi"
+  register: "Hyderabadi English with natural Deccani seasoning. Casual, dry and teasing; use local expressions where they sound spoken, not pasted on."
+  footer: "Virtual pies (π) only — no paise, sirf izzat. Zero-sum: winners split exactly what losers put in. Sab kuch record pe, miyan."
+  activityHeading: "Halchal"
+  activitySoFarHeading: "Halchal so far"
+  activityEmpty: "Koi halchal nahi. Sab log chup baithe hain jaise verdict se pension katne wali hai."
+  joinedFeed: "joined the mehfil"
+  joinedLedger: "Joined the mehfil"
+  openEmptyTitle: "Ekdum khaali, miyan."
+  openEmptySub: "Kya re, sab dar gaye kya? Ek banda toh bol sakta hai ki kal kya hone wala hai."
+  resolvedEmpty: "Nothing resolved yet. Pehla loser abhi loading mein hai."
+  openBetsEmpty: "khaali abhi"
+  betsEmpty: "Khaali table. Baatan full, conviction zero. Kya toh bhi log ho."
+  poolEmpty: "Pool khaali. Sabko gyaan, kisi ko position nahi."
+  leaderboardTitle: "Baap kaun hai?"
+  leaderboardSub: "Ranked by return on pies bet over at least {min} resolved predictions. Ek lucky bet se baap nahi bante, miyan."
+  leaderboardEmptyTitle: "Board ekdum khaali."
+  calibratingSub: "Abhi enough verdicts nahi hain. Haule haule."
+  membersTitle: "The mehfil"
+  membersSub: "One private table. Sab ko sab dikhta hai — especially the predictions you should probably not have made."
+  newTitle: "Kya toh bhi bolo"
+  magicPitch: "Tumhaari wording mein loophole zyada hai, prediction kam. Machine se theek karwa lo, miyan."
+  inboxSub: "Kaun kya bola, kaun kis ke khilaaf gaya, aur kiski hawa nikli."
+  inboxEmptyTitle: "Ekdum shaanti."
+  inboxEmptySub: "Koi lafda nahi. For once, everyone is behaving."
+  stakeLimit: "Bas miyan. Stake limit aa gaya. Ab itna hero banne ka nahi."
+  voidHint: "Ambiguous or unresolvable — lite lo, sabki bet wapas."
+  resolveSub: "Tumhaara sawaal, tumhaara faisla. Final hai. Baad mein kahani mat badalna."
+  recording: "Likh re. Ab peeche hatne ka nahi."
+  oops: "Arre, kya toh bhi ho gaya. Try again."
+  youWon: "You won {amount}. Baap ka game."
+  youLost: "You lost {amount}. Kya toh bhi khele tum."
+  brokeEven: "Break even. Na izzat gayi, na aayi."
+  questionPlaceholder: "Will the biryani line at Shadab cross the gate by 1 PM on Sunday?"
+  criteriaPlaceholder: "I'll be at Shadab at 1:00 PM sharp and count the line, photo as evidence. Line past the gate resolves YES; shorter resolves NO. If it's closed, I'll void it."
 mumbai:
-  name: Bambaiyya
-  register: Mumbai English with Bambaiyya seasoning (boss, bole toh, bindaas, daav, vaat); the group roasts each other freely, so cheeky banter is welcome
-  footer: "Virtual pies (π) only — paisa nahi, sirf izzat, aur woh bhi udhaar pe. Zero-sum: winners split exactly what losers put in. Sab on the record, boss."
-  activityHeading: Kya scene hai
-  activitySoFarHeading: Scene abhi tak
-  activityEmpty: Kuch nahi re. Sab log so gaye kya?
-  joinedFeed: joined the gang
-  joinedLedger: Joined the gang
-  openEmptyTitle: Scene shaant hai, boss.
-  openEmptySub: No open predictions. Kya re, poore gang mein ek bhi daring nahi?
-  resolvedEmpty: No verdicts yet. Jiski vaat lagegi, naam idhar aayega.
-  openBetsEmpty: khaali haath, khaali daring
-  betsEmpty: Table khaali. Bole toh, sab ke sab phattu.
-  poolEmpty: pool khaali — full phattu gang
-  leaderboardTitle: Bole toh, boss kaun?
-  leaderboardSub: Ranked by return on pies bet, over at least {min} resolved predictions. Ek lucky daav se boss nahi bante — apun ko track record mangta.
-  leaderboardEmptyTitle: Board khaali hai.
-  calibratingSub: Not enough verdicts to rank. Matlab bet karne ki himmat nahi hui.
-  membersTitle: The gang
-  membersSub: One private table. Sab ko sab dikhta hai — teri haar, tera rona, sab kuch.
-  newTitle: Scene create kar
-  magicPitch: Teri writing ka full rada hai, boss. Machine ko saaf karne de, warna gang hasegi.
-  inboxSub: Kisne kya kiya, kaun tere against khela, kiski vaat lagi.
-  inboxEmptyTitle: Sab shaant, boss.
-  inboxEmptySub: Koi tere against bhi nahi khel raha. Itna boring hai tu.
-  stakeLimit: Bas kar pagle. Stake limit lag gayi — itna bhi hero nahi hai tu.
-  voidHint: Ambiguous or unresolvable — tension nahi, sab ki bet wapas
-  resolveSub: Tera sawaal, tera faisla. Final hai — setting lagayi toh gang se bahar.
-  recording: Likh raha hai… ab peeche hatne ka nahi.
-  oops: Vaat lagi. Tere plan jaisi.
-  youWon: You won {amount}. Ekdum jhakaas, boss.
-  youLost: You lost {amount}. Vaat lag gayi teri.
-  brokeEven: Barabar chhoota. Na hero, na zero.
-  questionPlaceholder: Will the 8:42 Churchgate fast actually leave on time tomorrow?
-  criteriaPlaceholder: I'll be on the platform at 8:42 sharp and check m-indicator, screenshot as evidence. Departure within 2 minutes resolves YES; later resolves NO. Megablock means void.
+  name: "Bambaiyya"
+  register: "Mumbai English with natural Bambaiyya. Fast, dry, cocky, conversational. Use boss, bhidu, apun, scene, vaat and related slang without turning every line into a movie dialogue."
+  footer: "Virtual pies (π) only — paisa nahi, sirf izzat. Zero-sum: winners split exactly what losers put in. Sab on the record, boss."
+  activityHeading: "Kya scene hai"
+  activitySoFarHeading: "Scene abhi tak"
+  activityEmpty: "Kuch nahi re. Full silence. Koi toh lafda shuru kar."
+  joinedFeed: "joined the gang"
+  joinedLedger: "Joined the gang"
+  openEmptyTitle: "Scene shaant hai, boss."
+  openEmptySub: "Kya re, gang mein ek bhi banda willing nahi to put his name on a call?"
+  resolvedEmpty: "Nothing resolved yet. Jiski vaat lagegi, naam idhar aayega."
+  openBetsEmpty: "khaali haath"
+  betsEmpty: "Table khaali. Bole toh, sabko opinion hai. Daav kisi ko nahi lagana."
+  poolEmpty: "Pool khaali. Full theory, zero action."
+  leaderboardTitle: "Bole toh, boss kaun?"
+  leaderboardSub: "Ranked by return on pies bet over at least {min} resolved predictions. Ek lucky daav se boss nahi bante. Track record chahiye, bhidu."
+  leaderboardEmptyTitle: "Board khaali hai."
+  calibratingSub: "Not enough verdicts to rank. Matlab courage abhi aaya nahi."
+  membersTitle: "The gang"
+  membersSub: "One private table. Sabko sab dikhta hai — teri haar, tera rona, tera 'maine toh bola tha'."
+  newTitle: "Scene create kar"
+  magicPitch: "Teri wording mein full rada hai, boss. Machine ko clean karne de before the gang starts picking holes in it."
+  inboxSub: "Kisne kya kiya, kaun tere against gaya, kiski vaat lagi."
+  inboxEmptyTitle: "Sab shaant, boss."
+  inboxEmptySub: "Koi tere against bhi nahi khel raha. Itna boring hai tu."
+  stakeLimit: "Bas kar, bhidu. Stake limit lag gayi. Aur hawa nahi."
+  voidHint: "Ambiguous or unresolvable — tension nahi, sabki bet wapas."
+  resolveSub: "Tera sawaal, tera faisla. Final hai. Setting ki toh gang yaad rakhegi."
+  recording: "Likh raha hai. Ab bhaagna nahi."
+  oops: "Vaat lagi. Try again, boss."
+  youWon: "You won {amount}. Ekdum jhakaas."
+  youLost: "You lost {amount}. Vaat lag gayi teri."
+  brokeEven: "Barabar chhoota. Na hero, na zero."
+  questionPlaceholder: "Will the 8:42 Churchgate fast actually leave on time tomorrow?"
+  criteriaPlaceholder: "I'll be on the platform at 8:42 sharp and check m-indicator, screenshot as evidence. Departure within 2 minutes resolves YES; later resolves NO. Megablock means void."
 delhi:
-  name: Dilli
-  register: Delhi English with Dilli seasoning (bhai, scene, ekdum, bawaal); the group roasts each other freely, so cheeky banter is welcome
-  footer: "Virtual pies (π) only — paisa nahi, sirf izzat, aur izzat ka bhi loan chal raha hai. Zero-sum: winners split exactly what losers put in. Sab record pe hai, bhai."
-  activityHeading: Aaj ka bawaal
-  activitySoFarHeading: Bawaal so far
-  activityEmpty: Koi bawaal nahi. Sab ke sab vella baithe hain.
-  joinedFeed: joined the circle
-  joinedLedger: Joined the circle
-  openEmptyTitle: Koi scene nahi, bhai.
-  openEmptySub: No open predictions. Itni badi baatein, ek claim nahi? Sharam karo.
-  resolvedEmpty: No verdicts yet. Jo doobega, uska naam yahin chhapega.
-  openBetsEmpty: khaali — himmat bhi, jeb bhi
-  betsEmpty: Khaali table, bhai. Gyaan sab denge, bet koi nahi karega.
-  poolEmpty: pool khaali — sab ke sab phattu
-  leaderboardTitle: Sabse bada khiladi kaun?
-  leaderboardSub: Ranked by return on pies bet, over at least {min} resolved predictions. Ek lucky bet se khiladi nahi bante, bhai — aukaat track record se aati hai.
-  leaderboardEmptyTitle: Board ekdum khaali.
-  calibratingSub: "Not enough verdicts to rank. Seedhi baat: dar gaye."
-  membersTitle: Apna circle
-  membersSub: One private table. Sabko sab dikhta hai — teri haar bhi, tera drama bhi.
-  newTitle: Bada claim maaro
-  magicPitch: Bhai, likhna teri body mein nahi hai. Machine se theek karwa le, warna circle udayega.
-  inboxSub: Kisne kya kiya, kaun tere khilaaf utra, kaun kitna dooba.
-  inboxEmptyTitle: Koi bawaal nahi.
-  inboxEmptySub: Koi tere khilaaf bhi nahi khel raha. Itna irrelevant hai tu.
-  stakeLimit: Bas bhai bas. Limit aa gayi — Ambani ka beta nahi hai tu.
-  voidHint: Ambiguous or unresolvable — chill, sabki bet wapas
-  resolveSub: Tera claim, tera faisla. Final hai — jugaad lagaya toh circle yaad rakhega.
-  recording: Likh rahe hain… ab bhaagna mat.
-  oops: Oho. Gadbad ho gayi — teri planning jaisi.
-  youWon: You won {amount}. Aaj toh OG nikla.
-  youLost: You lost {amount}. Bade aaye khiladi.
-  brokeEven: Na jeeta na haara. Fully faltu effort.
-  questionPlaceholder: Will the AQI cross 400 in Delhi tomorrow morning?
-  criteriaPlaceholder: I'll screenshot the official CPCB reading for Anand Vihar at 8:00 AM sharp. 401 or higher resolves YES; 400 or lower resolves NO. If the station is down, I'll void it.
+  name: "Dilli"
+  register: "Delhi English with natural Dilli speech. Blunt, cocky, sarcastic and matey. Use bhai, scene, bawaal, bakchodi, phattu and similar slang naturally rather than as decoration."
+  footer: "Virtual pies (π) only — paisa nahi, sirf izzat. Zero-sum: winners split exactly what losers put in. Sab record pe hai, bhai."
+  activityHeading: "Aaj ka bawaal"
+  activitySoFarHeading: "Bawaal so far"
+  activityEmpty: "Koi bawaal nahi. Sabke paas opinion hai, kisi ke paas himmat nahi."
+  joinedFeed: "joined the circle"
+  joinedLedger: "Joined the circle"
+  openEmptyTitle: "Koi scene nahi, bhai."
+  openEmptySub: "Itni badi badi baatein aur ek claim nahi? Chal, naam laga."
+  resolvedEmpty: "Nothing resolved yet. Jo doobega, uska naam yahin chhapega."
+  openBetsEmpty: "abhi toh khaali"
+  betsEmpty: "Khaali table, bhai. Gyaan sab denge, bet koi nahi karega. Classic."
+  poolEmpty: "Pool khaali. Sab strategist, koi player nahi."
+  leaderboardTitle: "Sabse bada khiladi kaun?"
+  leaderboardSub: "Ranked by return on pies bet over at least {min} resolved predictions. Ek lucky hit se khiladi nahi bante. Aukaat record se aati hai, bhai."
+  leaderboardEmptyTitle: "Board ekdum khaali."
+  calibratingSub: "Not enough verdicts to rank. Seedhi baat: sab bach rahe hain."
+  membersTitle: "Apna circle"
+  membersSub: "One private table. Sabko sab dikhta hai — teri haar bhi, tera drama bhi, aur tera revisionist history bhi."
+  newTitle: "Bada claim maaro"
+  magicPitch: "Bhai, wording mein kaafi bakchodi hai. Machine se saaf karwa le before the circle pulls it apart."
+  inboxSub: "Kisne kya kiya, kaun tere khilaaf utra, kaun kitna dooba."
+  inboxEmptyTitle: "Koi bawaal nahi."
+  inboxEmptySub: "Koi tere khilaaf bhi nahi khel raha. Itna irrelevant bhi mat ho."
+  stakeLimit: "Bas bhai. Limit aa gayi. Ambani ka beta nahi hai tu."
+  voidHint: "Ambiguous or unresolvable — chill, sabki bet wapas."
+  resolveSub: "Tera claim, tera faisla. Final hai. Baad mein kahani badli toh sab yaad rakhenge."
+  recording: "Likh rahe hain. Ab bhaagna mat."
+  oops: "Oho. Gadbad ho gayi. Teri planning jaisi."
+  youWon: "You won {amount}. Aaj toh OG nikla."
+  youLost: "You lost {amount}. Bade aaye khiladi."
+  brokeEven: "Na jeeta na haara. Fully faltu effort."
+  questionPlaceholder: "Will the AQI cross 400 in Delhi tomorrow morning?"
+  criteriaPlaceholder: "I'll screenshot the official CPCB reading for Anand Vihar at 8:00 AM sharp. 401 or higher resolves YES; 400 or lower resolves NO. If the station is down, I'll void it."
 chennai:
-  name: Chennai Tanglish
-  register: Chennai English with Tanglish seasoning (machan, semma, vera level, aiyo, mokka); the group roasts each other freely, so cheeky banter is welcome
-  footer: "Virtual pies (π) only — no money, only maanam, and some of you are running low. Zero-sum: winners split exactly what losers put in. Ellame on the record, thalaiva."
-  activityHeading: Enna nadakkudhu
-  activitySoFarHeading: So far, machan
-  activityEmpty: Onnum illa. Full gumbal sleeping, semma waste.
-  joinedFeed: joined the gumbal
-  joinedLedger: Joined the gumbal
-  openEmptyTitle: Onnum illa, machan.
-  openEmptySub: No open predictions. Enna da, big talk only, claim illa?
-  resolvedEmpty: No verdicts yet. Losers' list loading, machan.
-  openBetsEmpty: onnum illa — guts-um illa
-  betsEmpty: Table fulla empty. Enna da, bayama iruka?
-  poolEmpty: pool empty — bayama, machan?
-  leaderboardTitle: Yaaru da mass?
-  leaderboardSub: Ranked by return on pies bet, over at least {min} resolved predictions. One lucky bet is not mass, machan — adhu just luck, ok va?
-  leaderboardEmptyTitle: Board fulla empty.
-  calibratingSub: "Not enough verdicts to rank. Meaning: scene podringa, bet podala."
-  membersTitle: The gumbal
-  membersSub: One private table. Ellarukum ellame theriyum — un loss, un mokka takes, everything.
-  newTitle: Scene podu
-  magicPitch: Un writing romba mokka, machan. Machine kitta kudu, illa na gumbal kalaaikum.
-  inboxSub: Yaaru enna pannanga, yaaru unakku ethira bet pannanga, yaaru mungitanga.
-  inboxEmptyTitle: Full silence, machan.
-  inboxEmptySub: Unakku ethira kooda yaarum bet podala. Avlo boring nee.
-  stakeLimit: Podhum machan. Stake limit over — appa sotthu nu nenaicha?
-  voidHint: Ambiguous or unresolvable — tension aagadha, ellarukum bet thirumba varum
-  resolveSub: Un question, un call. Final dhaan — fraud panna, gumbal vittudadhu.
-  recording: Ezhudhitrukom… ippo escape aaga mudiyadhu.
-  oops: Aiyo. Adhu work aagala — un life plans madhiri.
-  youWon: You won {amount}. Vera level, thalaiva.
-  youLost: You lost {amount}. Semma mokka play, machan.
-  brokeEven: Break even. No mass, no loss.
-  questionPlaceholder: Will it cross 38°C in T. Nagar tomorrow afternoon?
-  criteriaPlaceholder: I'll screenshot the IMD Chennai reading at 3:00 PM sharp. 38.1°C or higher resolves YES; 38.0°C or lower resolves NO. If IMD is down, I'll void it.
+  name: "Chennai Tanglish"
+  register: "Chennai English with natural Tanglish. Dry, affectionate and cutting. Use da, machan, semma, mokka and similar expressions where a Chennai friend would actually use them."
+  footer: "Virtual pies (π) only — no money, only maanam. Zero-sum: winners split exactly what losers put in. Ellame on the record, thalaiva."
+  activityHeading: "Enna nadakkudhu"
+  activitySoFarHeading: "So far, machan"
+  activityEmpty: "Onnum illa. Gumbal fulla silent. Idhuvum oru miracle dhaan."
+  joinedFeed: "joined the gumbal"
+  joinedLedger: "Joined the gumbal"
+  openEmptyTitle: "Onnum illa, machan."
+  openEmptySub: "Big talk only-aa? Oru proper claim podu da. Bayappadaadha."
+  resolvedEmpty: "Nothing resolved yet. Losers' list is still empty. Enjoy it while you can."
+  openBetsEmpty: "onnum illa"
+  betsEmpty: "Table fulla empty. Enna da, opinions irukku; conviction illa?"
+  poolEmpty: "Pool empty. Semma theory, zero action."
+  leaderboardTitle: "Yaaru da mass?"
+  leaderboardSub: "Ranked by return on pies bet over at least {min} resolved predictions. One lucky bet is not mass, machan. Consistency dhaan."
+  leaderboardEmptyTitle: "Board fulla empty."
+  calibratingSub: "Not enough verdicts to rank. Scene podreenga, bet podala."
+  membersTitle: "The gumbal"
+  membersSub: "One private table. Ellarukum ellame theriyum — un loss, un mokka takes, everything."
+  newTitle: "Scene podu"
+  magicPitch: "Un wording konjam mokka, machan. Machine clean pannattum before gumbal starts finding loopholes."
+  inboxSub: "Yaaru enna pannanga, yaaru unakku ethira bet pannanga, yaaru mungitanga."
+  inboxEmptyTitle: "Full silence, machan."
+  inboxEmptySub: "Unakku ethira kooda yaarum bet podala. Avlo peaceful."
+  stakeLimit: "Podhum machan. Stake limit over. Appa sotthu nu nenaicha?"
+  voidHint: "Ambiguous or unresolvable — tension aagadha, ellarukum bet thirumba varum."
+  resolveSub: "Un question, un call. Final dhaan. Apram story change panna mudiyadhu."
+  recording: "Ezhudhitrukom. Ippo escape aaga mudiyadhu."
+  oops: "Aiyo. Adhu work aagala. Try again."
+  youWon: "You won {amount}. Vera level."
+  youLost: "You lost {amount}. Semma mokka play, machan."
+  brokeEven: "Break even. No mass, no shame."
+  questionPlaceholder: "Will it cross 38°C in T. Nagar tomorrow afternoon?"
+  criteriaPlaceholder: "I'll screenshot the IMD Chennai reading at 3:00 PM sharp. 38.1°C or higher resolves YES; 38.0°C or lower resolves NO. If IMD is down, I'll void it."
 kolkata:
-  name: Kolkata
-  register: Kolkata English with Bangla seasoning (dada, ki re, lyadh, fatafati); the group roasts each other freely, so cheeky banter is welcome
-  footer: "Virtual pies (π) only — no money, only maan-shonman, and that too is questionable here. Zero-sum: winners split exactly what losers put in. Shob record-e thake, dada."
-  activityHeading: Ki cholchhe
-  activitySoFarHeading: Ekhon porjonto
-  activityEmpty: Kichhu na. Puro para full lyadh mode.
-  joinedFeed: joined the para
-  joinedLedger: Joined the para
-  openEmptyTitle: Kichhui nei, dada.
-  openEmptySub: No open predictions. Adda is strong, courage is missing. Ki re, ke korbe?
-  resolvedEmpty: No verdicts yet. Loser der naam ekhane uthbe, don't worry.
-  openBetsEmpty: khaali — lyadh jitechhe
-  betsEmpty: Table khaali. Cha-er dokane torko onek, bet zero.
-  poolEmpty: pool khaali — shobai bhitu
-  leaderboardTitle: Boro dada ke?
-  leaderboardSub: Ranked by return on pies bet, over at least {min} resolved predictions. Ek lucky bet diye dada howa jaye na — derby-r torko does not count as a track record.
-  leaderboardEmptyTitle: Board khaali.
-  calibratingSub: "Not enough verdicts to rank. Mane: lyadh, plus bhoy."
-  membersTitle: The para
-  membersSub: One private table. Shobai shob dekhte pay — parar kakima network approved.
-  newTitle: Boro claim koro
-  magicPitch: Tomar lekha ekdom jaghanya, dada. Machine ke thik korte dao, na hole para hashbe.
-  inboxSub: Ke ki korlo, ke tomar birudhhe khello, ke kotota dublo.
-  inboxEmptyTitle: Puro nishchup.
-  inboxEmptySub: Keu tomar birudhhe bet-o korchhe na. Eto boring tumi.
-  stakeLimit: Aar na, dada. Stake limit esheche — eto utshaho porikkhaye kothay chhilo?
-  voidHint: Ambiguous or unresolvable — thanda hou, shobai bet ferot pabe
-  resolveSub: Tomar proshno, tomar raye. Final — chalaki korle para bhulbe na.
-  recording: Likhe rakhchhi… ar phera jabe na, dada.
-  oops: Ish. Kaj korlo na — tomar plans er moto.
-  youWon: You won {amount}. Ekdom fatafati, dada.
-  youLost: You lost {amount}. Ki daroon khelle, dada.
-  brokeEven: Shoman shoman. Na laabh, na loss, na glory.
-  questionPlaceholder: Will Mohun Bagan actually beat East Bengal in the derby on Sunday?
-  criteriaPlaceholder: Official full-time result decides. Bagan win resolves YES; draw or East Bengal win resolves NO. Abandoned match means void.
+  name: "Kolkata"
+  register: "Kolkata English with natural Bangla seasoning. Conversational, dry, slightly theatrical only when it feels organic. Use dada, ki re, lyadh, fatafati and similar slang sparingly."
+  footer: "Virtual pies (π) only — no money, only maan-shonman. Zero-sum: winners split exactly what losers put in. Shob record-e thake, dada."
+  activityHeading: "Ki cholchhe"
+  activitySoFarHeading: "Ekhon porjonto"
+  activityEmpty: "Kichhu na. Para-ta unusually quiet. Suspicious."
+  joinedFeed: "joined the para"
+  joinedLedger: "Joined the para"
+  openEmptyTitle: "Kichhui nei, dada."
+  openEmptySub: "Adda bhalo, courage missing. Ki re, ke ekta proper call korbe?"
+  resolvedEmpty: "Nothing resolved yet. Loser der naam ekhono wait korchhe."
+  openBetsEmpty: "khaali"
+  betsEmpty: "Table khaali. Cha-er dokane torko onek, bet zero. Classic."
+  poolEmpty: "Pool khaali. Shobai analyst, keu trader na."
+  leaderboardTitle: "Boro dada ke?"
+  leaderboardSub: "Ranked by return on pies bet over at least {min} resolved predictions. Ek lucky bet diye dada howa jaye na."
+  leaderboardEmptyTitle: "Board khaali."
+  calibratingSub: "Not enough verdicts to rank. Mane, lyadh aar bhoy duita-i cholchhe."
+  membersTitle: "The para"
+  membersSub: "One private table. Shobai shob dekhte pay — especially the claims you were very sure about."
+  newTitle: "Boro claim koro"
+  magicPitch: "Tomar lekha ektu complicated, dada. Machine ke clean korte dao before para starts arguing over semantics."
+  inboxSub: "Ke ki korlo, ke tomar birudhhe khello, ke kotota dublo."
+  inboxEmptyTitle: "Puro nishchup."
+  inboxEmptySub: "Keu tomar birudhhe bet-o korchhe na. Peaceful, but disappointing."
+  stakeLimit: "Aar na, dada. Stake limit esheche. Eto utshaho porikkhaye kothay chhilo?"
+  voidHint: "Ambiguous or unresolvable — thanda hou, shobai bet ferot pabe."
+  resolveSub: "Tomar proshno, tomar raye. Final. Pore story rewrite cholbe na."
+  recording: "Likhe rakhchhi. Aar phera jabe na, dada."
+  oops: "Ish. Kaj korlo na. Try again."
+  youWon: "You won {amount}. Ekdom fatafati, dada."
+  youLost: "You lost {amount}. Besh khelechho. Unfortunately wrong."
+  brokeEven: "Shoman shoman. Na laabh, na loss."
+  questionPlaceholder: "Will Mohun Bagan actually beat East Bengal in the derby on Sunday?"
+  criteriaPlaceholder: "Official full-time result decides. Bagan win resolves YES; draw or East Bengal win resolves NO. Abandoned match means void."
 kochi:
-  name: Kochi Manglish
-  register: Kochi English with Manglish seasoning (machane, aliya, poli, mwone); the group roasts each other freely, so cheeky banter is welcome
-  footer: "Virtual pies (π) only — no money, only abhimaanam, and stocks are low. Zero-sum: winners split exactly what losers put in. Ellaam record-il undu, machane."
-  activityHeading: Enthokke und
-  activitySoFarHeading: Ithu vare
-  activityEmpty: Onnum illa, aliya. Ellaarum urangi.
-  joinedFeed: joined the koottam
-  joinedLedger: Joined the koottam
-  openEmptyTitle: Onnum illa, machane.
-  openEmptySub: No open predictions. Vaayil vartha maathram, dhairyam illa. Aarelum onnu idu.
-  resolvedEmpty: No verdicts yet. Thottavante list ivide varum.
-  openBetsEmpty: kaali — dhairyavum kaali
-  betsEmpty: Table kaali. Enthu patti, mwone — pedi aano?
-  poolEmpty: pool kaali — ellaarum pedi
-  leaderboardTitle: Aaranu ivide mass?
-  leaderboardSub: Ranked by return on pies bet, over at least {min} resolved predictions. One lucky bet is not mass, machane — luck-um skill-um thammil valya difference undu.
-  leaderboardEmptyTitle: Board kaali.
-  calibratingSub: "Not enough verdicts to rank. Athayath: scene undu, bet illa."
-  membersTitle: The koottam
-  membersSub: One private table. Ellaavarkkum ellaam kaanaam — ninte loss, ninte naanakedu, everything.
-  newTitle: Oru scene idu
-  magicPitch: Ninte writing oru rakshayum illa, aliya. Machine-inu kodu, allel koottam kaliyaakkum.
-  inboxSub: Aaru enthu cheythu, aaru ninakku ethire kali, aaru munghi.
-  inboxEmptyTitle: Full silence, machane.
-  inboxEmptySub: Ninakku ethire polum aarum bet cheyyunnilla. Athra boring aanu nee.
-  stakeLimit: Mathi machane. Stake limit kazhinju — achante mutholalla ithu.
-  voidHint: Ambiguous or unresolvable — tension venda, ellaavarkkum bet thirichu kittum
-  resolveSub: Ninte chodyam, ninte theerumanam. Final aanu — thattippu kaanichaal koottam marakkilla.
-  recording: Ezhuthunnu… ini pinmaaran pattilla, mwone.
-  oops: Ayyo. Athu nadannilla — ninte plans pole.
-  youWon: You won {amount}. Poli sanam, machane.
-  youLost: You lost {amount}. Nannayi kalichu, aliya.
-  brokeEven: Break even. Gunavum illa, doshavum illa.
-  questionPlaceholder: Will the Lulu Mall parking queue cross 30 minutes on Sunday afternoon?
-  criteriaPlaceholder: I'll time it from the gate to a parked car, starting 3:00 PM. Over 30 minutes resolves YES; under resolves NO. If I don't go, I'll void it.
+  name: "Kochi Manglish"
+  register: "Kochi English with natural Manglish. Casual, teasing and understated. Use machane, aliya, poli, mwone and related Malayalam expressions where they feel like actual speech."
+  footer: "Virtual pies (π) only — no money, only abhimaanam. Zero-sum: winners split exactly what losers put in. Ellaam record-il undu, machane."
+  activityHeading: "Enthokke und"
+  activitySoFarHeading: "Ithu vare"
+  activityEmpty: "Onnum illa, aliya. Ellaarum suspiciously quiet."
+  joinedFeed: "joined the koottam"
+  joinedLedger: "Joined the koottam"
+  openEmptyTitle: "Onnum illa, machane."
+  openEmptySub: "Vaayil vartha undu, dhairyam illa. Aarelum oru proper call idu."
+  resolvedEmpty: "Nothing resolved yet. Thottavante list can wait."
+  openBetsEmpty: "kaali"
+  betsEmpty: "Table kaali. Enthu patti, mwone — pedi aano? Opinions plenty."
+  poolEmpty: "Pool kaali. Full analysis, zero position."
+  leaderboardTitle: "Aaranu ivide mass?"
+  leaderboardSub: "Ranked by return on pies bet over at least {min} resolved predictions. One lucky bet is not mass, machane — consistency venam."
+  leaderboardEmptyTitle: "Board kaali."
+  calibratingSub: "Not enough verdicts to rank. Scene undu, bet illa."
+  membersTitle: "The koottam"
+  membersSub: "One private table. Ellaavarkkum ellaam kaanaam — ninte loss, ninte naanakedu, everything."
+  newTitle: "Oru scene idu"
+  magicPitch: "Ninte wording oru rakshayum illa, aliya. Machine clean cheyyatte before koottam starts dissecting it."
+  inboxSub: "Aaru enthu cheythu, aaru ninakku ethire kali, aaru munghi."
+  inboxEmptyTitle: "Full silence, machane."
+  inboxEmptySub: "Ninakku ethire polum aarum bet cheyyunnilla. Athu almost insulting aanu."
+  stakeLimit: "Mathi machane. Stake limit kazhinju. Ith achante muthal alla."
+  voidHint: "Ambiguous or unresolvable — tension venda, ellaavarkkum bet thirichu kittum."
+  resolveSub: "Ninte chodyam, ninte theerumanam. Final aanu. Pinne story maattan pattilla."
+  recording: "Ezhuthunnu. Ini pinmaaran pattilla, mwone."
+  oops: "Ayyo. Athu nadannilla. Try again."
+  youWon: "You won {amount}. Poli."
+  youLost: "You lost {amount}. Nalla attempt, aliya."
+  brokeEven: "Break even. Safe-aayi odi."
+  questionPlaceholder: "Will the Lulu Mall parking queue cross 30 minutes on Sunday afternoon?"
+  criteriaPlaceholder: "I'll time it from the gate to a parked car, starting 3:00 PM. Over 30 minutes resolves YES; under resolves NO. If I don't go, I'll void it."
 ahmedabad:
-  name: Amdavadi
-  register: Ahmedabad English with Amdavadi Gujarati seasoning (bhai, su, jalsa, dhando, locha); the group roasts each other freely, so cheeky banter is welcome
-  footer: "Virtual pies (π) only — paisa nahi, khali izzat, ane e pan discount ma. Zero-sum: winners split exactly what losers put in. Badhu record par chhe, bhai."
-  activityHeading: Su chale chhe
-  activitySoFarHeading: Atyar sudhi
-  activityEmpty: Kai nathi, bhai. Badha jalsa karva gaya.
-  joinedFeed: joined the toli
-  joinedLedger: Joined the toli
-  openEmptyTitle: Ekdum khali, bhai.
-  openEmptySub: No open predictions. Vaato bau karo chho, dhando koi karto nathi.
-  resolvedEmpty: No verdicts yet. Doobela bhai-o nu list ahi aavshe.
-  openBetsEmpty: khali — himmat pan khali
-  betsEmpty: Table khali. Su bhai, kharcho karvani bik lage chhe?
-  poolEmpty: pool khali — badha fattu
-  leaderboardTitle: Sauthi moto khiladi kon?
-  leaderboardSub: Ranked by return on pies bet, over at least {min} resolved predictions. Ek lucky bet thi khiladi nathi banatu, bhai — dhando sustain karvo pade.
-  leaderboardEmptyTitle: Board sav khali.
-  calibratingSub: "Not enough verdicts to rank. Matlab: bik ma ne bik ma bet j nathi kari."
-  membersTitle: Aapdi toli
-  membersSub: One private table. Badha ne badhu dekhaay chhe — taro loss, tara natak, badhu.
-  newTitle: Moto claim maaro
-  magicPitch: Taru lakhaan sav locha chhe, bhai. Machine ne aapi de, nahi to toli hasse.
-  inboxSub: Kone su karyu, kon tara saame ramyu, kon ketlu doobyu.
-  inboxEmptyTitle: Sav shaant.
-  inboxEmptySub: Tara saame pan koi bet nathi kartu. Atlo boring chhe tu.
-  stakeLimit: Bas bhai. Stake limit aavi gayi — Adani no dikro nathi tu.
-  voidHint: Ambiguous or unresolvable — chinta nahi, badha ni bet paachhi
-  resolveSub: Taro sawaal, taro faislo. Final chhe — locha karyo to toli yaad rakhshe.
-  recording: Lakhi rahya chhe… have paachha nathi javatu.
-  oops: Are re, locha thai gayo. Tara jevo j.
-  youWon: You won {amount}. Jalsa, bhai, jalsa.
-  youLost: You lost {amount}. Bahu saras dhando karyo.
-  brokeEven: Sarkhe sarkhu. Na nafo, na khot, na maja.
-  questionPlaceholder: Will the Manek Chowk sandwich line cross 20 people at 11 PM on Saturday?
-  criteriaPlaceholder: I'll count heads in the line at 11:00 PM sharp, photo as evidence. 21 or more resolves YES; 20 or fewer resolves NO. Rain means void.
+  name: "Amdavadi"
+  register: "Ahmedabad English with natural Amdavadi Gujarati seasoning. Casual, entrepreneurial, teasing and economical. Use bhai, su, jalsa, dhando, locha and similar phrases naturally."
+  footer: "Virtual pies (π) only — paisa nahi, khali izzat. Zero-sum: winners split exactly what losers put in. Badhu record par chhe, bhai."
+  activityHeading: "Su chale chhe"
+  activitySoFarHeading: "Atyar sudhi"
+  activityEmpty: "Kai nathi, bhai. Badha jalsa ma busy chhe, apparently."
+  joinedFeed: "joined the toli"
+  joinedLedger: "Joined the toli"
+  openEmptyTitle: "Ekdum khali, bhai."
+  openEmptySub: "Vaato bau karo chho. Ek proper claim maaro. Dhando karvo hoy toh karvo."
+  resolvedEmpty: "Nothing resolved yet. Doobela bhai-o nu list can wait."
+  openBetsEmpty: "khali"
+  betsEmpty: "Table khali. Su bhai, opinion free chhe, risk chargeable chhe?"
+  poolEmpty: "Pool khali. Theory profitable, apparently."
+  leaderboardTitle: "Sauthi moto khiladi kon?"
+  leaderboardSub: "Ranked by return on pies bet over at least {min} resolved predictions. Ek lucky bet thi khiladi nathi banatu. Dhando sustain karvo pade."
+  leaderboardEmptyTitle: "Board sav khali."
+  calibratingSub: "Not enough verdicts to rank. Matlab, badha watch kare chhe; koi risk nathi leta."
+  membersTitle: "Aapdi toli"
+  membersSub: "One private table. Badha ne badhu dekhaay chhe — taro loss, tara natak, badhu."
+  newTitle: "Moto claim maaro"
+  magicPitch: "Taru lakhaan sav locha chhe, bhai. Machine ne aapi de before toli starts negotiating the loopholes."
+  inboxSub: "Kone su karyu, kon tara saame ramyu, kon ketlu doobyu."
+  inboxEmptyTitle: "Sav shaant."
+  inboxEmptySub: "Tara saame pan koi bet nathi kartu. Business model weak chhe."
+  stakeLimit: "Bas bhai. Stake limit aavi gayi. Venture capital nathi aa."
+  voidHint: "Ambiguous or unresolvable — chinta nahi, badha ni bet paachhi."
+  resolveSub: "Taro sawaal, taro faislo. Final chhe. Locha kari ne pachi renegotiate nahi."
+  recording: "Lakhi rahya chhe. Have paachha nathi javatu."
+  oops: "Are re, locha thai gayo. Try again."
+  youWon: "You won {amount}. Jalsa, bhai."
+  youLost: "You lost {amount}. Bahu saras dhando karyo."
+  brokeEven: "Sarkhe sarkhu. Na nafo, na khot."
+  questionPlaceholder: "Will the Manek Chowk sandwich line cross 20 people at 11 PM on Saturday?"
+  criteriaPlaceholder: "I'll count heads in the line at 11:00 PM sharp, photo as evidence. 21 or more resolves YES; 20 or fewer resolves NO. Rain means void."
 pune:
-  name: Puneri
-  register: Pune English with light Marathi seasoning (re, bhau, kay), delivered with the passive-aggressive courtesy of a Puneri paati signboard; the group roasts each other freely
+  name: "Puneri"
+  register: "Pune English with light Marathi seasoning and dry Puneri signboard energy. Polite on the surface, savage underneath. The humour is in understatement and administrative disapproval."
   footer: "Virtual pies (π) only — no money involved, kindly do not ask. Zero-sum: winners split exactly what losers put in. Everything is on the record. Rules are rules. — Management"
-  activityHeading: Kay chalu aahe
-  activitySoFarHeading: Aata paryant
-  activityEmpty: Kahi nahi. The group is observing rest hours (1 to 4 PM, and apparently the rest of the day too).
-  joinedFeed: joined the katta
-  joinedLedger: Joined the katta
-  openEmptyTitle: Shukshukaat.
-  openEmptySub: No open predictions. Kindly create one yourself instead of waiting for others. — Management
-  resolvedEmpty: No verdicts yet. Losers will be listed here in due course. No exceptions.
-  openBetsEmpty: empty — noted with disappointment
-  betsEmpty: Table rikaami. Everyone has opinions, nobody has bets. Typical.
-  poolEmpty: pool empty — bravery not found
-  leaderboardTitle: Sarvat mota khiladi kon?
-  leaderboardSub: Ranked by return on pies bet, over at least {min} resolved predictions. One lucky bet will not get you on this board. This is Pune. Standards apply.
-  leaderboardEmptyTitle: Board rikaama.
-  calibratingSub: Not enough verdicts to rank. Kindly bet more and talk less.
-  membersTitle: The katta
-  membersSub: One private table. Everyone sees everything. Outsiders strictly prohibited. — Management
-  newTitle: Claim taak, bhau
-  magicPitch: Your wording is not up to standard, re. Allow the machine to correct it. This is for your own good.
-  inboxSub: Who did what, who bet against you, and who has been listed for losing.
-  inboxEmptyTitle: Shaantata.
-  inboxEmptySub: Nobody is betting against you. Kindly become more interesting.
-  stakeLimit: Bas re. Stake limit reached. Further enthusiasm will not be entertained. — Management
-  voidHint: Ambiguous or unresolvable — everyone gets their bet back. No arguments. — Management
-  resolveSub: Your prediction, your verdict. It is final. Dishonesty will be remembered longer than you think.
-  recording: Being written down. Withdrawal is not permitted.
-  oops: That did not work. Kindly try again, properly this time.
-  youWon: You won {amount}. Congratulations. Kindly do not celebrate loudly.
-  youLost: You lost {amount}. As expected. — Management
-  brokeEven: Broke even. Neither achievement nor disgrace.
-  questionPlaceholder: Will the misal at Bedekar sell out before noon on Sunday?
-  criteriaPlaceholder: I'll reach at 11:45 AM and ask the counter, photo of the board as evidence. Sold out by 12:00 resolves YES; still serving resolves NO. Shop closed means void.
+  activityHeading: "Kay chalu aahe"
+  activitySoFarHeading: "Aata paryant"
+  activityEmpty: "Kahi nahi. The group appears to have confused a prediction game with an afternoon nap."
+  joinedFeed: "joined the katta"
+  joinedLedger: "Joined the katta"
+  openEmptyTitle: "Shukshukaat."
+  openEmptySub: "No open predictions. Kindly make one yourself instead of waiting for somebody with courage to arrive. — Management"
+  resolvedEmpty: "No verdicts yet. Losers will be listed here in due course. No exceptions."
+  openBetsEmpty: "empty — duly noted"
+  betsEmpty: "Table rikaami. Everyone has opinions. Nobody has paid the admission fee."
+  poolEmpty: "Pool empty — confidence unavailable."
+  leaderboardTitle: "Sarvat mota khiladi kon?"
+  leaderboardSub: "Ranked by return on pies bet over at least {min} resolved predictions. One lucky bet will not get you on this board. This is Pune. Standards apply."
+  leaderboardEmptyTitle: "Board rikaama."
+  calibratingSub: "Not enough verdicts to rank. Kindly bet more and speak less."
+  membersTitle: "The katta"
+  membersSub: "One private table. Everyone sees everything. Outsiders strictly prohibited. — Management"
+  newTitle: "Claim taak, bhau"
+  magicPitch: "Your wording is unnecessarily complicated, re. Allow the machine to remove the nonsense before somebody exploits it."
+  inboxSub: "Who did what, who bet against you, and who has earned a permanent place in the losing archive."
+  inboxEmptyTitle: "Shaantata."
+  inboxEmptySub: "Nobody is betting against you. Kindly become more interesting."
+  stakeLimit: "Bas re. Stake limit reached. Further enthusiasm will not be entertained. — Management"
+  voidHint: "Ambiguous or unresolvable — everyone gets their bet back. No arguments. — Management"
+  resolveSub: "Your prediction, your verdict. It is final. Kindly do not invent a new interpretation after losing."
+  recording: "Being written down. Withdrawal is not permitted."
+  oops: "That did not work. Kindly try again, properly this time."
+  youWon: "You won {amount}. Congratulations. Kindly contain yourself."
+  youLost: "You lost {amount}. As expected. — Management"
+  brokeEven: "Broke even. Neither achievement nor disgrace."
+  questionPlaceholder: "Will the misal at Bedekar sell out before noon on Sunday?"
+  criteriaPlaceholder: "I'll reach at 11:45 AM and ask the counter, photo of the board as evidence. Sold out by 12:00 resolves YES; still serving resolves NO. Shop closed means void."
+unhinged:
+  name: "Unhinged"
+  register: "Mega-offensive private-group banter between four adult college friends who have explicitly opted into ruthless roasting. Natural Indian English/Hinglish, sharp profanity, dry contempt, personal digs, absurd escalation and deadpan humiliation. Use current slang only when it sounds natural: aura, mog, cooked, delulu, BFFR, clocked, touch grass, etc. The joke should usually come from the situation or the person's decision, not random meme-word stuffing. No slurs or protected-class attacks."
+  footer: "Virtual pies (π) only — no actual paisa, just imaginary wealth and a permanent public record of your worst decisions. Zero-sum: winners get exactly what losers lose."
+  activityHeading: "Aaj ka lafda"
+  activitySoFarHeading: "Damage report"
+  activityEmpty: "Nothing yet. Remarkable restraint. Give them five minutes."
+  joinedFeed: "joined the circus"
+  joinedLedger: "Walked into the arena voluntarily"
+  openEmptyTitle: "Nothing open. Pathetic."
+  openEmptySub: "Everyone has a thesis. Nobody has the courage to put their name on it. Make the call, bhai."
+  resolvedEmpty: "Nothing resolved yet. The humiliation is merely scheduled."
+  openBetsEmpty: "khaali. Cowardice noted."
+  betsEmpty: "Nobody has bet yet. Three paragraphs of gyaan and not one actual position. BFFR."
+  poolEmpty: "Pool khaali. Four self-proclaimed geniuses, zero skin in the game."
+  leaderboardTitle: "Which one of you is actually good at this?"
+  leaderboardSub: "Ranked by return on pies bet over at least {min} resolved predictions. One lucky call proves nothing. If your record is shit, the leaderboard will simply document it."
+  leaderboardEmptyTitle: "No evidence of competence so far."
+  calibratingSub: "Not enough verdicts yet. Keep making confident mistakes."
+  membersTitle: "The four idiots"
+  membersSub: "Private table. Everyone sees everything. Your wins, your losses, your terrible calls and the excuses you invent afterwards."
+  newTitle: "Make a claim you'll regret"
+  magicPitch: "Your wording is doing a lot of work to hide a very stupid idea. Let the machine tighten it before the other three tear it apart."
+  inboxSub: "New claims, bets against you, verdicts and fresh evidence that your friends know you better than you know yourself."
+  inboxEmptyTitle: "Suspiciously quiet."
+  inboxEmptySub: "Nobody has embarrassed themselves yet. This group is clearly underperforming."
+  stakeLimit: "That's enough, Nostradamus. You've hit the limit. More confidence would be irresponsible."
+  voidHint: "Ambiguous or unresolvable — nobody gets to manufacture a win out of a loophole. Bet returned."
+  resolveSub: "Your claim, your verdict. Final. No appeals, no sob story, no 'bhai that's not what I meant' after the result."
+  recording: "Recorded. Congratulations, the bad take now has a timestamp."
+  oops: "Something broke. Even the app has limits on how much nonsense it will tolerate."
+  youWon: "You won {amount}. Fair play. Try not to become unbearable about it."
+  youLost: "You lost {amount}. Absolutely deserved. You were wrong with confidence, which is somehow worse."
+  brokeEven: "You broke even. A completely average performance from a deeply average man."
+  questionPlaceholder: "Will this idiot actually reach the gym before 9 AM tomorrow?"
+  criteriaPlaceholder: "Define an objective YES/NO test and evidence before submitting. No loopholes, no emotional appeals, no 'technically' after the fact. If it cannot be resolved cleanly, void it."
