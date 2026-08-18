@@ -109,9 +109,22 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
-/* The π unit symbol always keeps the sans face — the display and mono
+/* The bordered paper surface every panel, tile, and table sits on, and the
+   divided list that goes inside one. Structure only — size, padding, and type
+   stay utilities at the call site, so they can still be overridden there. */
+.card {
+  border: 1px solid var(--color-line);
+  border-radius: 0.5rem;
+  background-color: var(--color-surface);
+}
+
+.list > * + * {
+  border-top: 1px solid var(--color-line);
+}
+
+/* The π pie symbol always keeps the sans face — the display and mono
    faces draw π like a capital Π. */
-.unit {
+.pie {
   font-family: var(--font-instrument), system-ui, sans-serif;
 }
 

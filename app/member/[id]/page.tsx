@@ -2,8 +2,9 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Avatar } from "@/components/avatar";
 import { LingoPicker } from "@/components/lingo-picker";
+import { Pies } from "@/components/pies";
 import { SideChip } from "@/components/side-chip";
-import { Units } from "@/components/units";
+import { tone } from "@/components/ui";
 import {
   getMember,
   listMarkets,
@@ -14,8 +15,8 @@ import {
 } from "@/lib/data";
 import { fmtDate, timeAgo } from "@/lib/format";
 import { type Lingo, lingoOf } from "@/lib/lingo";
+import { fmtPct, fmtPies } from "@/lib/pies";
 import { requireMember } from "@/lib/session";
-import { fmtPct, fmtUnits } from "@/lib/units";
 
 export default async function MemberPage({ params }: { params: Promise<{ id: string }> }) {
   const me = await requireMember();
@@ -62,10 +63,10 @@ export default async function MemberPage({ params }: { params: Promise<{ id: str
       </div>
 
       <div className="mt-5 grid grid-cols-2 gap-2 sm:grid-cols-5 sm:gap-3">
-        <Stat label="Net units" value={<Units c={netC} sign />} />
+        <Stat label="Net pies" value={<Pies c={netC} sign />} />
         <Stat
           label="Lifetime P/L"
-          value={<Units c={stats.profitC} sign />}
+          value={<Pies c={stats.profitC} sign />}
           tone={stats.profitC > 0 ? "up" : stats.profitC < 0 ? "down" : undefined}
         />
         <Stat label="Return" value={stats.roi == null ? "—" : fmtPct(stats.roi)} />
@@ -74,7 +75,7 @@ export default async function MemberPage({ params }: { params: Promise<{ id: str
           label="Best / worst"
           value={
             stats.resolvedCount > 0
-              ? `${fmtUnits(stats.biggestWinC, { sign: true })} / ${fmtUnits(stats.biggestLossC, { sign: true })}`
+              ? `${fmtPies(stats.biggestWinC, { sign: true })} / ${fmtPies(stats.biggestLossC, { sign: true })}`
               : "—"
           }
         />
@@ -83,9 +84,9 @@ export default async function MemberPage({ params }: { params: Promise<{ id: str
       {openPositions.length > 0 && (
         <section className="mt-7">
           <h2 className="display text-xl font-bold uppercase tracking-wide text-soft">
-            Open bets — <Units c={openPositions.reduce((s, v) => s + v.myStakeC, 0)} />
+            Open bets — <Pies c={openPositions.reduce((s, v) => s + v.myStakeC, 0)} />
           </h2>
-          <ul className="mt-3 divide-y divide-line rounded-lg border border-line bg-surface">
+          <ul className="mt-3 card list">
             {openPositions.map((v) => (
               <li key={v.market.id} className="flex items-center gap-3 px-4 py-2.5 text-sm">
                 <Link
@@ -95,7 +96,7 @@ export default async function MemberPage({ params }: { params: Promise<{ id: str
                   {v.market.question}
                 </Link>
                 <span className="mono font-bold">
-                  <Units c={v.myStakeC} />
+                  <Pies c={v.myStakeC} />
                 </span>
                 <SideChip side={v.mySide!} small />
               </li>
@@ -111,7 +112,7 @@ export default async function MemberPage({ params }: { params: Promise<{ id: str
         {results.length === 0 ? (
           <p className="mt-2 text-sm text-soft">{t.resolvedEmpty}</p>
         ) : (
-          <ul className="mt-3 divide-y divide-line rounded-lg border border-line bg-surface">
+          <ul className="mt-3 card list">
             {results.map((r) => (
               <li key={r.market.id} className="flex items-center gap-3 px-4 py-2.5 text-sm">
                 <Link
@@ -121,20 +122,12 @@ export default async function MemberPage({ params }: { params: Promise<{ id: str
                   {r.market.question}
                 </Link>
                 <span className="hidden items-center gap-1.5 text-xs text-soft sm:flex">
-                  <Units c={r.stakeC} /> on <SideChip side={r.side} small />
+                  <Pies c={r.stakeC} /> on <SideChip side={r.side} small />
                 </span>
                 <span
-                  className={`mono w-20 text-right font-bold ${
-                    r.noContest
-                      ? "text-soft"
-                      : r.profitC > 0
-                        ? "text-felt"
-                        : r.profitC < 0
-                          ? "text-no-deep"
-                          : "text-soft"
-                  }`}
+                  className={`mono w-20 text-right font-bold ${r.noContest ? "text-soft" : tone(r.profitC)}`}
                 >
-                  {r.noContest ? "void" : <Units c={r.profitC} sign />}
+                  {r.noContest ? "void" : <Pies c={r.profitC} sign />}
                 </span>
               </li>
             ))}
@@ -147,16 +140,16 @@ export default async function MemberPage({ params }: { params: Promise<{ id: str
           The full ledger
         </h2>
         <p className="text-xs text-soft">
-          Every unit movement, newest first. The balance column is derived by replaying the whole
+          Every pie movement, newest first. The balance column is derived by replaying the whole
           history — nothing is ever overwritten.
         </p>
-        <div className="mt-3 overflow-x-auto rounded-lg border border-line bg-surface">
+        <div className="mt-3 overflow-x-auto card">
           <table className="w-full min-w-[520px] text-sm">
             <thead>
               <tr className="border-b border-line text-left text-[11px] uppercase tracking-wider text-soft">
                 <th className="px-4 py-2">When</th>
                 <th className="px-2 py-2">What</th>
-                <th className="px-2 py-2 text-right">Δ units</th>
+                <th className="px-2 py-2 text-right">Δ pies</th>
                 <th className="px-4 py-2 text-right">Balance</th>
               </tr>
             </thead>
@@ -183,20 +176,12 @@ export default async function MemberPage({ params }: { params: Promise<{ id: str
                       <span className="text-soft"> {item.row.note}</span>
                     )}
                   </td>
-                  <td
-                    className={`mono px-2 py-2 text-right ${
-                      item.row.balanceDeltaC > 0
-                        ? "text-felt"
-                        : item.row.balanceDeltaC < 0
-                          ? "text-no-deep"
-                          : "text-soft"
-                    }`}
-                  >
+                  <td className={`mono px-2 py-2 text-right ${tone(item.row.balanceDeltaC)}`}>
                     {item.row.balanceDeltaC === 0
                       ? "·"
-                      : `${fmtUnits(item.row.balanceDeltaC, { sign: true })}`}
+                      : `${fmtPies(item.row.balanceDeltaC, { sign: true })}`}
                   </td>
-                  <td className="mono px-4 py-2 text-right font-semibold">{fmtUnits(afterC)}</td>
+                  <td className="mono px-4 py-2 text-right font-semibold">{fmtPies(afterC)}</td>
                 </tr>
               ))}
             </tbody>
@@ -234,7 +219,7 @@ function Stat({
   tone?: "up" | "down";
 }) {
   return (
-    <div className="rounded-lg border border-line bg-surface px-3 py-2">
+    <div className="card px-3 py-2">
       <p className="text-[10px] font-semibold uppercase tracking-wider text-soft">{label}</p>
       <p
         className={`mono mt-0.5 text-lg font-bold ${

@@ -38,6 +38,7 @@ jobs:
       packages: write
     outputs:
       image: ${{ steps.meta.outputs.image }}
+      tag: ${{ steps.meta.outputs.tag }}
     steps:
       - uses: actions/checkout@v7
       - uses: docker/setup-buildx-action@v4
@@ -46,9 +47,11 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - name: Image name (lowercase)
+      - name: Image name (lowercase) and short-sha tag
         id: meta
-        run: echo "image=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
+        run: |
+          echo "image=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
+          echo "tag=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
       - name: Build & push image (arm64, matching the OCI host)
         uses: docker/build-push-action@v7
         with:
@@ -56,7 +59,7 @@ jobs:
           platforms: linux/arm64
           push: true
           tags: |
-            ${{ steps.meta.outputs.image }}:${{ github.sha }}
+            ${{ steps.meta.outputs.image }}:${{ steps.meta.outputs.tag }}
             ${{ steps.meta.outputs.image }}:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
@@ -69,7 +72,7 @@ jobs:
     # which is the single source of truth for the server's .env:
     #   vars:    OCI_HOST, OCI_USER, OCI_SSH_PORT (optional), DEPLOY_DIR,
     #            APP_PORT, APP_BIND, DB_PORT, AUTH_URL, FOUNDING_MEMBERS,
-    #            MAX_STAKE_UNITS, RANKED_MIN_RESOLVED, LLM_BASE_URL, LLM_MODEL
+    #            MAX_STAKE_PIES, RANKED_MIN_RESOLVED, LLM_BASE_URL, LLM_MODEL
     #   secrets: OCI_SSH_KEY, POSTGRES_PASSWORD, AUTH_SECRET,
     #            AUTH_GOOGLE_ID, AUTH_GOOGLE_SECRET, LLM_API_KEY
     # The registry pull uses this run's ephemeral GITHUB_TOKEN — no PAT needed.
@@ -88,7 +91,7 @@ jobs:
       - name: Deploy over SSH
         uses: appleboy/ssh-action@v1
         env:
-          APP_IMAGE: ${{ needs.image.outputs.image }}:${{ github.sha }}
+          APP_IMAGE: ${{ needs.image.outputs.image }}:${{ needs.image.outputs.tag }}
           APP_PORT: ${{ vars.APP_PORT }}
           DEPLOY_DIR: ${{ vars.DEPLOY_DIR }}
           GHCR_USER: ${{ github.actor }}
@@ -139,7 +142,7 @@ jobs:
             AUTH_GOOGLE_SECRET=${{ secrets.AUTH_GOOGLE_SECRET }}
             AUTH_DEV_LOGIN=false
             FOUNDING_MEMBERS=${{ vars.FOUNDING_MEMBERS }}
-            MAX_STAKE_UNITS=${{ vars.MAX_STAKE_UNITS }}
+            MAX_STAKE_PIES=${{ vars.MAX_STAKE_PIES }}
             RANKED_MIN_RESOLVED=${{ vars.RANKED_MIN_RESOLVED }}
             LLM_BASE_URL=${{ vars.LLM_BASE_URL }}
             LLM_API_KEY=${{ secrets.LLM_API_KEY }}

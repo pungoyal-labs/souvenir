@@ -1,7 +1,7 @@
 # Chiang Pai
 
 A private, social, peer-to-peer prediction market for one fixed group of
-friends. Virtual units only, strictly zero-sum, no house. Every prediction
+friends. Virtual pies only, strictly zero-sum, no house. Every prediction
 creates a position, every position has consequences, every outcome is recorded —
 and over time the leaderboard reveals who is actually good at predicting things.
 
@@ -9,33 +9,39 @@ and over time the leaderboard reveals who is actually good at predicting things.
 
 - Any member opens a **prediction**: one binary question plus explicit resolution
   criteria. The creator resolves it later as **YES**, **NO**, or **void**.
-- Members bet on either side, up to **10 units** total exposure per prediction
-  (`MAX_STAKE_UNITS`). One side at a time; a **switch** moves your whole bet
+- Members bet on either side, up to **10 pies** total exposure per prediction
+  (`MAX_STAKE_PIES`). One side at a time; a **switch** moves your whole bet
   across before resolution.
 - On resolution the winning side splits the **entire pool** pro-rata. Rounding
   uses the largest-remainder method so payouts sum to the pool exactly. Voided
   predictions (and resolutions where nobody held the winning side) refund every bet.
 - Members have an **infinite bank**: there is no starting balance and no
   balance check — your headline number is lifetime net, and it can go negative.
-- The **leaderboard** ranks by return on units bet, and only once you have
+- The **leaderboard** ranks by return on pies bet, and only once you have
   `RANKED_MIN_RESOLVED` (default 5) resolved predictions; before that you're
   "calibrating". No odds or implied probabilities are ever displayed.
 - Each member has an **inbox**: new predictions, bets on the ones they're in, and
   verdicts when those resolve. It is derived from the ledger at read time — the
   only stored state is a per-member "seen" timestamp.
 
-**Vocabulary.** The UI says *prediction*, *bet*, *resolve* (and *pool*, never
-"pot"). The code and schema say `market`, `stake`, and `settle*` — routes, tables
-and the engine's settlement math all keep those names. Keep the two vocabularies
-apart rather than half-renaming either.
+**Vocabulary.** The UI says *prediction*, *bet*, *resolve*, *pool*, and *pie*
+(the π unit). The code and schema say `market`, `stake`, `settle*`, and
+`amountC` — routes, tables, and the engine's settlement math keep those names.
+Keep the two vocabularies apart rather than half-renaming either.
+
+**Lingo.** Each member picks the dialect the app speaks to them in. Every
+flavored string lives in [`lingo.yaml`](lingo.yaml) — edit that file and run
+`pnpm lingo:gen` (or just `pnpm dev`) to compile it into `lib/lingo.data.ts`.
+`english` is the reference: a dialect missing one of its fields fails the build
+rather than rendering blank.
 
 ## Accounting
 
-The `ledger` table is append-only and is the single source of truth. Every unit
+The `ledger` table is append-only and is the single source of truth. Every pie
 movement is a row (`bet`, `switch`, `payout`, `refund`); balances, positions,
 pools, results, and the leaderboard are all derived by replaying it. Nothing is
-ever overwritten, so every historical market and every member's full unit
-history can be reconstructed. Units are stored as integer centi-units so the
+ever overwritten, so every historical market and every member's full pie
+history can be reconstructed. Pies are stored as integer centi-pies so the
 zero-sum property survives fractional payouts; `lib/engine.ts` holds the pure
 settlement math and `lib/engine.test.ts` fuzz-tests the invariant.
 
@@ -75,7 +81,7 @@ All environment variables are validated in one place, `lib/env.ts` — see
 | `AUTH_URL` | Public base URL / domain; Google OAuth callbacks derive from it |
 | `AUTH_GOOGLE_ID/SECRET` | Google OAuth app (redirect URI `{AUTH_URL}/api/auth/callback/google`) |
 | `FOUNDING_MEMBERS` | Comma-separated emails: always allowed in, and the only members who can invite |
-| `MAX_STAKE_UNITS` | Per-member exposure cap per market (default 10) |
+| `MAX_STAKE_PIES` | Per-member exposure cap per market (default 10) |
 | `RANKED_MIN_RESOLVED` | Resolved predictions needed to appear ranked (default 5) |
 | `DB_PORT` / `APP_PORT` / `APP_BIND` / `PORT` | Fully configurable database and HTTP ports |
 | `LLM_BASE_URL` / `LLM_API_KEY` / `LLM_MODEL` | Optional Anthropic-compatible endpoint for draft polish (hidden when unset) |
@@ -94,7 +100,7 @@ Membership is controlled: Google sign-in is only accepted for emails in
 ## Deployment (OCI over SSH)
 
 Push to `main` runs the pipeline on arm64 runners (matching the arm64 OCI
-host): verify → build & push one arm64 GHCR image (`:sha`) → SSH into the OCI
+host): verify → build & push one arm64 GHCR image (`:short-sha` + `:latest`) → SSH into the OCI
 box, pull the pinned tag, and `docker compose up -d` (compose runs the one-shot
 `migrate` container from the same image, then bounces `app`).
 

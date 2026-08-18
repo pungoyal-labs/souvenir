@@ -1,10 +1,11 @@
 import Link from "next/link";
 import { Avatar } from "@/components/avatar";
+import { EmptyState, tone } from "@/components/ui";
 import { type InboxItem, inbox, markInboxSeen } from "@/lib/data";
 import { timeAgo } from "@/lib/format";
 import { type Lingo, lingoOf } from "@/lib/lingo";
+import { piesText } from "@/lib/pies";
 import { requireMember } from "@/lib/session";
-import { fmtUnits, UNIT } from "@/lib/units";
 
 export default async function InboxPage() {
   const me = await requireMember();
@@ -20,12 +21,11 @@ export default async function InboxPage() {
       <p className="mt-1 text-sm text-soft">{t.inboxSub}</p>
 
       {items.length === 0 ? (
-        <div className="mt-5 rounded-lg border border-dashed border-line bg-surface p-8 text-center">
-          <p className="display text-2xl font-bold uppercase tracking-wide">{t.inboxEmptyTitle}</p>
-          <p className="mt-1 text-sm text-soft">{t.inboxEmptySub}</p>
+        <div className="mt-5">
+          <EmptyState title={t.inboxEmptyTitle} sub={t.inboxEmptySub} />
         </div>
       ) : (
-        <ul className="mt-5 divide-y divide-line rounded-lg border border-line bg-surface">
+        <ul className="mt-5 card list">
           {items.map((item) => (
             <Item key={itemKey(item)} item={item} t={t} />
           ))}
@@ -73,7 +73,7 @@ function Line({ item, t }: { item: InboxItem; t: Lingo }) {
           {name}{" "}
           {item.row.kind === "switch"
             ? `switched to ${item.row.side?.toUpperCase()}`
-            : `put ${fmtUnits(item.row.amountC)}${UNIT} on ${item.row.side?.toUpperCase()}`}
+            : `put ${piesText(item.row.amountC)} on ${item.row.side?.toUpperCase()}`}
         </>
       );
     case "resolved":
@@ -84,15 +84,11 @@ function Line({ item, t }: { item: InboxItem; t: Lingo }) {
             ? "voided it"
             : `resolved it ${item.market.status.toUpperCase()}`}
           {item.myProfitC !== null && (
-            <span
-              className={`mono ml-1.5 font-bold ${
-                item.myProfitC > 0 ? "text-felt" : item.myProfitC < 0 ? "text-no-deep" : "text-soft"
-              }`}
-            >
+            <span className={`mono ml-1.5 font-bold ${tone(item.myProfitC)}`}>
               {item.myProfitC === 0
                 ? "(bet returned)"
                 : `(${(item.myProfitC > 0 ? t.youWon : t.youLost)(
-                    `${fmtUnits(Math.abs(item.myProfitC))}${UNIT}`,
+                    `${piesText(Math.abs(item.myProfitC))}`,
                   )})`}
             </span>
           )}

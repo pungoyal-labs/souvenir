@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { computePositions, type MarketEvent, refundAll, type Side, settle } from "./engine.ts";
 
-const bet = (memberId: string, side: Side, units: number): MarketEvent => ({
+const bet = (memberId: string, side: Side, pies: number): MarketEvent => ({
   memberId,
   kind: "bet",
   side,
-  amountC: units * 100,
+  amountC: pies * 100,
 });
 
 describe("computePositions", () => {

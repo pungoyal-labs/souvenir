@@ -1,5 +1,5 @@
 /**
- * The Chiang Pai mark: π (the unit) on card-table felt. One crossbar (the
+ * The Chiang Pai mark: π (the pie) on card-table felt. One crossbar (the
  * pool) splitting into two legs — YES ultramarine and NO burnt orange.
  * Kept in sync with app/icon.svg, the favicon.
  */

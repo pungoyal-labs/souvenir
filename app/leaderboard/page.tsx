@@ -1,11 +1,12 @@
 import Link from "next/link";
 import { Avatar } from "@/components/avatar";
-import { Units } from "@/components/units";
+import { Pies } from "@/components/pies";
+import { EmptyState } from "@/components/ui";
 import { leaderboard, type MemberStats } from "@/lib/data";
 import { env } from "@/lib/env";
 import { lingoOf } from "@/lib/lingo";
+import { fmtPct } from "@/lib/pies";
 import { requireMember } from "@/lib/session";
-import { fmtPct } from "@/lib/units";
 
 export default async function LeaderboardPage() {
   const me = await requireMember();
@@ -21,7 +22,7 @@ export default async function LeaderboardPage() {
       <p className="mt-1 text-sm text-soft">{t.leaderboardSub(env.RANKED_MIN_RESOLVED)}</p>
 
       {ranked.length > 0 ? (
-        <div className="mt-5 overflow-x-auto rounded-lg border border-line bg-surface">
+        <div className="mt-5 overflow-x-auto card">
           <table className="w-full min-w-[560px] text-sm">
             <thead>
               <tr className="border-b border-line text-left text-[11px] uppercase tracking-wider text-soft">
@@ -42,14 +43,11 @@ export default async function LeaderboardPage() {
           </table>
         </div>
       ) : (
-        <div className="mt-5 rounded-lg border border-dashed border-line bg-surface p-8 text-center">
-          <p className="display text-2xl font-bold uppercase tracking-wide">
-            {t.leaderboardEmptyTitle}
-          </p>
-          <p className="mt-1 text-sm text-soft">
-            Nobody has {env.RANKED_MIN_RESOLVED} resolved predictions yet. Reputations are made
-            early — get betting.
-          </p>
+        <div className="mt-5">
+          <EmptyState
+            title={t.leaderboardEmptyTitle}
+            sub={`Nobody has ${env.RANKED_MIN_RESOLVED} resolved predictions yet. Reputations are made early — get betting.`}
+          />
         </div>
       )}
 
@@ -59,7 +57,7 @@ export default async function LeaderboardPage() {
             Calibrating
           </h2>
           <p className="text-xs text-soft">{t.calibratingSub}</p>
-          <ul className="mt-3 divide-y divide-line rounded-lg border border-line bg-surface">
+          <ul className="mt-3 card list">
             {unranked.map((s) => (
               <li key={s.member.id} className="flex items-center gap-3 px-4 py-2.5 text-sm">
                 <Avatar name={s.member.name} image={s.member.image} size={26} />
@@ -71,7 +69,7 @@ export default async function LeaderboardPage() {
                   {s.resolvedCount}/{env.RANKED_MIN_RESOLVED} resolved
                 </span>
                 <span className="mono w-20 text-right font-semibold">
-                  <Units c={s.netC} sign />
+                  <Pies c={s.netC} sign />
                 </span>
               </li>
             ))}
@@ -105,16 +103,16 @@ function Row({ s, rank, isMe }: { s: MemberStats; rank: number; isMe: boolean })
         {s.roi === null ? "—" : fmtPct(s.roi)}
       </td>
       <td className="mono px-2 py-2.5 text-right">
-        <Units c={s.profitC} sign />
+        <Pies c={s.profitC} sign />
       </td>
       <td className="mono px-2 py-2.5 text-right">
         {s.wins}–{s.losses}
       </td>
       <td className="mono px-2 py-2.5 text-right">
-        <Units c={s.wageredC} />
+        <Pies c={s.wageredC} />
       </td>
       <td className="mono px-4 py-2.5 text-right font-semibold">
-        <Units c={s.netC} sign />
+        <Pies c={s.netC} sign />
       </td>
     </tr>
   );

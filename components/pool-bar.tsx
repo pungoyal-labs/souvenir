@@ -1,9 +1,9 @@
 import { lingoOf } from "@/lib/lingo";
-import { Units } from "./units";
+import { Pies } from "./pies";
 
 /**
  * The signature element: a tug-of-war between YES and NO.
- * Width is share of committed units — the group's revealed belief,
+ * Width is share of committed pies — the group's revealed belief,
  * with no odds or probabilities calculated for anyone.
  */
 export function PoolBar({
@@ -37,13 +37,13 @@ export function PoolBar({
           <span className="text-yes-deep">
             YES{" "}
             <span className="mono">
-              <Units c={yesPoolC} />
+              <Pies c={yesPoolC} />
             </span>
           </span>
           {total === 0 && <span className="text-soft">{t.poolEmpty}</span>}
           <span className="text-no-deep">
             <span className="mono">
-              <Units c={noPoolC} />
+              <Pies c={noPoolC} />
             </span>{" "}
             NO
           </span>

@@ -13,8 +13,8 @@ export default async function NewMarketPage() {
       <h1 className="display text-4xl font-extrabold uppercase tracking-wide">{t.newTitle}</h1>
       <p className="mt-1 text-sm text-soft">
         One binary question. Say exactly how you'll decide YES or NO — you're the one who resolves
-        it, and the criteria go on the permanent record. Everyone can bet up to{" "}
-        {env.MAX_STAKE_UNITS} units on either side.
+        it, and the criteria go on the permanent record. Everyone can bet up to {env.MAX_STAKE_PIES}{" "}
+        pies on either side.
       </p>
       <div className="mt-5">
         <NewMarketForm polishAvailable={llmEnabled} lingo={me.lingo} />

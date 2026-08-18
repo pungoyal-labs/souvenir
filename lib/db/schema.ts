@@ -36,9 +36,9 @@ export const markets = pgTable("markets", {
   resolutionNote: text("resolution_note"),
 });
 
-// Append-only. Every unit movement in the system is a row here; balances and
+// Append-only. Every pie movement in the system is a row here; balances and
 // positions are always derived by replaying it, never stored elsewhere.
-//   grant   +amount   units issued to a member on joining
+//   grant   +amount   pies issued to a member on joining
 //   bet     -amount   stake committed to a market side
 //   switch   0        stake moved to the other side (side = destination)
 //   payout  +amount   winning share of a resolved market's pool

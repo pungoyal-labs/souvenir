@@ -2,11 +2,11 @@ import Link from "next/link";
 import type { ActivityItem } from "@/lib/data";
 import { timeAgo } from "@/lib/format";
 import { type Lingo, lingoOf } from "@/lib/lingo";
-import { fmtUnits, UNIT } from "@/lib/units";
+import { piesText } from "@/lib/pies";
 import { Avatar } from "./avatar";
 
 function phrase(item: ActivityItem, t: Lingo): string {
-  const amount = `${fmtUnits(item.row.amountC)}${UNIT}`;
+  const amount = `${piesText(item.row.amountC)}`;
   switch (item.row.kind) {
     case "bet":
       return `put ${amount} on ${item.row.side?.toUpperCase()}`;

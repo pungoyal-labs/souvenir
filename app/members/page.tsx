@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Avatar } from "@/components/avatar";
 import { InviteForm } from "@/components/invite-form";
-import { Units } from "@/components/units";
+import { Pies } from "@/components/pies";
 import { isFounder, listInvites, listMembers, netOf } from "@/lib/data";
 import { fmtDate } from "@/lib/format";
 import { lingoOf } from "@/lib/lingo";
@@ -22,7 +22,7 @@ export default async function MembersPage() {
       <h1 className="display text-4xl font-extrabold uppercase tracking-wide">{t.membersTitle}</h1>
       <p className="mt-1 text-sm text-soft">{t.membersSub}</p>
 
-      <ul className="mt-5 divide-y divide-line rounded-lg border border-line bg-surface">
+      <ul className="mt-5 card list">
         {all.map((m, i) => (
           <li key={m.id} className="flex items-center gap-3 px-4 py-3">
             <Avatar name={m.name} image={m.image} size={34} />
@@ -36,7 +36,7 @@ export default async function MembersPage() {
               </p>
             </div>
             <span className="mono ml-auto font-bold">
-              <Units c={balances[i]} sign />
+              <Pies c={balances[i]} sign />
             </span>
           </li>
         ))}

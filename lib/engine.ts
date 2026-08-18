@@ -64,7 +64,7 @@ export interface SettlementResult {
  * Distribute the entire pool to the winning side, pro-rata by stake.
  * Rounding uses the largest-remainder method so payouts sum to the pool
  * exactly (zero-sum, no house). If nobody held the winning side, every
- * participant is refunded their stake instead — units never vanish.
+ * participant is refunded their stake instead — pies never vanish.
  */
 export function settle(positions: Map<string, Position>, winner: Side): SettlementResult {
   let totalPoolC = 0;

@@ -3,16 +3,16 @@ import { notFound } from "next/navigation";
 import { ActivityFeed } from "@/components/activity";
 import { Avatar } from "@/components/avatar";
 import { BetPanel } from "@/components/bet-panel";
+import { Pies } from "@/components/pies";
 import { PoolBar } from "@/components/pool-bar";
 import { ResolvePanel } from "@/components/resolve-panel";
 import { SideChip, StatusChip } from "@/components/side-chip";
-import { Units } from "@/components/units";
 import { getMarketView } from "@/lib/data";
 import { env } from "@/lib/env";
 import { fmtDate, timeAgo } from "@/lib/format";
 import { lingoOf } from "@/lib/lingo";
+import { toCents } from "@/lib/pies";
 import { requireMember } from "@/lib/session";
-import { toCents } from "@/lib/units";
 
 export default async function MarketPage({ params }: { params: Promise<{ id: string }> }) {
   const me = await requireMember();
@@ -40,7 +40,7 @@ export default async function MarketPage({ params }: { params: Promise<{ id: str
 
       <h1 className="display mt-2 text-4xl font-extrabold leading-tight">{market.question}</h1>
 
-      <div className="mt-3 rounded-lg border border-line bg-surface p-4">
+      <div className="mt-3 card p-4">
         <p className="text-[11px] font-semibold uppercase tracking-wider text-soft">Resolves how</p>
         <p className="mt-1 whitespace-pre-wrap break-words text-sm">{market.criteria}</p>
       </div>
@@ -66,7 +66,7 @@ export default async function MarketPage({ params }: { params: Promise<{ id: str
           {settlements.length > 0 && (
             <div className="mt-3 border-t border-line pt-3">
               <p className="text-[11px] font-semibold uppercase tracking-wider text-soft">
-                Where the <Units c={totalPoolC} /> pool went
+                Where the <Pies c={totalPoolC} /> pool went
               </p>
               <ul className="mt-2 space-y-1.5">
                 {settlements.map((s) => (
@@ -77,7 +77,7 @@ export default async function MarketPage({ params }: { params: Promise<{ id: str
                       {s.row.kind === "payout" ? "collected" : "refunded"}
                     </span>
                     <span className="mono ml-auto font-bold">
-                      <Units c={s.row.amountC} />
+                      <Pies c={s.row.amountC} />
                     </span>
                   </li>
                 ))}
@@ -91,7 +91,7 @@ export default async function MarketPage({ params }: { params: Promise<{ id: str
         <PoolBar yesPoolC={view.yesPoolC} noPoolC={view.noPoolC} lingo={me.lingo} />
         {totalPoolC > 0 && (
           <p className="mono mt-1 text-center text-xs text-soft">
-            <Units c={totalPoolC} /> in the pool
+            <Pies c={totalPoolC} /> in the pool
           </p>
         )}
       </div>
@@ -102,7 +102,7 @@ export default async function MarketPage({ params }: { params: Promise<{ id: str
         {view.participants.length === 0 ? (
           <p className="mt-2 text-sm text-soft">{t.betsEmpty}</p>
         ) : (
-          <ul className="mt-2 divide-y divide-line rounded-lg border border-line bg-surface">
+          <ul className="mt-2 card list">
             {view.participants.map((p) => (
               <li key={p.member.id} className="flex items-center gap-3 px-4 py-2.5">
                 <Avatar name={p.member.name} image={p.member.image} size={28} />
@@ -112,7 +112,7 @@ export default async function MarketPage({ params }: { params: Promise<{ id: str
                 </Link>
                 <span className="ml-auto flex items-center gap-2">
                   <span className="mono font-bold">
-                    <Units c={p.stakeC} />
+                    <Pies c={p.stakeC} />
                   </span>
                   <SideChip side={p.side} small />
                 </span>
@@ -128,7 +128,7 @@ export default async function MarketPage({ params }: { params: Promise<{ id: str
             marketId={market.id}
             mySide={view.mySide}
             myStakeC={view.myStakeC}
-            maxStakeC={toCents(env.MAX_STAKE_UNITS)}
+            maxStakeC={toCents(env.MAX_STAKE_PIES)}
             lingo={me.lingo}
           />
           {market.creatorId === me.id && <ResolvePanel marketId={market.id} lingo={me.lingo} />}

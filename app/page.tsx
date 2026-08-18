@@ -1,11 +1,12 @@
 import Link from "next/link";
 import { ActivityFeed } from "@/components/activity";
 import { MarketCard } from "@/components/market-card";
-import { Units } from "@/components/units";
+import { Pies } from "@/components/pies";
+import { EmptyState } from "@/components/ui";
 import { listMarkets, memberResults, netOf, recentActivity, summarizeResults } from "@/lib/data";
 import { lingoOf } from "@/lib/lingo";
+import { piesText } from "@/lib/pies";
 import { requireMember } from "@/lib/session";
-import { fmtUnits, UNIT } from "@/lib/units";
 
 export default async function Home({ searchParams }: { searchParams: Promise<{ view?: string }> }) {
   const me = await requireMember();
@@ -30,10 +31,10 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ v
       <div>
         {/* What do I have, what's at stake, how am I doing */}
         <div className="grid grid-cols-3 gap-2 sm:gap-3">
-          <StatTile label="Net units" value={<Units c={netC} sign />} />
+          <StatTile label="Net pies" value={<Pies c={netC} sign />} />
           <StatTile
             label="Open bets"
-            value={<Units c={committedC} />}
+            value={<Pies c={committedC} />}
             sub={
               committedC > 0
                 ? `across ${committedCount} prediction${committedCount === 1 ? "" : "s"}`
@@ -45,7 +46,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ v
             value={`${myStats.wins}–${myStats.losses}`}
             sub={
               myStats.resolvedCount > 0
-                ? `${fmtUnits(myStats.profitC, { sign: true })}${UNIT} lifetime`
+                ? `${piesText(myStats.profitC, { sign: true })} lifetime`
                 : "no verdicts yet"
             }
           />
@@ -86,9 +87,8 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ v
         </div>
 
         {!showSettled && open.length === 0 && (
-          <div className="mt-4 rounded-lg border border-dashed border-line bg-surface p-8 text-center">
-            <p className="display text-2xl font-bold uppercase tracking-wide">{t.openEmptyTitle}</p>
-            <p className="mt-1 text-sm text-soft">{t.openEmptySub}</p>
+          <div className="mt-4">
+            <EmptyState title={t.openEmptyTitle} sub={t.openEmptySub} />
           </div>
         )}
         {showSettled && resolved.length === 0 && (
@@ -110,7 +110,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ v
 
 function StatTile({ label, value, sub }: { label: string; value: React.ReactNode; sub?: string }) {
   return (
-    <div className="rounded-lg border border-line bg-surface px-3 py-2.5 sm:px-4">
+    <div className="card px-3 py-2.5 sm:px-4">
       <p className="text-[11px] font-semibold uppercase tracking-wider text-soft">{label}</p>
       <p className="display mono mt-0.5 text-2xl font-extrabold sm:text-3xl">{value}</p>
       {sub && <p className="text-xs text-soft">{sub}</p>}

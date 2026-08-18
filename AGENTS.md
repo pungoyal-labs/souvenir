@@ -13,6 +13,8 @@ allowlist (`lib/auth.ts`).
 - `pnpm db:generate` — new Drizzle migration after editing `lib/db/schema.ts`
 - `pnpm db:migrate` — apply migrations (also run by the `migrate` compose service)
 - `pnpm seed` — demo data (dev only)
+- `pnpm lingo:gen` — compile `lingo.yaml` into `lib/lingo.data.ts` (`dev` and
+  `build` run it first, so you rarely call it by hand)
 
 Pre-commit (husky): biome on staged files, tsc, engine tests.
 
@@ -22,15 +24,23 @@ Pre-commit (husky): biome on staged files, tsc, engine tests.
   are always derived by replaying it. Never store or overwrite a balance.
 - All settlement math lives in `lib/engine.ts` (pure, tested). Zero-sum is the
   invariant: payouts must sum exactly to the pool (largest-remainder rounding).
-- Units are integer centi-units end to end; format only at the edge (`lib/units.ts`).
+- Pies are integer centi-pies end to end; format only at the edge (`lib/pies.ts`).
 - `lib/env.ts` is the only file that reads `process.env` — everything else
   imports `env` from there (zod-validated).
 - Relative imports inside `lib/` and `scripts/` carry explicit `.ts` extensions
   so plain `node scripts/*.ts` runs them (Node type stripping).
 - Members have an infinite bank: no starting grant, net can go negative, the
-  per-market exposure cap (`MAX_STAKE_UNITS`) is the only brake.
+  per-market exposure cap (`MAX_STAKE_PIES`) is the only brake.
 - The inbox is derived from markets + ledger at read time; the only stored
   notification state is `members.inbox_seen_at`.
+- Every flavored string lives in `lingo.yaml` (edited by hand), never in a
+  component. `lib/lingo.data.ts` is generated from it and committed; `english`
+  is the reference — the generator rejects a lingo whose fields don't match it.
+- Addresses are canonicalized through `normalizeEmail` (`lib/email.ts`) before
+  any lookup or write: Gmail ignores dots, so the allowlist, `members.email`,
+  and `FOUNDING_MEMBERS` all key off the dotless spelling.
+- The UI says *prediction*, *bet*, *resolve*, *pool*, *pie*; the code and schema
+  say `market`, `stake`, `settle*`, `amountC`. Don't half-rename either side.
 - pnpm uses the hoisted node linker (see pnpm-workspace.yaml) so Next.js
   standalone output works identically locally and in Docker.
 - One Docker image serves the app AND runs migrations: next.config.ts

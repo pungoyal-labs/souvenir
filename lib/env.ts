@@ -4,6 +4,7 @@
 // never process.env directly.
 
 import { z } from "zod";
+import { normalizeEmail } from "./email.ts";
 
 const envSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
@@ -37,14 +38,12 @@ const envSchema = z.object({
     .transform((s) =>
       s
         .split(",")
-        .map((e) => e.trim().toLowerCase())
+        .map((e) => normalizeEmail(e))
         .filter(Boolean),
     ),
 
-  /** Units granted to each member on joining. Members need not be equal — edit per deploy. */
-
-  /** Maximum total exposure per member per market, in units. */
-  MAX_STAKE_UNITS: z.coerce.number().int().positive().default(10),
+  /** Maximum total exposure per member per market, in pies. */
+  MAX_STAKE_PIES: z.coerce.number().int().positive().default(10),
 
   /** Resolved markets required before a member appears in the ranked leaderboard. */
   RANKED_MIN_RESOLVED: z.coerce.number().int().positive().default(5),

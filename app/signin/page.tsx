@@ -14,7 +14,7 @@ export default async function SignInPage({
   const { error } = await searchParams;
 
   return (
-    <div className="mx-auto mt-10 max-w-sm overflow-hidden rounded-lg border border-line bg-surface text-center shadow-[0_2px_0_rgba(33,38,31,0.08)]">
+    <div className="mx-auto mt-10 max-w-sm overflow-hidden card text-center shadow-[0_2px_0_rgba(33,38,31,0.08)]">
       <div aria-hidden className="zari" />
       <div className="p-8">
         <Logo size={64} className="mx-auto rounded-2xl" />
@@ -25,7 +25,7 @@ export default async function SignInPage({
           Pai
         </p>
         <p className="mt-3 text-sm text-soft">
-          A private prediction game. Virtual units, real reputations.
+          A private prediction game. Virtual pies, real reputations.
         </p>
 
         {error === "AccessDenied" && (

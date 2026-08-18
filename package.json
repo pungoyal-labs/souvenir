@@ -3,8 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
+    "dev": "node scripts/gen-lingo.ts && next dev",
+    "build": "node scripts/gen-lingo.ts && next build",
+    "lingo:gen": "node scripts/gen-lingo.ts",
     "start": "next start",
     "lint": "biome check .",
     "test": "vitest run",
@@ -35,7 +36,8 @@
     "husky": "^9.1.7",
     "tailwindcss": "^4",
     "typescript": "^7.0.2",
-    "vitest": "^4.1.10"
+    "vitest": "^4.1.10",
+    "yaml": "^2.9.0"
   },
   "packageManager": "pnpm@11.22.0"
 }

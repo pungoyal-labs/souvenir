@@ -5,7 +5,7 @@ import { useState, useTransition } from "react";
 import { betAction, switchAction } from "@/app/actions";
 import type { Side } from "@/lib/engine";
 import { lingoOf } from "@/lib/lingo";
-import { Units } from "./units";
+import { Pies } from "./pies";
 
 export function BetPanel({
   marketId,
@@ -23,14 +23,14 @@ export function BetPanel({
   const t = lingoOf(lingo);
   const router = useRouter();
   const [pending, startTransition] = useTransition();
-  const [units, setUnits] = useState(1);
+  const [pies, setPies] = useState(1);
   const [error, setError] = useState<string | null>(null);
 
   // Infinite bank: net going negative is fine, so the only ceiling is the
   // per-market exposure cap.
   const roomC = maxStakeC - myStakeC;
-  const maxUnits = Math.floor(roomC / 100);
-  const clamped = Math.min(Math.max(units, 1), Math.max(maxUnits, 1));
+  const maxPies = Math.floor(roomC / 100);
+  const clamped = Math.min(Math.max(pies, 1), Math.max(maxPies, 1));
 
   const bet = (side: Side) =>
     startTransition(async () => {
@@ -51,10 +51,10 @@ export function BetPanel({
   const other: Side = mySide === "yes" ? "no" : "yes";
 
   return (
-    <div className="rounded-lg border border-line bg-surface p-4">
+    <div className="card p-4">
       <h3 className="display text-lg font-bold uppercase tracking-wide text-soft">Place a bet</h3>
 
-      {maxUnits < 1 ? (
+      {maxPies < 1 ? (
         <p className="mt-2 text-sm text-soft">{t.stakeLimit}</p>
       ) : (
         <>
@@ -62,26 +62,26 @@ export function BetPanel({
             <div className="flex items-center rounded-md border border-line">
               <button
                 type="button"
-                aria-label="One unit less"
+                aria-label="One pie less"
                 className="px-3 py-2 text-lg leading-none text-soft hover:text-ink disabled:opacity-30"
                 disabled={clamped <= 1 || pending}
-                onClick={() => setUnits(clamped - 1)}
+                onClick={() => setPies(clamped - 1)}
               >
                 −
               </button>
               <span className="mono w-10 text-center text-lg font-bold">{clamped}</span>
               <button
                 type="button"
-                aria-label="One unit more"
+                aria-label="One pie more"
                 className="px-3 py-2 text-lg leading-none text-soft hover:text-ink disabled:opacity-30"
-                disabled={clamped >= maxUnits || pending}
-                onClick={() => setUnits(clamped + 1)}
+                disabled={clamped >= maxPies || pending}
+                onClick={() => setPies(clamped + 1)}
               >
                 +
               </button>
             </div>
             <span className="text-xs text-soft">
-              units · room for <Units c={roomC} /> more here
+              pies · room for <Pies c={roomC} /> more here
             </span>
           </div>
 
@@ -111,7 +111,7 @@ export function BetPanel({
           <p>
             You've bet{" "}
             <span className="mono font-bold">
-              <Units c={myStakeC} />
+              <Pies c={myStakeC} />
             </span>{" "}
             on <span className="font-bold uppercase">{mySide}</span>.
           </p>

@@ -2,11 +2,12 @@ import Link from "next/link";
 import type { MarketView } from "@/lib/data";
 import { timeAgo } from "@/lib/format";
 import { lingoOf } from "@/lib/lingo";
-import { fmtUnits, UNIT } from "@/lib/units";
+import { piesText } from "@/lib/pies";
 import { Avatar } from "./avatar";
+import { Pies } from "./pies";
 import { PoolBar } from "./pool-bar";
 import { SideChip, StatusChip } from "./side-chip";
-import { Units } from "./units";
+import { tone } from "./ui";
 
 export function MarketCard({
   view,
@@ -26,7 +27,7 @@ export function MarketCard({
   return (
     <Link
       href={`/market/${market.id}`}
-      className="block rounded-lg border border-line bg-surface p-4 shadow-[0_1px_0_rgba(33,38,31,0.06)] transition-[transform,box-shadow] hover:-translate-y-0.5 hover:shadow-[0_8px_18px_-10px_rgba(20,48,36,0.4)]"
+      className="block card p-4 shadow-[0_1px_0_rgba(33,38,31,0.06)] transition-[transform,box-shadow] hover:-translate-y-0.5 hover:shadow-[0_8px_18px_-10px_rgba(20,48,36,0.4)]"
     >
       <div className="flex items-center justify-between gap-2">
         <StatusChip status={market.status} />
@@ -48,7 +49,7 @@ export function MarketCard({
               <span
                 key={p.member.id}
                 className="rounded-full ring-2 ring-yes-tint"
-                title={`${p.member.name}: ${fmtUnits(p.stakeC)}${UNIT} on YES`}
+                title={`${p.member.name}: ${piesText(p.stakeC)} on YES`}
               >
                 <Avatar name={p.member.name} image={p.member.image} size={22} />
               </span>
@@ -59,7 +60,7 @@ export function MarketCard({
               <span
                 key={p.member.id}
                 className="rounded-full ring-2 ring-no-tint"
-                title={`${p.member.name}: ${fmtUnits(p.stakeC)}${UNIT} on NO`}
+                title={`${p.member.name}: ${piesText(p.stakeC)} on NO`}
               >
                 <Avatar name={p.member.name} image={p.member.image} size={22} />
               </span>
@@ -72,20 +73,16 @@ export function MarketCard({
         <p className="mt-2 flex items-center gap-1.5 text-sm font-semibold">
           You:{" "}
           <span className="mono">
-            <Units c={view.myStakeC} />
+            <Pies c={view.myStakeC} />
           </span>{" "}
           on <SideChip side={view.mySide} small />
         </p>
       )}
       {market.status !== "open" && myProfitC !== undefined && (
-        <p
-          className={`mono mt-2 text-sm font-bold ${
-            myProfitC > 0 ? "text-felt" : myProfitC < 0 ? "text-no-deep" : "text-soft"
-          }`}
-        >
+        <p className={`mono mt-2 text-sm font-bold ${tone(myProfitC)}`}>
           {myProfitC === 0
             ? t.brokeEven
-            : (myProfitC > 0 ? t.youWon : t.youLost)(`${fmtUnits(Math.abs(myProfitC))}${UNIT}`)}
+            : (myProfitC > 0 ? t.youWon : t.youLost)(`${piesText(Math.abs(myProfitC))}`)}
         </p>
       )}
     </Link>

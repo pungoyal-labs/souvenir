@@ -29,7 +29,7 @@ async function requireMemberId(): Promise<string> {
   return session.memberId;
 }
 
-function asResult(err: unknown): ActionResult {
+function failure(err: unknown): ActionResult {
   if (err instanceof DataError) {
     // Expected rule violations (stake caps, closed markets, …), not faults.
     logger.debug({ reason: err.message }, "action rejected");
@@ -39,32 +39,46 @@ function asResult(err: unknown): ActionResult {
   return { ok: false, error: "Something went wrong. Try again." };
 }
 
-export async function betAction(
-  marketId: string,
-  side: Side,
-  units: number,
-): Promise<ActionResult> {
+/**
+ * Every mutation is the same shape: act as the signed-in member, turn a broken
+ * rule into a message the panel can show, and revalidate what the write
+ * changed. `run` returns whatever extra the caller needs on success.
+ */
+async function mutate<T extends object>(
+  run: (memberId: string) => Promise<T>,
+  paths: (result: T) => string[],
+): Promise<ActionResult & Partial<T>> {
   const memberId = await requireMemberId();
+  let result: T;
   try {
-    await placeBet(memberId, marketId, side, units);
+    result = await run(memberId);
   } catch (err) {
-    return asResult(err);
+    // A failure carries no payload, which TypeScript can't know for a generic
+    // T — hence the one cast.
+    return failure(err) as ActionResult & Partial<T>;
   }
-  revalidatePath("/");
-  revalidatePath(`/market/${marketId}`);
-  return { ok: true };
+  for (const path of paths(result)) revalidatePath(path);
+  return { ok: true, ...result };
+}
+
+export async function betAction(marketId: string, side: Side, pies: number): Promise<ActionResult> {
+  return mutate(
+    async (memberId) => {
+      await placeBet(memberId, marketId, side, pies);
+      return {};
+    },
+    () => ["/", `/market/${marketId}`],
+  );
 }
 
 export async function switchAction(marketId: string): Promise<ActionResult> {
-  const memberId = await requireMemberId();
-  try {
-    await switchSides(memberId, marketId);
-  } catch (err) {
-    return asResult(err);
-  }
-  revalidatePath("/");
-  revalidatePath(`/market/${marketId}`);
-  return { ok: true };
+  return mutate(
+    async (memberId) => {
+      await switchSides(memberId, marketId);
+      return {};
+    },
+    () => ["/", `/market/${marketId}`],
+  );
 }
 
 export async function resolveAction(
@@ -72,30 +86,23 @@ export async function resolveAction(
   outcome: Side | "refunded",
   note: string,
 ): Promise<ActionResult> {
-  const memberId = await requireMemberId();
-  try {
-    await resolveMarket(marketId, memberId, outcome, note);
-  } catch (err) {
-    return asResult(err);
-  }
-  revalidatePath("/");
-  revalidatePath(`/market/${marketId}`);
-  revalidatePath("/leaderboard");
-  return { ok: true };
+  return mutate(
+    async (memberId) => {
+      await resolveMarket(marketId, memberId, outcome, note);
+      return {};
+    },
+    () => ["/", `/market/${marketId}`, "/leaderboard"],
+  );
 }
 
 export async function createMarketAction(
   question: string,
   criteria: string,
 ): Promise<ActionResult & { marketId?: string }> {
-  const memberId = await requireMemberId();
-  try {
-    const marketId = await createMarket(memberId, question, criteria);
-    revalidatePath("/");
-    return { ok: true, marketId };
-  } catch (err) {
-    return asResult(err);
-  }
+  return mutate(
+    async (memberId) => ({ marketId: await createMarket(memberId, question, criteria) }),
+    () => ["/"],
+  );
 }
 
 export async function polishAction(
@@ -132,12 +139,11 @@ export async function setLingoAction(lingo: string): Promise<ActionResult> {
 }
 
 export async function inviteAction(email: string): Promise<ActionResult> {
-  const memberId = await requireMemberId();
-  try {
-    await invite(email, memberId);
-  } catch (err) {
-    return asResult(err);
-  }
-  revalidatePath("/members");
-  return { ok: true };
+  return mutate(
+    async (memberId) => {
+      await invite(email, memberId);
+      return {};
+    },
+    () => ["/members"],
+  );
 }

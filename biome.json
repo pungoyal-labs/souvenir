@@ -7,7 +7,7 @@
   },
   "files": {
     "ignoreUnknown": false,
-    "includes": ["**", "!drizzle", "!next-env.d.ts", "!app/globals.css"]
+    "includes": ["**", "!drizzle", "!next-env.d.ts", "!app/globals.css", "!lib/lingo.data.ts"]
   },
   "formatter": {
     "enabled": true,

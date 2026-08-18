@@ -4,8 +4,8 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Avatar } from "@/components/avatar";
 import { Logo } from "@/components/logo";
+import { Pies } from "@/components/pies";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { Units } from "@/components/units";
 import { destroySession, getSession } from "@/lib/auth";
 import { getMember, inbox, netOf } from "@/lib/data";
 import { lingoOf } from "@/lib/lingo";
@@ -90,7 +90,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                     title="Your net and history"
                   >
                     <span className="mono text-sm font-semibold text-[#e8c46a]">
-                      <Units c={netC} sign />
+                      <Pies c={netC} sign />
                     </span>
                     <Avatar name={member.name} image={member.image} size={26} />
                   </Link>

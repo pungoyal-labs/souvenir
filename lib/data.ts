@@ -1,4 +1,4 @@
-// All reads and unit-moving writes. Every mutation runs in a transaction,
+// All reads and pie-moving writes. Every mutation runs in a transaction,
 // locks the rows it checks, and only ever appends to the ledger.
 
 import { randomUUID } from "node:crypto";
@@ -13,6 +13,7 @@ import {
   markets,
   members,
 } from "./db/schema.ts";
+import { normalizeEmail } from "./email.ts";
 import {
   computePositions,
   exposure,
@@ -25,9 +26,9 @@ import {
 } from "./engine.ts";
 import { env } from "./env.ts";
 import { logger } from "./logger.ts";
-import { toCents } from "./units.ts";
+import { toCents } from "./pies.ts";
 
-/** User-facing failures (insufficient units, market closed, …). */
+/** User-facing failures (insufficient pies, market closed, …). */
 export class DataError extends Error {}
 
 // ---------- derived shapes ----------
@@ -131,10 +132,36 @@ async function membersById(): Promise<Map<string, Member>> {
   return new Map(all.map((m) => [m.id, m]));
 }
 
+type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
+
+/**
+ * Every write starts the same way: take the row lock so concurrent bets on one
+ * market serialize, then read back the stake events to replay. Callers check
+ * `status` themselves — the message differs between betting and resolving.
+ */
+async function lockMarket(tx: Tx, marketId: string): Promise<Market> {
+  const [market] = await tx.select().from(markets).where(eq(markets.id, marketId)).for("update");
+  if (!market) throw new DataError("Prediction not found.");
+  return market;
+}
+
+function requireOpen(market: Market): void {
+  if (market.status !== "open") throw new DataError("This prediction has already been resolved.");
+}
+
+/** The bet/switch rows for one market, oldest first — the replay input. */
+async function stakeRows(tx: Tx, marketId: string): Promise<LedgerRow[]> {
+  return tx
+    .select()
+    .from(ledger)
+    .where(and(eq(ledger.marketId, marketId), inArray(ledger.kind, ["bet", "switch"])))
+    .orderBy(asc(ledger.id));
+}
+
 // ---------- membership ----------
 
 export async function isAllowed(email: string): Promise<boolean> {
-  const normalized = email.trim().toLowerCase();
+  const normalized = normalizeEmail(email);
   if (env.FOUNDING_MEMBERS.includes(normalized)) return true;
   const [row] = await db.select().from(allowlist).where(eq(allowlist.email, normalized));
   if (row) return true;
@@ -153,7 +180,7 @@ export async function ensureMember(
   image: string | null,
   opts?: { bypassAllowlist?: boolean },
 ): Promise<Member | null> {
-  const normalized = email.trim().toLowerCase();
+  const normalized = normalizeEmail(email);
   const [existing] = await db.select().from(members).where(eq(members.email, normalized));
   if (existing) {
     if ((name && name !== existing.name) || (image && image !== existing.image)) {
@@ -206,7 +233,7 @@ export async function invite(email: string, invitedBy: string): Promise<void> {
   if (!inviter || !isFounder(inviter)) {
     throw new DataError("Only founding members can invite people.");
   }
-  const normalized = email.trim().toLowerCase();
+  const normalized = normalizeEmail(email);
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalized)) {
     throw new DataError("That doesn't look like an email address.");
   }
@@ -324,33 +351,24 @@ export async function placeBet(
   memberId: string,
   marketId: string,
   side: Side,
-  units: number,
+  pies: number,
 ): Promise<void> {
-  if (!Number.isInteger(units) || units < 1) {
-    throw new DataError("A bet must be a whole number of units, at least 1.");
+  if (!Number.isInteger(pies) || pies < 1) {
+    throw new DataError("A bet must be a whole number of pies, at least 1.");
   }
-  const amountC = toCents(units);
-  const maxC = toCents(env.MAX_STAKE_UNITS);
+  const amountC = toCents(pies);
+  const maxC = toCents(env.MAX_STAKE_PIES);
 
   await db.transaction(async (tx) => {
-    // Serialize this member's balance ops and this market's stake ops.
-    const [market] = await tx.select().from(markets).where(eq(markets.id, marketId)).for("update");
-    if (!market) throw new DataError("Prediction not found.");
-    if (market.status !== "open") throw new DataError("This prediction has already been resolved.");
-
-    const rows = await tx
-      .select()
-      .from(ledger)
-      .where(and(eq(ledger.marketId, marketId), inArray(ledger.kind, ["bet", "switch"])))
-      .orderBy(asc(ledger.id));
-    const pos = replay(rows).get(memberId) ?? { yesC: 0, noC: 0 };
+    requireOpen(await lockMarket(tx, marketId));
+    const pos = replay(await stakeRows(tx, marketId)).get(memberId) ?? { yesC: 0, noC: 0 };
 
     const oppStakeC = side === "yes" ? pos.noC : pos.yesC;
     if (oppStakeC > 0) {
       throw new DataError("You're on the other side of this one. Switch sides first.");
     }
     if (exposure(pos) + amountC > maxC) {
-      throw new DataError(`Max exposure is ${env.MAX_STAKE_UNITS} units per prediction.`);
+      throw new DataError(`Max exposure is ${env.MAX_STAKE_PIES} pies per prediction.`);
     }
     // No balance check: members have an infinite bank. Net can go negative;
     // the per-market exposure cap is the only brake.
@@ -370,16 +388,8 @@ export async function placeBet(
 export async function switchSides(memberId: string, marketId: string): Promise<void> {
   let switched: { from: Side; stakeC: number } | undefined;
   await db.transaction(async (tx) => {
-    const [market] = await tx.select().from(markets).where(eq(markets.id, marketId)).for("update");
-    if (!market) throw new DataError("Prediction not found.");
-    if (market.status !== "open") throw new DataError("This prediction has already been resolved.");
-
-    const rows = await tx
-      .select()
-      .from(ledger)
-      .where(and(eq(ledger.marketId, marketId), inArray(ledger.kind, ["bet", "switch"])))
-      .orderBy(asc(ledger.id));
-    const pos = replay(rows).get(memberId);
+    requireOpen(await lockMarket(tx, marketId));
+    const pos = replay(await stakeRows(tx, marketId)).get(memberId);
     const stakeC = pos ? exposure(pos) : 0;
     if (!pos || stakeC === 0) throw new DataError("You have no bet to switch.");
 
@@ -417,19 +427,13 @@ export async function resolveMarket(
 ): Promise<void> {
   let settled: { rows: number; totalC: number; autoRefunded: boolean } | undefined;
   await db.transaction(async (tx) => {
-    const [market] = await tx.select().from(markets).where(eq(markets.id, marketId)).for("update");
-    if (!market) throw new DataError("Prediction not found.");
+    const market = await lockMarket(tx, marketId);
     if (market.creatorId !== resolverId) {
       throw new DataError("Only the creator can resolve this prediction.");
     }
     if (market.status !== "open") throw new DataError("Already resolved — resolution is final.");
 
-    const rows = await tx
-      .select()
-      .from(ledger)
-      .where(and(eq(ledger.marketId, marketId), inArray(ledger.kind, ["bet", "switch"])))
-      .orderBy(asc(ledger.id));
-    const positions = replay(rows);
+    const positions = replay(await stakeRows(tx, marketId));
 
     let resolutionNote = note.trim();
 
@@ -483,7 +487,7 @@ export async function resolveMarket(
             side: outcome,
             amountC,
             balanceDeltaC: amountC,
-            note: `Share of the ${result.totalPoolC / 100}-unit pool`,
+            note: `Share of the ${result.totalPoolC / 100}-pie pool`,
           });
         }
       }
