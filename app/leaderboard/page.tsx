@@ -16,8 +16,8 @@ export default async function LeaderboardPage() {
         Who can actually predict things
       </h1>
       <p className="mt-1 text-sm text-soft">
-        Ranked by return on units wagered, over at least {env.RANKED_MIN_RESOLVED} resolved
-        predictions. One lucky punt won't get you on the board — a track record will.
+        Ranked by return on units bet, over at least {env.RANKED_MIN_RESOLVED} resolved predictions.
+        One lucky bet won't get you on the board — a track record will.
       </p>
 
       {ranked.length > 0 ? (
@@ -30,7 +30,7 @@ export default async function LeaderboardPage() {
                 <th className="px-2 py-2.5 text-right">Return</th>
                 <th className="px-2 py-2.5 text-right">Profit</th>
                 <th className="px-2 py-2.5 text-right">Record</th>
-                <th className="px-2 py-2.5 text-right">Wagered</th>
+                <th className="px-2 py-2.5 text-right">Bet</th>
                 <th className="px-4 py-2.5 text-right">Net</th>
               </tr>
             </thead>
@@ -56,7 +56,7 @@ export default async function LeaderboardPage() {
           <h2 className="display text-xl font-bold uppercase tracking-wide text-soft">
             Calibrating
           </h2>
-          <p className="text-xs text-soft">Not enough settled predictions to rank yet.</p>
+          <p className="text-xs text-soft">Not enough resolved predictions to rank yet.</p>
           <ul className="mt-3 divide-y divide-line rounded-lg border border-line bg-surface">
             {unranked.map((s) => (
               <li key={s.member.id} className="flex items-center gap-3 px-4 py-2.5 text-sm">

@@ -58,7 +58,7 @@ export default async function MembersPage() {
             Invite a friend
           </h2>
           <p className="text-xs text-soft">
-            They sign in with the Google account for this email and start betting straight away.
+            They sign in with the Google account for this email and can bet straight away.
           </p>
           <div className="mt-2">
             <InviteForm />

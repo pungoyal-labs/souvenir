@@ -75,7 +75,7 @@ export default async function MemberPage({ params }: { params: Promise<{ id: str
       {openPositions.length > 0 && (
         <section className="mt-7">
           <h2 className="display text-xl font-bold uppercase tracking-wide text-soft">
-            Currently at stake — <Units c={openPositions.reduce((s, v) => s + v.myStakeC, 0)} />
+            Open bets — <Units c={openPositions.reduce((s, v) => s + v.myStakeC, 0)} />
           </h2>
           <ul className="mt-3 divide-y divide-line rounded-lg border border-line bg-surface">
             {openPositions.map((v) => (
@@ -98,10 +98,10 @@ export default async function MemberPage({ params }: { params: Promise<{ id: str
 
       <section className="mt-7">
         <h2 className="display text-xl font-bold uppercase tracking-wide text-soft">
-          Settled calls
+          Resolved predictions
         </h2>
         {results.length === 0 ? (
-          <p className="mt-2 text-sm text-soft">No settled predictions yet.</p>
+          <p className="mt-2 text-sm text-soft">Nothing resolved yet.</p>
         ) : (
           <ul className="mt-3 divide-y divide-line rounded-lg border border-line bg-surface">
             {results.map((r) => (

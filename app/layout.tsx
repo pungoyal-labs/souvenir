@@ -57,7 +57,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             {member && (
               <nav className="order-last -mx-4 flex w-screen items-center gap-1 overflow-x-auto px-4 text-sm sm:order-none sm:mx-0 sm:w-auto sm:px-0">
                 <Link href="/" className="rounded px-2 py-1 hover:bg-white/10">
-                  Markets
+                  Predictions
                 </Link>
                 <Link href="/leaderboard" className="rounded px-2 py-1 hover:bg-white/10">
                   Leaderboard

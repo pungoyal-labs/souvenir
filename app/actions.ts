@@ -94,16 +94,19 @@ export async function polishAction(
   feedback: string,
 ): Promise<ActionResult & { draft?: PolishedDraft }> {
   await requireMemberId();
-  if (!llmEnabled) return { ok: false, error: "Polish isn't configured on this deploy." };
+  if (!llmEnabled) return { ok: false, error: "The magic isn't switched on for this deploy." };
   if (!question.trim() && !criteria.trim()) {
-    return { ok: false, error: "Write a rough draft first — then polish it." };
+    return {
+      ok: false,
+      error: "Write a rough draft first — the magic needs something to work with.",
+    };
   }
   try {
     const draft = await polishMarketDraft({ question, criteria }, feedback);
     return { ok: true, draft };
   } catch (err) {
     logger.error({ err }, "polish failed");
-    return { ok: false, error: "The polish model didn't answer. Try again." };
+    return { ok: false, error: "The magic fizzled. Try again." };
   }
 }
 

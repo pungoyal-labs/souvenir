@@ -48,12 +48,10 @@ export function BetPanel({
 
   return (
     <div className="rounded-lg border border-line bg-surface p-4">
-      <h3 className="display text-lg font-bold uppercase tracking-wide text-soft">
-        Take a position
-      </h3>
+      <h3 className="display text-lg font-bold uppercase tracking-wide text-soft">Place a bet</h3>
 
       {maxUnits < 1 ? (
-        <p className="mt-2 text-sm text-soft">You've hit the exposure limit on this market.</p>
+        <p className="mt-2 text-sm text-soft">You've hit the exposure limit on this prediction.</p>
       ) : (
         <>
           <div className="mt-3 flex items-center gap-3">
@@ -90,7 +88,7 @@ export function BetPanel({
               onClick={() => bet("yes")}
               className="display rounded-md bg-yes py-2.5 text-lg font-bold uppercase text-white hover:bg-yes-press disabled:cursor-not-allowed disabled:opacity-40"
             >
-              Back yes
+              Bet yes
             </button>
             <button
               type="button"
@@ -98,7 +96,7 @@ export function BetPanel({
               onClick={() => bet("no")}
               className="display rounded-md bg-no py-2.5 text-lg font-bold uppercase text-white hover:bg-no-press disabled:cursor-not-allowed disabled:opacity-40"
             >
-              Back no
+              Bet no
             </button>
           </div>
         </>
@@ -107,7 +105,7 @@ export function BetPanel({
       {mySide && (
         <div className="mt-3 border-t border-line pt-3 text-sm">
           <p>
-            You have{" "}
+            You've bet{" "}
             <span className="mono font-bold">
               <Units c={myStakeC} />
             </span>{" "}
@@ -119,7 +117,7 @@ export function BetPanel({
             onClick={switchSide}
             className="mt-1.5 rounded-md border border-line px-3 py-1.5 font-semibold hover:bg-paper disabled:opacity-40"
           >
-            Switch entire stake to {other.toUpperCase()}
+            Switch entire bet to {other.toUpperCase()}
           </button>
         </div>
       )}

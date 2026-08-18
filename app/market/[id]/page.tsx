@@ -26,7 +26,7 @@ export default async function MarketPage({ params }: { params: Promise<{ id: str
   return (
     <div className="mx-auto max-w-3xl">
       <Link href="/" className="text-sm text-soft hover:text-ink">
-        ← All markets
+        ← All predictions
       </Link>
 
       <div className="mt-3 flex items-center justify-between gap-3">
@@ -51,7 +51,7 @@ export default async function MarketPage({ params }: { params: Promise<{ id: str
                 Resolved <SideChip side={market.status} />
               </span>
             ) : (
-              "Voided — all stakes returned"
+              "Voided — all bets returned"
             )}
           </p>
           <p className="mt-1 text-xs text-soft">
@@ -89,18 +89,16 @@ export default async function MarketPage({ params }: { params: Promise<{ id: str
         <PoolBar yesPoolC={view.yesPoolC} noPoolC={view.noPoolC} />
         {totalPoolC > 0 && (
           <p className="mono mt-1 text-center text-xs text-soft">
-            <Units c={totalPoolC} /> in the pot
+            <Units c={totalPoolC} /> in the pool
           </p>
         )}
       </div>
 
       {/* Who believes what */}
       <section className="mt-5">
-        <h2 className="display text-lg font-bold uppercase tracking-wide text-soft">Positions</h2>
+        <h2 className="display text-lg font-bold uppercase tracking-wide text-soft">Bets</h2>
         {view.participants.length === 0 ? (
-          <p className="mt-2 text-sm text-soft">
-            Nobody has committed yet. First in sets the tone.
-          </p>
+          <p className="mt-2 text-sm text-soft">Nobody has bet yet. First in sets the tone.</p>
         ) : (
           <ul className="mt-2 divide-y divide-line rounded-lg border border-line bg-surface">
             {view.participants.map((p) => (

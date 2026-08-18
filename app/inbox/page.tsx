@@ -17,14 +17,14 @@ export default async function InboxPage() {
     <div className="mx-auto max-w-2xl">
       <h1 className="display text-4xl font-extrabold uppercase tracking-wide">Inbox</h1>
       <p className="mt-1 text-sm text-soft">
-        New predictions, moves on your markets, and verdicts on your calls.
+        New predictions, bets on the ones you're in, and verdicts when they resolve.
       </p>
 
       {items.length === 0 ? (
         <div className="mt-5 rounded-lg border border-dashed border-line bg-surface p-8 text-center">
           <p className="display text-2xl font-bold">All quiet.</p>
           <p className="mt-1 text-sm text-soft">
-            When friends open markets or move against you, it shows up here.
+            When friends open predictions or bet against you, it shows up here.
           </p>
         </div>
       ) : (
@@ -69,7 +69,7 @@ function Line({ item }: { item: InboxItem }) {
   const name = <span className="font-semibold">{item.actor.name}</span>;
   switch (item.kind) {
     case "new_market":
-      return <>{name} opened a new market</>;
+      return <>{name} opened a new prediction</>;
     case "activity":
       return (
         <>
@@ -84,7 +84,7 @@ function Line({ item }: { item: InboxItem }) {
         <>
           {name}{" "}
           {item.market.status === "refunded"
-            ? "voided the market"
+            ? "voided it"
             : `resolved it ${item.market.status.toUpperCase()}`}
           {item.myProfitC !== null && (
             <span
@@ -93,7 +93,7 @@ function Line({ item }: { item: InboxItem }) {
               }`}
             >
               {item.myProfitC === 0 ? (
-                "(stake returned)"
+                "(bet returned)"
               ) : (
                 <>
                   (you {item.myProfitC > 0 ? "won" : "lost"} <Units c={Math.abs(item.myProfitC)} />)

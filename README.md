@@ -7,22 +7,27 @@ and over time the leaderboard reveals who is actually good at predicting things.
 
 ## The game
 
-- Any member opens a **market**: one binary question plus explicit resolution
-  criteria. The creator settles it later as **YES**, **NO**, or **void**.
-- Members back either side, up to **10 units** total exposure per market
-  (`MAX_STAKE_UNITS`). One side at a time; a **switch** moves your whole stake
+- Any member opens a **prediction**: one binary question plus explicit resolution
+  criteria. The creator resolves it later as **YES**, **NO**, or **void**.
+- Members bet on either side, up to **10 units** total exposure per prediction
+  (`MAX_STAKE_UNITS`). One side at a time; a **switch** moves your whole bet
   across before resolution.
 - On resolution the winning side splits the **entire pool** pro-rata. Rounding
   uses the largest-remainder method so payouts sum to the pool exactly. Voided
-  markets (and resolutions where nobody held the winning side) refund all stakes.
+  predictions (and resolutions where nobody held the winning side) refund every bet.
 - Members have an **infinite bank**: there is no starting balance and no
   balance check — your headline number is lifetime net, and it can go negative.
-- The **leaderboard** ranks by return on units wagered, and only once you have
+- The **leaderboard** ranks by return on units bet, and only once you have
   `RANKED_MIN_RESOLVED` (default 5) resolved predictions; before that you're
   "calibrating". No odds or implied probabilities are ever displayed.
-- Each member has an **inbox**: new markets, moves on markets they're in, and
-  verdicts on their calls. It is derived from the ledger at read time — the only
-  stored state is a per-member "seen" timestamp.
+- Each member has an **inbox**: new predictions, bets on the ones they're in, and
+  verdicts when those resolve. It is derived from the ledger at read time — the
+  only stored state is a per-member "seen" timestamp.
+
+**Vocabulary.** The UI says *prediction*, *bet*, *resolve* (and *pool*, never
+"pot"). The code and schema say `market`, `stake`, and `settle*` — routes, tables
+and the engine's settlement math all keep those names. Keep the two vocabularies
+apart rather than half-renaming either.
 
 ## Accounting
 
@@ -38,7 +43,7 @@ settlement math and `lib/engine.test.ts` fuzz-tests the invariant.
 
 Next.js 16 (App Router, server actions) · React 19 · TypeScript 7 ·
 Tailwind CSS 4 · Google OAuth (no auth library) · Postgres 18 · Drizzle ORM ·
-Biome · Vitest · pnpm 11 · Docker. Optional LLM polish of market drafts via any
+Biome · Vitest · pnpm 11 · Docker. Optional LLM polish of prediction drafts via any
 Anthropic-compatible API (configured for MiniMax M3).
 
 ## Local development

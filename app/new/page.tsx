@@ -11,12 +11,12 @@ export default async function NewMarketPage() {
         Stick your neck out
       </h1>
       <p className="mt-1 text-sm text-soft">
-        One binary question. Say exactly how you'll decide YES or NO — you're the one who settles
-        it, and the criteria go on the permanent record. Everyone can stake up to{" "}
+        One binary question. Say exactly how you'll decide YES or NO — you're the one who resolves
+        it, and the criteria go on the permanent record. Everyone can bet up to{" "}
         {env.MAX_STAKE_UNITS} units on either side.
       </p>
       <div className="mt-5">
-        <NewMarketForm polishAvailable={llmEnabled} llmModel={env.LLM_MODEL} />
+        <NewMarketForm polishAvailable={llmEnabled} />
       </div>
     </div>
   );

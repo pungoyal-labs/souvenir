@@ -13,7 +13,7 @@ const OPTIONS: { value: Outcome; label: string; hint: string }[] = [
   {
     value: "refunded",
     label: "Void",
-    hint: "Ambiguous or unresolvable — everyone gets their stake back",
+    hint: "Ambiguous or unresolvable — everyone gets their bet back",
   },
 ];
 
@@ -44,7 +44,7 @@ export function ResolvePanel({ marketId }: { marketId: string }) {
         Resolve — your call
       </h3>
       <p className="mt-1 text-xs text-soft">
-        You created this market, so you settle it. Resolution is final.
+        You created this prediction, so you resolve it. Resolution is final.
       </p>
 
       <div className="mt-3 grid grid-cols-3 gap-2">
@@ -87,7 +87,7 @@ export function ResolvePanel({ marketId }: { marketId: string }) {
           onClick={() => setConfirming(true)}
           className="mt-3 w-full rounded-md bg-felt py-2.5 font-semibold text-white hover:bg-felt-deep disabled:opacity-40"
         >
-          Settle this market
+          Resolve this prediction
         </button>
       ) : (
         <div className="mt-3 flex gap-2">
@@ -98,7 +98,7 @@ export function ResolvePanel({ marketId }: { marketId: string }) {
             className="flex-1 rounded-md bg-felt py-2.5 font-semibold text-white hover:bg-felt-deep disabled:opacity-40"
           >
             {pending
-              ? "Settling…"
+              ? "Resolving…"
               : `Confirm ${outcome === "refunded" ? "void" : outcome?.toUpperCase()} — final`}
           </button>
           <button

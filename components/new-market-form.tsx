@@ -5,13 +5,7 @@ import { useState, useTransition } from "react";
 import { createMarketAction, polishAction } from "@/app/actions";
 import type { PolishedDraft } from "@/lib/llm";
 
-export function NewMarketForm({
-  polishAvailable,
-  llmModel,
-}: {
-  polishAvailable: boolean;
-  llmModel: string;
-}) {
+export function NewMarketForm({ polishAvailable }: { polishAvailable: boolean }) {
   const router = useRouter();
   const [publishing, startPublish] = useTransition();
   const [polishing, startPolish] = useTransition();
@@ -27,7 +21,7 @@ export function NewMarketForm({
       setError(null);
       const res = await polishAction(question, criteria, feedback);
       if (!res.ok || !res.draft) {
-        setError(res.error ?? "Polish failed.");
+        setError(res.error ?? "The magic fizzled. Try again.");
       } else {
         setSuggestion(res.draft);
         setFeedback("");
@@ -80,9 +74,9 @@ export function NewMarketForm({
         <div className="rounded-lg border border-dashed border-felt/40 bg-felt-tint/40 p-4">
           <div className="flex items-center justify-between gap-3">
             <p className="text-sm">
-              <span className="font-semibold">Tighten it up?</span>{" "}
+              <span className="font-semibold">✨ Sprinkle some AI magic?</span>{" "}
               <span className="text-soft">
-                {llmModel} can sharpen the wording and criteria before your friends see it.
+                It'll sharpen the wording and close the loopholes before your friends see it.
               </span>
             </p>
             <button
@@ -91,7 +85,7 @@ export function NewMarketForm({
               onClick={polish}
               className="shrink-0 rounded-md border border-felt px-3 py-1.5 text-sm font-semibold text-felt hover:bg-felt hover:text-white disabled:opacity-40"
             >
-              {polishing ? "Polishing…" : suggestion ? "Polish again" : "Polish draft"}
+              {polishing ? "Working magic…" : suggestion ? "Try again" : "Work some magic"}
             </button>
           </div>
 
@@ -124,7 +118,7 @@ export function NewMarketForm({
                 <input
                   value={feedback}
                   onChange={(e) => setFeedback(e.target.value)}
-                  placeholder="Tell it what to change, then polish again"
+                  placeholder="Say what to change, then try again"
                   className="min-w-0 flex-1 rounded-md border border-line bg-paper px-3 py-1.5 text-sm"
                 />
               </div>

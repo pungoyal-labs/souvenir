@@ -1,4 +1,4 @@
-// Optional LLM polish for market drafts, via any Anthropic-compatible API
+// Optional LLM polish for prediction drafts, via any Anthropic-compatible API
 // (configured for MiniMax M3 through LLM_BASE_URL / LLM_API_KEY / LLM_MODEL).
 // Purely advisory: the creator iterates on the draft before publishing, and
 // nothing in the core game depends on this being configured.
@@ -18,7 +18,7 @@ export interface PolishedDraft extends MarketDraft {
   rationale: string;
 }
 
-const SYSTEM_PROMPT = `You edit draft predictions for a private, zero-sum prediction game among friends. Every market is a single binary question that will later be resolved YES or NO by its creator.
+const SYSTEM_PROMPT = `You edit draft predictions for a private, zero-sum prediction game among friends. Every prediction is a single binary question that will later be resolved YES or NO by its creator.
 
 House conventions:
 - The question is one sentence, phrased so it is unambiguously answerable YES or NO, with a concrete subject, threshold, place and deadline where relevant. Playful tone is welcome; vagueness is not.

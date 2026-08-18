@@ -12,7 +12,7 @@ export function MarketCard({
   myProfitC,
 }: {
   view: MarketView;
-  /** For settled markets: the viewer's net result, if they took part. */
+  /** For resolved predictions: the viewer's net result, if they took part. */
   myProfitC?: number;
 }) {
   const { market, creator, participants } = view;

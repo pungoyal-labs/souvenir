@@ -19,6 +19,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ v
   ]);
 
   const committedC = open.reduce((s, v) => s + v.myStakeC, 0);
+  const committedCount = open.filter((v) => v.myStakeC > 0).length;
   const myStats = summarizeResults(results);
   const profitByMarket = new Map(results.map((r) => [r.market.id, r.profitC]));
 
@@ -29,11 +30,11 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ v
         <div className="grid grid-cols-3 gap-2 sm:gap-3">
           <StatTile label="Net units" value={<Units c={netC} sign />} />
           <StatTile
-            label="At stake"
+            label="Open bets"
             value={<Units c={committedC} />}
             sub={
               committedC > 0
-                ? `across ${open.filter((v) => v.myStakeC > 0).length} open`
+                ? `across ${committedCount} prediction${committedCount === 1 ? "" : "s"}`
                 : "nothing yet"
             }
           />
@@ -43,7 +44,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ v
             sub={
               myStats.resolvedCount > 0
                 ? `${fmtUnits(myStats.profitC, { sign: true })}${UNIT} lifetime`
-                : "no calls settled"
+                : "nothing resolved yet"
             }
           />
         </div>
@@ -54,13 +55,13 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ v
               href="/"
               className={showSettled ? "text-soft hover:text-ink" : "border-b-[3px] border-felt"}
             >
-              Open books
+              Open predictions
             </Link>
             <Link
               href="/?view=settled"
               className={showSettled ? "border-b-[3px] border-felt" : "text-soft hover:text-ink"}
             >
-              Settled
+              Resolved
             </Link>
           </div>
           <Link
@@ -91,7 +92,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ v
         )}
         {showSettled && resolved.length === 0 && (
           <p className="mt-4 text-sm text-soft">
-            Nothing settled yet. History starts with the first resolution.
+            Nothing resolved yet. History starts with the first verdict.
           </p>
         )}
       </div>
