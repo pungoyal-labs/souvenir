@@ -66,9 +66,13 @@ jobs:
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04-arm
     # Vars/secrets come from the "oracle-cloud" GitHub environment:
-    #   vars:    OCI_HOST, OCI_USER, OCI_SSH_PORT (optional), DEPLOY_DIR, GHCR_USER
-    #   secrets: OCI_SSH_KEY, GHCR_TOKEN (PAT with read:packages)
+    #   vars:    OCI_HOST, OCI_USER, OCI_SSH_PORT (optional), DEPLOY_DIR
+    #   secrets: OCI_SSH_KEY
+    # The registry pull uses this run's ephemeral GITHUB_TOKEN — no PAT needed.
     environment: oracle-cloud
+    permissions:
+      contents: read
+      packages: read
     concurrency:
       group: deploy-oracle-cloud
       cancel-in-progress: false
@@ -78,8 +82,8 @@ jobs:
         env:
           APP_IMAGE: ${{ needs.image.outputs.image }}:${{ github.sha }}
           DEPLOY_DIR: ${{ vars.DEPLOY_DIR }}
-          GHCR_USER: ${{ vars.GHCR_USER }}
-          GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
+          GHCR_USER: ${{ github.actor }}
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           host: ${{ vars.OCI_HOST }}
           username: ${{ vars.OCI_USER }}

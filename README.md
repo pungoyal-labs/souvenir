@@ -101,9 +101,11 @@ Configure a GitHub **environment named `oracle-cloud`** with:
 | var | `OCI_USER` | ssh user |
 | var | `OCI_SSH_PORT` | optional, defaults to 22 |
 | var | `DEPLOY_DIR` | directory on the server holding `docker-compose.yml` + `.env` |
-| var | `GHCR_USER` | GitHub username for registry pulls |
 | secret | `OCI_SSH_KEY` | private key for the ssh user |
-| secret | `GHCR_TOKEN` | PAT with `read:packages` |
+
+No registry credentials are needed: the deploy job logs the server into GHCR
+with its own ephemeral `GITHUB_TOKEN` (`packages: read`), which is valid for
+exactly as long as the deploy runs.
 
 One-time server setup: install Docker, create `DEPLOY_DIR` containing this
 repo's `docker-compose.yml` and a production `.env` (strong `AUTH_SECRET` and
