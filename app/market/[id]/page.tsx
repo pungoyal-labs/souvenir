@@ -10,11 +10,13 @@ import { Units } from "@/components/units";
 import { getMarketView } from "@/lib/data";
 import { env } from "@/lib/env";
 import { fmtDate, timeAgo } from "@/lib/format";
+import { lingoOf } from "@/lib/lingo";
 import { requireMember } from "@/lib/session";
 import { toCents } from "@/lib/units";
 
 export default async function MarketPage({ params }: { params: Promise<{ id: string }> }) {
   const me = await requireMember();
+  const t = lingoOf(me.lingo);
   const { id } = await params;
   const data = await getMarketView(id, me.id);
   if (!data) notFound();
@@ -98,9 +100,7 @@ export default async function MarketPage({ params }: { params: Promise<{ id: str
       <section className="mt-5">
         <h2 className="display text-lg font-bold uppercase tracking-wide text-soft">Bets</h2>
         {view.participants.length === 0 ? (
-          <p className="mt-2 text-sm text-soft">
-            Khaali table — nobody has bet yet. First in sets the tone.
-          </p>
+          <p className="mt-2 text-sm text-soft">{t.betsEmpty}</p>
         ) : (
           <ul className="mt-2 divide-y divide-line rounded-lg border border-line bg-surface">
             {view.participants.map((p) => (
@@ -129,17 +129,18 @@ export default async function MarketPage({ params }: { params: Promise<{ id: str
             mySide={view.mySide}
             myStakeC={view.myStakeC}
             maxStakeC={toCents(env.MAX_STAKE_UNITS)}
+            lingo={me.lingo}
           />
-          {market.creatorId === me.id && <ResolvePanel marketId={market.id} />}
+          {market.creatorId === me.id && <ResolvePanel marketId={market.id} lingo={me.lingo} />}
         </div>
       )}
 
       <section className="mt-7">
         <h2 className="display text-lg font-bold uppercase tracking-wide text-soft">
-          Scene so far
+          {t.activitySoFarHeading}
         </h2>
         <div className="mt-3">
-          <ActivityFeed items={activity} />
+          <ActivityFeed items={activity} lingo={me.lingo} />
         </div>
       </section>
     </div>

@@ -18,13 +18,15 @@ export interface PolishedDraft extends MarketDraft {
   rationale: string;
 }
 
-const SYSTEM_PROMPT = `You edit draft predictions for a private, zero-sum prediction game among friends. Every prediction is a single binary question that will later be resolved YES or NO by its creator.
+const systemPrompt = (
+  register: string,
+) => `You edit draft predictions for a private, zero-sum prediction game among friends. Every prediction is a single binary question that will later be resolved YES or NO by its creator.
 
 House conventions:
 - The question is one sentence, phrased so it is unambiguously answerable YES or NO, with a concrete subject, threshold, place and deadline where relevant. Playful tone is welcome; vagueness is not.
 - The resolution criteria state exactly how the creator will decide: what counts, what is measured, who or what is the source of truth, and the moment of measurement. Someone who disagrees with the creator should still agree the criteria were followed.
 - Keep the creator's intent and stakes exactly as they meant them. Sharpen; never invent a different bet.
-- The group's register is Bangalore English with light Kannada seasoning (scene, swalpa, guru). Match the creator's tone; never force slang into a question that was written straight.
+- The creator's register is ${register}. Match the creator's tone; never force slang into a question that was written straight.
 - The criteria are read on phones: short sentences, with a blank line between ideas when there are more than two. Never one long unbroken paragraph, and never a word or token longer than about 30 characters.
 - Question under 200 characters. Criteria under 2000 characters.
 
@@ -34,6 +36,7 @@ Respond with ONLY a JSON object, no markdown fences:
 export async function polishMarketDraft(
   draft: MarketDraft,
   feedback?: string,
+  register = "plain English",
 ): Promise<PolishedDraft> {
   if (!llmEnabled) throw new Error("LLM polish is not configured");
 
@@ -54,7 +57,7 @@ export async function polishMarketDraft(
   const response = await client.messages.create({
     model: env.LLM_MODEL,
     max_tokens: 2000,
-    system: SYSTEM_PROMPT,
+    system: systemPrompt(register),
     messages: [{ role: "user", content: userParts.join("\n\n") }],
   });
   logger.info(

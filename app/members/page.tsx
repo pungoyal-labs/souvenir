@@ -4,10 +4,12 @@ import { InviteForm } from "@/components/invite-form";
 import { Units } from "@/components/units";
 import { isFounder, listInvites, listMembers, netOf } from "@/lib/data";
 import { fmtDate } from "@/lib/format";
+import { lingoOf } from "@/lib/lingo";
 import { requireMember } from "@/lib/session";
 
 export default async function MembersPage() {
   const me = await requireMember();
+  const t = lingoOf(me.lingo);
   const all = await listMembers();
   const invites = await listInvites();
   const balances = await Promise.all(all.map((m) => netOf(m.id)));
@@ -17,10 +19,8 @@ export default async function MembersPage() {
   return (
     <div className="mx-auto max-w-2xl">
       <p className="eyebrow">Members</p>
-      <h1 className="display text-4xl font-extrabold uppercase tracking-wide">The adda</h1>
-      <p className="mt-1 text-sm text-soft">
-        One private table. Everyone sees everything — the neighbourhood aunties would approve.
-      </p>
+      <h1 className="display text-4xl font-extrabold uppercase tracking-wide">{t.membersTitle}</h1>
+      <p className="mt-1 text-sm text-soft">{t.membersSub}</p>
 
       <ul className="mt-5 divide-y divide-line rounded-lg border border-line bg-surface">
         {all.map((m, i) => (

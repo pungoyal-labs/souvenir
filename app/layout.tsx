@@ -8,7 +8,7 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { Units } from "@/components/units";
 import { destroySession, getSession } from "@/lib/auth";
 import { getMember, inbox, netOf } from "@/lib/data";
-import { UNIT } from "@/lib/units";
+import { lingoOf } from "@/lib/lingo";
 import "./globals.css";
 
 const display = Big_Shoulders({
@@ -26,8 +26,7 @@ const mono = Spline_Sans_Mono({
 
 export const metadata: Metadata = {
   title: "Chiang Pai",
-  description:
-    "Namma private prediction adda. Zero-sum, full bragging rights, yella on the record.",
+  description: "A private prediction game for friends. Zero-sum, all bragging rights.",
 };
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
@@ -35,6 +34,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const member = session ? await getMember(session.memberId) : null;
   const netC = member ? await netOf(member.id) : 0;
   const hasUnread = member ? (await inbox(member.id)).unreadCount > 0 : false;
+  const t = lingoOf(member?.lingo ?? "english");
 
   return (
     <html lang="en" suppressHydrationWarning>
@@ -117,10 +117,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         </header>
         <div aria-hidden className="zari" />
         <main className="mx-auto max-w-5xl px-4 py-6">{children}</main>
-        <footer className="mx-auto max-w-5xl px-4 pb-8 pt-4 text-xs text-soft">
-          Virtual units ({UNIT}) only — no money, only maryaade. Zero-sum: winners split exactly
-          what losers put in. Yella on the record.
-        </footer>
+        <footer className="mx-auto max-w-5xl px-4 pb-8 pt-4 text-xs text-soft">{t.footer}</footer>
       </body>
     </html>
   );

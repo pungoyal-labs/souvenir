@@ -4,20 +4,25 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { resolveAction } from "@/app/actions";
 import type { Side } from "@/lib/engine";
+import { lingoOf } from "@/lib/lingo";
 
 type Outcome = Side | "refunded";
 
-const OPTIONS: { value: Outcome; label: string; hint: string }[] = [
+const OPTIONS: { value: Outcome; label: string; hint: string | null }[] = [
   { value: "yes", label: "YES", hint: "The YES side splits the whole pool" },
   { value: "no", label: "NO", hint: "The NO side splits the whole pool" },
-  {
-    value: "refunded",
-    label: "Void",
-    hint: "Ambiguous or unresolvable — swalpa adjust maadi, everyone gets their bet back",
-  },
+  // The void hint comes from the lingo dictionary at render time.
+  { value: "refunded", label: "Void", hint: null },
 ];
 
-export function ResolvePanel({ marketId }: { marketId: string }) {
+export function ResolvePanel({
+  marketId,
+  lingo = "english",
+}: {
+  marketId: string;
+  lingo?: string;
+}) {
+  const t = lingoOf(lingo);
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [outcome, setOutcome] = useState<Outcome | null>(null);
@@ -31,7 +36,7 @@ export function ResolvePanel({ marketId }: { marketId: string }) {
       setError(null);
       const res = await resolveAction(marketId, outcome, note);
       if (!res.ok) {
-        setError(res.error ?? "Aiyo, that didn't work.");
+        setError(res.error ?? t.oops);
         setConfirming(false);
       } else {
         router.refresh();
@@ -52,7 +57,7 @@ export function ResolvePanel({ marketId }: { marketId: string }) {
           <button
             key={opt.value}
             type="button"
-            title={opt.hint}
+            title={opt.hint ?? t.voidHint}
             onClick={() => {
               setOutcome(opt.value);
               setConfirming(false);

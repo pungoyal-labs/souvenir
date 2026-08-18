@@ -18,25 +18,25 @@ export default async function SignInPage({
       <div aria-hidden className="zari" />
       <div className="p-8">
         <Logo size={64} className="mx-auto rounded-2xl" />
-        <p className="eyebrow mt-5">Ee sala cup namde?</p>
+        <p className="eyebrow mt-5">Who saw it coming?</p>
         <p className="display mt-1 text-5xl font-extrabold uppercase leading-none tracking-wide">
           Chiang
           <br />
           Pai
         </p>
         <p className="mt-3 text-sm text-soft">
-          Namma private prediction adda. Virtual units, real reputations.
+          A private prediction game. Virtual units, real reputations.
         </p>
 
         {error === "AccessDenied" && (
           <p className="mt-4 rounded-md bg-no-tint px-3 py-2 text-sm font-semibold text-no-deep">
-            Aiyo — that Google account isn't on the list. This adda is invite-only; ask a founding
-            member to add you.
+            That Google account isn't on the list. This table is invite-only; ask a founding member
+            to add you.
           </p>
         )}
         {error && error !== "AccessDenied" && (
           <p className="mt-4 rounded-md bg-no-tint px-3 py-2 text-sm font-semibold text-no-deep">
-            Aiyo, sign-in failed. Try once more.
+            Sign-in failed. Try again.
           </p>
         )}
 

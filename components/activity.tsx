@@ -1,10 +1,11 @@
 import Link from "next/link";
 import type { ActivityItem } from "@/lib/data";
 import { timeAgo } from "@/lib/format";
+import { type Lingo, lingoOf } from "@/lib/lingo";
 import { fmtUnits, UNIT } from "@/lib/units";
 import { Avatar } from "./avatar";
 
-function phrase(item: ActivityItem): string {
+function phrase(item: ActivityItem, t: Lingo): string {
   const amount = `${fmtUnits(item.row.amountC)}${UNIT}`;
   switch (item.row.kind) {
     case "bet":
@@ -16,19 +17,22 @@ function phrase(item: ActivityItem): string {
     case "refund":
       return `was refunded ${amount}`;
     case "grant":
-      return "joined the adda";
+      return t.joinedFeed;
   }
 }
 
 export function ActivityFeed({
   items,
   showMarket,
+  lingo = "english",
 }: {
   items: ActivityItem[];
   showMarket?: boolean;
+  lingo?: string;
 }) {
+  const t = lingoOf(lingo);
   if (items.length === 0) {
-    return <p className="text-sm text-soft">Scene illa. Quiet before the action.</p>;
+    return <p className="text-sm text-soft">{t.activityEmpty}</p>;
   }
   return (
     <ul className="space-y-2.5">
@@ -36,7 +40,7 @@ export function ActivityFeed({
         <li key={item.row.id} className="flex items-start gap-2 text-sm">
           <Avatar name={item.member.name} image={item.member.image} size={22} />
           <span className="min-w-0">
-            <span className="font-semibold">{item.member.name}</span> {phrase(item)}
+            <span className="font-semibold">{item.member.name}</span> {phrase(item, t)}
             {showMarket && item.market && (
               <>
                 {" — "}

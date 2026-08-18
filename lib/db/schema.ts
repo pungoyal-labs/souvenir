@@ -10,6 +10,8 @@ export const members = pgTable("members", {
   name: text("name").notNull(),
   image: text("image"),
   joinedAt: timestamp("joined_at", { withTimezone: true }).notNull().defaultNow(),
+  // The lingo the UI speaks to this member in; a lib/lingo.ts key.
+  lingo: text("lingo").notNull().default("english"),
   // Inbox read cursor: events after this instant count as unread. The inbox
   // itself is derived entirely from markets + ledger — no notification rows.
   inboxSeenAt: timestamp("inbox_seen_at", { withTimezone: true }),

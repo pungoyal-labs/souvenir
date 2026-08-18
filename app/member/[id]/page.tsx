@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Avatar } from "@/components/avatar";
+import { LingoPicker } from "@/components/lingo-picker";
 import { SideChip } from "@/components/side-chip";
 import { Units } from "@/components/units";
 import {
@@ -12,6 +13,7 @@ import {
   summarizeResults,
 } from "@/lib/data";
 import { fmtDate, timeAgo } from "@/lib/format";
+import { type Lingo, lingoOf } from "@/lib/lingo";
 import { requireMember } from "@/lib/session";
 import { fmtPct, fmtUnits } from "@/lib/units";
 
@@ -21,6 +23,7 @@ export default async function MemberPage({ params }: { params: Promise<{ id: str
   const member = await getMember(id);
   if (!member) notFound();
   const isMe = member.id === me.id;
+  const t = lingoOf(me.lingo);
 
   const [netC, results, ledgerItems, { open }] = await Promise.all([
     netOf(member.id),
@@ -51,6 +54,11 @@ export default async function MemberPage({ params }: { params: Promise<{ id: str
             {isMe && " · this is you"}
           </p>
         </div>
+        {isMe && (
+          <div className="ml-auto">
+            <LingoPicker current={me.lingo} />
+          </div>
+        )}
       </div>
 
       <div className="mt-5 grid grid-cols-2 gap-2 sm:grid-cols-5 sm:gap-3">
@@ -159,7 +167,7 @@ export default async function MemberPage({ params }: { params: Promise<{ id: str
                     {timeAgo(item.row.at)}
                   </td>
                   <td className="px-2 py-2">
-                    {describe(item.row.kind, item.row.side)}
+                    {describe(item.row.kind, item.row.side, t)}
                     {item.market && (
                       <>
                         {" — "}
@@ -199,10 +207,10 @@ export default async function MemberPage({ params }: { params: Promise<{ id: str
   );
 }
 
-function describe(kind: string, side: string | null): string {
+function describe(kind: string, side: string | null, t: Lingo): string {
   switch (kind) {
     case "grant":
-      return "Joined the adda";
+      return t.joinedLedger;
     case "bet":
       return `Backed ${side?.toUpperCase()}`;
     case "switch":

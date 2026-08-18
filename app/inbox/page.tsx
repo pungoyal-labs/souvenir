@@ -3,11 +3,13 @@ import { Avatar } from "@/components/avatar";
 import { Units } from "@/components/units";
 import { type InboxItem, inbox, markInboxSeen } from "@/lib/data";
 import { timeAgo } from "@/lib/format";
+import { lingoOf } from "@/lib/lingo";
 import { requireMember } from "@/lib/session";
 import { fmtUnits, UNIT } from "@/lib/units";
 
 export default async function InboxPage() {
   const me = await requireMember();
+  const t = lingoOf(me.lingo);
   const { items } = await inbox(me.id);
   // Everything on screen is now seen; the unread highlights below still show
   // this one time because they were computed before the cursor moved.
@@ -22,10 +24,8 @@ export default async function InboxPage() {
 
       {items.length === 0 ? (
         <div className="mt-5 rounded-lg border border-dashed border-line bg-surface p-8 text-center">
-          <p className="display text-2xl font-bold uppercase tracking-wide">Full silence.</p>
-          <p className="mt-1 text-sm text-soft">
-            When friends open predictions or bet against you, the scene shows up here.
-          </p>
+          <p className="display text-2xl font-bold uppercase tracking-wide">{t.inboxEmptyTitle}</p>
+          <p className="mt-1 text-sm text-soft">{t.inboxEmptySub}</p>
         </div>
       ) : (
         <ul className="mt-5 divide-y divide-line rounded-lg border border-line bg-surface">

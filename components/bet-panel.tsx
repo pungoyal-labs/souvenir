@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { betAction, switchAction } from "@/app/actions";
 import type { Side } from "@/lib/engine";
+import { lingoOf } from "@/lib/lingo";
 import { Units } from "./units";
 
 export function BetPanel({
@@ -11,12 +12,15 @@ export function BetPanel({
   mySide,
   myStakeC,
   maxStakeC,
+  lingo = "english",
 }: {
   marketId: string;
   mySide: Side | null;
   myStakeC: number;
   maxStakeC: number;
+  lingo?: string;
 }) {
+  const t = lingoOf(lingo);
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [units, setUnits] = useState(1);
@@ -32,7 +36,7 @@ export function BetPanel({
     startTransition(async () => {
       setError(null);
       const res = await betAction(marketId, side, clamped);
-      if (!res.ok) setError(res.error ?? "Aiyo, that didn't work.");
+      if (!res.ok) setError(res.error ?? t.oops);
       else router.refresh();
     });
 
@@ -40,7 +44,7 @@ export function BetPanel({
     startTransition(async () => {
       setError(null);
       const res = await switchAction(marketId);
-      if (!res.ok) setError(res.error ?? "Aiyo, that didn't work.");
+      if (!res.ok) setError(res.error ?? t.oops);
       else router.refresh();
     });
 
@@ -51,9 +55,7 @@ export function BetPanel({
       <h3 className="display text-lg font-bold uppercase tracking-wide text-soft">Place a bet</h3>
 
       {maxUnits < 1 ? (
-        <p className="mt-2 text-sm text-soft">
-          Full house, guru — you've hit the stake limit on this prediction.
-        </p>
+        <p className="mt-2 text-sm text-soft">{t.stakeLimit}</p>
       ) : (
         <>
           <div className="mt-3 flex items-center gap-3">

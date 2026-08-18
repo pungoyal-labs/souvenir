@@ -3,11 +3,13 @@ import { ActivityFeed } from "@/components/activity";
 import { MarketCard } from "@/components/market-card";
 import { Units } from "@/components/units";
 import { listMarkets, memberResults, netOf, recentActivity, summarizeResults } from "@/lib/data";
+import { lingoOf } from "@/lib/lingo";
 import { requireMember } from "@/lib/session";
 import { fmtUnits, UNIT } from "@/lib/units";
 
 export default async function Home({ searchParams }: { searchParams: Promise<{ view?: string }> }) {
   const me = await requireMember();
+  const t = lingoOf(me.lingo);
   const { view } = await searchParams;
   const showSettled = view === "settled";
 
@@ -35,7 +37,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ v
             sub={
               committedC > 0
                 ? `across ${committedCount} prediction${committedCount === 1 ? "" : "s"}`
-                : "khaali for now"
+                : t.openBetsEmpty
             }
           />
           <StatTile
@@ -84,23 +86,21 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ v
 
         {!showSettled && open.length === 0 && (
           <div className="mt-4 rounded-lg border border-dashed border-line bg-surface p-8 text-center">
-            <p className="display text-2xl font-bold uppercase tracking-wide">Scene illa.</p>
-            <p className="mt-1 text-sm text-soft">
-              No open predictions. Somebody has to say "ee sala cup namde" first — why not you?
-            </p>
+            <p className="display text-2xl font-bold uppercase tracking-wide">{t.openEmptyTitle}</p>
+            <p className="mt-1 text-sm text-soft">{t.openEmptySub}</p>
           </div>
         )}
         {showSettled && resolved.length === 0 && (
-          <p className="mt-4 text-sm text-soft">
-            No verdicts yet. History starts with the first one.
-          </p>
+          <p className="mt-4 text-sm text-soft">{t.resolvedEmpty}</p>
         )}
       </div>
 
       <aside>
-        <h2 className="display text-lg font-bold uppercase tracking-wide text-soft">The scene</h2>
+        <h2 className="display text-lg font-bold uppercase tracking-wide text-soft">
+          {t.activityHeading}
+        </h2>
         <div className="mt-3">
-          <ActivityFeed items={activity} showMarket />
+          <ActivityFeed items={activity} showMarket lingo={me.lingo} />
         </div>
       </aside>
     </div>

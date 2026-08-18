@@ -798,6 +798,10 @@ export async function inbox(
   };
 }
 
+export async function setLingo(memberId: string, lingo: string): Promise<void> {
+  await db.update(members).set({ lingo }).where(eq(members.id, memberId));
+}
+
 export async function markInboxSeen(memberId: string): Promise<void> {
   await db.update(members).set({ inboxSeenAt: new Date() }).where(eq(members.id, memberId));
 }

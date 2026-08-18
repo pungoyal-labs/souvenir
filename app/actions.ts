@@ -3,8 +3,18 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
-import { createMarket, DataError, invite, placeBet, resolveMarket, switchSides } from "@/lib/data";
+import {
+  createMarket,
+  DataError,
+  getMember,
+  invite,
+  placeBet,
+  resolveMarket,
+  setLingo,
+  switchSides,
+} from "@/lib/data";
 import type { Side } from "@/lib/engine";
+import { isLingoKey, lingoOf } from "@/lib/lingo";
 import { llmEnabled, type PolishedDraft, polishMarketDraft } from "@/lib/llm";
 import { logger } from "@/lib/logger";
 
@@ -26,7 +36,7 @@ function asResult(err: unknown): ActionResult {
     return { ok: false, error: err.message };
   }
   logger.error({ err }, "action failed");
-  return { ok: false, error: "Aiyo, something went wrong. Try once more." };
+  return { ok: false, error: "Something went wrong. Try again." };
 }
 
 export async function betAction(
@@ -93,7 +103,7 @@ export async function polishAction(
   criteria: string,
   feedback: string,
 ): Promise<ActionResult & { draft?: PolishedDraft }> {
-  await requireMemberId();
+  const memberId = await requireMemberId();
   if (!llmEnabled) return { ok: false, error: "The magic isn't switched on for this deploy." };
   if (!question.trim() && !criteria.trim()) {
     return {
@@ -102,12 +112,23 @@ export async function polishAction(
     };
   }
   try {
-    const draft = await polishMarketDraft({ question, criteria }, feedback);
+    const member = await getMember(memberId);
+    const register = lingoOf(member?.lingo ?? "english").register;
+    const draft = await polishMarketDraft({ question, criteria }, feedback, register);
     return { ok: true, draft };
   } catch (err) {
     logger.error({ err }, "polish failed");
-    return { ok: false, error: "Aiyo, the magic fizzled. Try again." };
+    return { ok: false, error: "The magic fizzled. Try again." };
   }
+}
+
+export async function setLingoAction(lingo: string): Promise<ActionResult> {
+  const memberId = await requireMemberId();
+  if (!isLingoKey(lingo)) return { ok: false, error: "Pick a lingo from the list." };
+  await setLingo(memberId, lingo);
+  // The lingo colors copy on every page, including the layout's footer.
+  revalidatePath("/", "layout");
+  return { ok: true };
 }
 
 export async function inviteAction(email: string): Promise<ActionResult> {

@@ -3,9 +3,17 @@
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { createMarketAction, polishAction } from "@/app/actions";
+import { lingoOf } from "@/lib/lingo";
 import type { PolishedDraft } from "@/lib/llm";
 
-export function NewMarketForm({ polishAvailable }: { polishAvailable: boolean }) {
+export function NewMarketForm({
+  polishAvailable,
+  lingo = "english",
+}: {
+  polishAvailable: boolean;
+  lingo?: string;
+}) {
+  const t = lingoOf(lingo);
   const router = useRouter();
   const [publishing, startPublish] = useTransition();
   const [polishing, startPolish] = useTransition();
@@ -21,7 +29,7 @@ export function NewMarketForm({ polishAvailable }: { polishAvailable: boolean })
       setError(null);
       const res = await polishAction(question, criteria, feedback);
       if (!res.ok || !res.draft) {
-        setError(res.error ?? "Aiyo, the magic fizzled. Try again.");
+        setError(res.error ?? "The magic fizzled. Try again.");
       } else {
         setSuggestion(res.draft);
         setFeedback("");
@@ -51,7 +59,7 @@ export function NewMarketForm({ polishAvailable }: { polishAvailable: boolean })
           value={question}
           onChange={(e) => setQuestion(e.target.value)}
           maxLength={200}
-          placeholder="Will it rain in Jayanagar before 6 PM tomorrow?"
+          placeholder={t.questionPlaceholder}
           className="mt-1 w-full rounded-md border border-line bg-surface px-3 py-2.5 text-lg"
         />
       </label>
@@ -65,7 +73,7 @@ export function NewMarketForm({ polishAvailable }: { polishAvailable: boolean })
           onChange={(e) => setCriteria(e.target.value)}
           maxLength={2000}
           rows={4}
-          placeholder="I'll check from my terrace in 4th Block at 6:00 PM sharp — a wet road counts as rain, photo as evidence. Rain resolves YES; dry resolves NO. If I'm out of Bangalore by then, I'll void it."
+          placeholder={t.criteriaPlaceholder}
           className="mt-1 w-full rounded-md border border-line bg-surface px-3 py-2.5 text-sm"
         />
       </label>
