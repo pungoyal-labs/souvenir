@@ -14,6 +14,9 @@ RUN npm i -g pnpm@11
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 ENV NEXT_TELEMETRY_DISABLED=1
+# Satisfies lib/env.ts validation during page-data collection. Build-stage
+# only — the runner stage starts FROM a fresh base and reads the real .env.
+ENV AUTH_SECRET=insecure-build-time-placeholder
 RUN pnpm build
 
 # The single runtime image. Serves the app, and also runs the one-shot

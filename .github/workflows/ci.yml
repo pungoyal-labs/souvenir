@@ -28,6 +28,10 @@ jobs:
         run: pnpm vitest run
       - name: Build
         run: pnpm build
+        env:
+          # Satisfies lib/env.ts validation during page-data collection; the
+          # running server always gets its real secret from the deploy .env.
+          AUTH_SECRET: insecure-build-time-placeholder
 
   image:
     needs: verify

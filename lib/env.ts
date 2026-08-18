@@ -16,7 +16,12 @@ const envSchema = z.object({
   /** Pino level. Defaults to info in production, debug otherwise (lib/logger.ts). */
   LOG_LEVEL: z.enum(["fatal", "error", "warn", "info", "debug", "trace", "silent"]).optional(),
 
-  AUTH_SECRET: z.string().default("dev-only-secret-change-in-production"),
+  // Required everywhere — sessions are HMAC-signed with it, so there is no
+  // safe fallback value. Build machines export a placeholder (see Dockerfile
+  // and ci.yml); the running server gets its real value from .env.
+  AUTH_SECRET: z
+    .string()
+    .min(16, "AUTH_SECRET is required — generate one with `openssl rand -base64 32`"),
   /** Public base URL. Google callbacks and cookie `secure` both derive from it. */
   AUTH_URL: z
     .url()
@@ -57,15 +62,5 @@ const envSchema = z.object({
 });
 
 export const env = envSchema.parse(process.env);
-
-// The default secret is committed to a public repo; a production instance
-// signing sessions with it would accept forged cookies. Called from
-// instrumentation.ts at server boot — a module-scope throw would also fire
-// during `next build`'s page-data collection, where no secrets exist.
-export function assertProductionAuthSecret(): void {
-  if (env.NODE_ENV === "production" && env.AUTH_SECRET === "dev-only-secret-change-in-production") {
-    throw new Error("AUTH_SECRET must be set in production (see .env.example)");
-  }
-}
 
 export type Env = typeof env;

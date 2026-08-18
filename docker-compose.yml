@@ -34,6 +34,10 @@ services:
     build:
       context: .
     command: ["node", "scripts/migrate.ts"]
+    # lib/env.ts validates the full environment (AUTH_SECRET included) on
+    # import, so migrate needs the real .env just like the app.
+    env_file:
+      - .env
     environment:
       DATABASE_URL: postgres://chiangpai:${POSTGRES_PASSWORD:-chiangpai}@db:5432/chiangpai
     depends_on:
@@ -50,9 +54,10 @@ services:
     # set APP_BIND=0.0.0.0 to expose directly.
     ports:
       - "${APP_BIND:-127.0.0.1}:${APP_PORT:-3000}:3000"
+    # Required: the server refuses to start without AUTH_SECRET, so fail
+    # fast here with a clear error if .env is missing.
     env_file:
-      - path: .env
-        required: false
+      - .env
     environment:
       DATABASE_URL: postgres://chiangpai:${POSTGRES_PASSWORD:-chiangpai}@db:5432/chiangpai
     depends_on:
