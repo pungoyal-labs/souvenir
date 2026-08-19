@@ -62,13 +62,8 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ v
               <p className="text-xs text-soft">{t.forYouSub}</p>
             </div>
             <div className="mt-3 grid gap-4 sm:grid-cols-2">
-              {forYou.map((rec) => (
-                <MarketCard
-                  key={rec.view.market.id}
-                  view={rec.view}
-                  reasons={rec.reasons}
-                  lingo={me.lingo}
-                />
+              {forYou.map((v) => (
+                <MarketCard key={v.market.id} view={v} lingo={me.lingo} />
               ))}
             </div>
           </section>

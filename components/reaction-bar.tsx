@@ -5,10 +5,12 @@ import { useState, useTransition } from "react";
 import { reactAction } from "@/app/actions";
 import type { ReactionKind } from "@/lib/data";
 import { lingoOf } from "@/lib/lingo";
+import { Avatar } from "./avatar";
 
 interface Reactor {
   id: string;
   name: string;
+  avatarUpdatedAt: Date | null;
 }
 
 /**
@@ -48,23 +50,36 @@ export function ReactionBar({
     const mine = reactors.some((r) => r.id === meId);
     const count = reactors.length;
     return (
-      <button
-        type="button"
-        disabled={pending || (!open && !mine)}
-        onClick={() => toggle(kind, !mine)}
-        title={reactors.map((r) => r.name).join(", ")}
-        className={`rounded-md border px-3 py-1.5 text-sm font-semibold disabled:opacity-40 ${
-          mine ? "border-gold/60 bg-gold/20" : "border-line text-soft hover:bg-paper hover:text-ink"
-        }`}
-      >
-        {mine ? activeLabel : label}
-        {count > 0 && <span className="mono ml-1.5">{count}</span>}
-      </button>
+      <span className="flex items-center gap-1.5">
+        <button
+          type="button"
+          disabled={pending || (!open && !mine)}
+          onClick={() => toggle(kind, !mine)}
+          title={reactors.map((r) => r.name).join(", ")}
+          className={`rounded-md border px-3 py-1.5 text-sm font-semibold disabled:opacity-40 ${
+            mine
+              ? "border-gold/60 bg-gold/20"
+              : "border-line text-soft hover:bg-paper hover:text-ink"
+          }`}
+        >
+          {mine ? activeLabel : label}
+          {count > 0 && <span className="mono ml-1.5">{count}</span>}
+        </button>
+        {count > 0 && (
+          <span className="flex -space-x-1.5">
+            {reactors.map((r) => (
+              <span key={r.id} title={r.name}>
+                <Avatar member={r} size={20} />
+              </span>
+            ))}
+          </span>
+        )}
+      </span>
     );
   };
 
   return (
-    <div className="mt-3 flex items-center gap-2">
+    <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2">
       {button("upvote", upvoters, "👍 Upvote", "👍 Upvoted")}
       {button("watch", watchers, "👁 Watch", "👁 Watching")}
       {error && <p className="text-sm font-semibold text-no-deep">{error}</p>}

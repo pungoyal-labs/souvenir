@@ -39,8 +39,8 @@ import { env } from "./env.ts";
 import { expiresAtFrom, inviteState, newInviteCode } from "./invites.ts";
 import { logger } from "./logger.ts";
 import { parseMentions } from "./mentions.ts";
-import { piesText, toCents } from "./pies.ts";
-import { type CandidateMarket, type MarketHistory, type Reason, recommend } from "./recommend.ts";
+import { toCents } from "./pies.ts";
+import { type CandidateMarket, type MarketHistory, recommend } from "./recommend.ts";
 import {
   newRecoveryCode,
   recoveryExpiresAt,
@@ -88,19 +88,15 @@ export interface MarketView {
   participants: ParticipantPosition[];
   mySide: Side | null;
   myStakeC: number;
+  upvotes: number;
+  watchers: number;
+  commentCount: number;
 }
 
 export interface ActivityItem {
   row: LedgerRow;
   member: Member;
   market: Market | null;
-}
-
-/** An open market the viewer hasn't joined, with why it's being pitched. */
-export interface RecommendedMarket {
-  view: MarketView;
-  /** Display-ready chip labels, strongest signal first. */
-  reasons: string[];
 }
 
 export interface MemberStats {
@@ -170,6 +166,19 @@ async function reactionsByMarket(marketIds: string[]): Promise<Map<string, Marke
     list.push(row);
     byMarket.set(row.marketId, list);
   }
+  return byMarket;
+}
+
+/** Comment tallies for the given markets, keyed by market. */
+async function commentCountByMarket(marketIds: string[]): Promise<Map<string, number>> {
+  const byMarket = new Map<string, number>();
+  if (marketIds.length === 0) return byMarket;
+  const rows = await db
+    .select({ marketId: comments.marketId, n: sql<number>`count(*)::int` })
+    .from(comments)
+    .where(inArray(comments.marketId, marketIds))
+    .groupBy(comments.marketId);
+  for (const row of rows) byMarket.set(row.marketId!, row.n);
   return byMarket;
 }
 
@@ -763,6 +772,8 @@ function buildView(
   rows: LedgerRow[],
   memberById: Map<string, Member>,
   viewerId: string,
+  reactions: MarketReactionRow[],
+  commentCount: number,
 ): MarketView {
   const positions = replay(rows);
   const participants = positionsToParticipants(positions, memberById);
@@ -782,6 +793,9 @@ function buildView(
     participants,
     mySide: myStakeC > 0 ? (mine!.yesC > 0 ? "yes" : "no") : null,
     myStakeC,
+    upvotes: reactions.filter((r) => r.kind === "upvote").length,
+    watchers: reactions.filter((r) => r.kind === "watch").length,
+    commentCount,
   };
 }
 
@@ -789,45 +803,29 @@ export async function listMarkets(viewerId: string): Promise<{
   open: MarketView[];
   resolved: MarketView[];
   /** Open markets the viewer hasn't joined, ranked by lib/recommend. */
-  forYou: RecommendedMarket[];
+  forYou: MarketView[];
 }> {
   const all = await db.select().from(markets).orderBy(desc(markets.createdAt));
   const memberById = await membersById();
   const rowsByMarket = await marketLedger(all.map((m) => m.id));
-  const views = all.map((m) => buildView(m, rowsByMarket.get(m.id) ?? [], memberById, viewerId));
+  const reactions = await reactionsByMarket(all.map((m) => m.id));
+  const commentCounts = await commentCountByMarket(all.map((m) => m.id));
+  const views = all.map((m) =>
+    buildView(
+      m,
+      rowsByMarket.get(m.id) ?? [],
+      memberById,
+      viewerId,
+      reactions.get(m.id) ?? [],
+      commentCounts.get(m.id) ?? 0,
+    ),
+  );
   const open = views.filter((v) => v.market.status === "open");
   const resolved = views
     .filter((v) => v.market.status !== "open")
     .sort((a, b) => (b.market.resolvedAt?.getTime() ?? 0) - (a.market.resolvedAt?.getTime() ?? 0));
-  const forYou = await recommendFor(viewerId, open, all, rowsByMarket, memberById);
+  const forYou = await recommendFor(viewerId, open, all, rowsByMarket, reactions);
   return { open, resolved, forYou };
-}
-
-function reasonLabel(reason: Reason, memberById: Map<string, Member>): string {
-  switch (reason.kind) {
-    case "hot":
-      return `🔥 ${reason.recentActions} bets in 2 days`;
-    case "pool":
-      return `${piesText(reason.poolC)} on the line`;
-    case "contested":
-      return "dead heat";
-    case "friends": {
-      const names = reason.memberIds.map(
-        (id) => memberById.get(id)?.name.split(" ")[0] ?? "someone",
-      );
-      return `${names.join(" & ")} ${names.length === 1 ? "is" : "are"} in`;
-    }
-    case "topic":
-      return "your kind of bet";
-    case "fresh":
-      return "just opened";
-    case "unseen":
-      return "you haven't looked";
-    case "endorsed":
-      return `👍 ${reason.upvotes} upvotes`;
-    case "watching":
-      return "you're watching";
-  }
 }
 
 /**
@@ -840,13 +838,12 @@ async function recommendFor(
   open: MarketView[],
   all: Market[],
   rowsByMarket: Map<string, LedgerRow[]>,
-  memberById: Map<string, Member>,
-): Promise<RecommendedMarket[]> {
+  reactions: Map<string, MarketReactionRow[]>,
+): Promise<MarketView[]> {
   const viewed = await db
     .select({ marketId: marketViews.marketId })
     .from(marketViews)
     .where(eq(marketViews.memberId, viewerId));
-  const reactions = await reactionsByMarket(open.map((v) => v.market.id));
 
   const candidates: CandidateMarket[] = open.map((v) => {
     const reacted = reactions.get(v.market.id) ?? [];
@@ -885,10 +882,7 @@ async function recommendFor(
     candidates,
     history,
     viewedMarketIds: new Set(viewed.map((r) => r.marketId)),
-  }).map((rec) => ({
-    view: viewById.get(rec.marketId)!,
-    reasons: rec.reasons.slice(0, 2).map((r) => reasonLabel(r, memberById)),
-  }));
+  }).map((rec) => viewById.get(rec.marketId)!);
 }
 
 export async function getMarketView(
@@ -909,22 +903,22 @@ export async function getMarketView(
   if (!market) return null;
   const memberById = await membersById();
   const rows = (await marketLedger([marketId])).get(marketId) ?? [];
-  const view = buildView(market, rows, memberById, viewerId);
-  const items: ActivityItem[] = rows.map((row) => ({
-    row,
-    member: memberById.get(row.memberId)!,
-    market,
-  }));
   const commentRows = await db
     .select()
     .from(comments)
     .where(eq(comments.marketId, marketId))
     .orderBy(asc(comments.id));
+  const reacted = (await reactionsByMarket([marketId])).get(marketId) ?? [];
+  const view = buildView(market, rows, memberById, viewerId, reacted, commentRows.length);
+  const items: ActivityItem[] = rows.map((row) => ({
+    row,
+    member: memberById.get(row.memberId)!,
+    market,
+  }));
   const [seen] = await db
     .select({ seenBy: sql<number>`count(distinct ${marketViews.memberId})::int` })
     .from(marketViews)
     .where(eq(marketViews.marketId, marketId));
-  const reacted = (await reactionsByMarket([marketId])).get(marketId) ?? [];
   const reactors = (kind: ReactionKind) =>
     reacted
       .filter((r) => r.kind === kind)
@@ -1338,10 +1332,12 @@ export type InboxItem =
       kind: "comment";
       at: Date;
       unread: boolean;
-      market: Market;
       actor: Member;
       commentId: number;
       body: string;
+      /** Where the talk is: exactly one of these is set. */
+      market: Market | null;
+      bill: { id: string; label: string } | null;
     }
   | {
       kind: "mention";
@@ -1432,18 +1428,27 @@ export async function inbox(
     }
   }
 
-  // Table talk: comments on predictions that concern me, and — on predictions
-  // or bills — comments that tag me. Both derive straight from the comment
-  // and mention rows; a comment that tags me shows once, as the mention.
+  // Table talk: comments on predictions that concern me, comments anywhere
+  // I've joined the thread myself, and — on predictions or bills — comments
+  // that tag me. All derive straight from the comment and mention rows; a
+  // comment that tags me shows once, as the mention.
   const commentRows = await db.select().from(comments).orderBy(asc(comments.id));
   const myMentions = commentRows.length
     ? await db.select().from(commentMentions).where(eq(commentMentions.memberId, memberId))
     : [];
   const taggedIn = new Set(myMentions.map((m) => m.commentId));
+  const talkedMarkets = new Set<string>();
+  const talkedBills = new Set<string>();
+  for (const c of commentRows) {
+    if (c.authorId !== memberId) continue;
+    if (c.marketId) talkedMarkets.add(c.marketId);
+    if (c.billId) talkedBills.add(c.billId);
+  }
   const wantsBillLabel = commentRows.some(
-    (c) => c.billId && taggedIn.has(c.id) && c.authorId !== memberId,
+    (c) => c.billId && c.authorId !== memberId && (taggedIn.has(c.id) || talkedBills.has(c.billId)),
   );
   const billLabelById = wantsBillLabel ? await billLabels() : new Map<string, string>();
+  const billOf = (billId: string) => ({ id: billId, label: billLabelById.get(billId) ?? "a bill" });
 
   for (const c of commentRows) {
     if (c.authorId === memberId) continue;
@@ -1459,10 +1464,12 @@ export async function inbox(
         kind: "mention",
         ...base,
         market: c.marketId ? (marketById.get(c.marketId) ?? null) : null,
-        bill: c.billId ? { id: c.billId, label: billLabelById.get(c.billId) ?? "a bill" } : null,
+        bill: c.billId ? billOf(c.billId) : null,
       });
-    } else if (c.marketId && mine.has(c.marketId)) {
-      items.push({ kind: "comment", ...base, market: marketById.get(c.marketId)! });
+    } else if (c.marketId && (mine.has(c.marketId) || talkedMarkets.has(c.marketId))) {
+      items.push({ kind: "comment", ...base, market: marketById.get(c.marketId)!, bill: null });
+    } else if (c.billId && talkedBills.has(c.billId)) {
+      items.push({ kind: "comment", ...base, market: null, bill: billOf(c.billId) });
     }
   }
 

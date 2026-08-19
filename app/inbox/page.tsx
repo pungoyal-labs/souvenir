@@ -41,13 +41,14 @@ function itemKey(item: InboxItem): string {
   return `${item.kind}-${item.market.id}`;
 }
 
-/** Bill mentions land on /bills; everything else has a prediction page. */
+/** Bill talk lands on /bills; everything else has a prediction page. */
 function itemHref(item: InboxItem): string {
   return item.market ? `/market/${item.market.id}` : "/bills";
 }
 
 function itemSubject(item: InboxItem): string {
-  if (item.kind === "mention") return item.market?.question ?? item.bill?.label ?? "";
+  if (item.kind === "mention" || item.kind === "comment")
+    return item.market?.question ?? item.bill?.label ?? "";
   return item.market.question;
 }
 
@@ -80,7 +81,11 @@ function Line({ item, t }: { item: InboxItem; t: Lingo }) {
     case "new_market":
       return <>{name} opened a new prediction</>;
     case "comment":
-      return <>{name} commented</>;
+      return (
+        <>
+          {name} commented{item.bill ? " on a bill" : ""}
+        </>
+      );
     case "mention":
       return (
         <>

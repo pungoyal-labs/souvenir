@@ -12,20 +12,22 @@ import { tone } from "./ui";
 export function MarketCard({
   view,
   myProfitC,
-  reasons,
   lingo = "english",
 }: {
   view: MarketView;
   /** For resolved predictions: the viewer's net result, if they took part. */
   myProfitC?: number;
-  /** For recommended predictions: why this one is being pitched. */
-  reasons?: string[];
   lingo?: string;
 }) {
   const t = lingoOf(lingo);
   const { market, creator, participants } = view;
   const yesBackers = participants.filter((p) => p.side === "yes");
   const noBackers = participants.filter((p) => p.side === "no");
+  const social = [
+    view.upvotes > 0 && `👍 ${view.upvotes}`,
+    view.watchers > 0 && `👁 ${view.watchers}`,
+    view.commentCount > 0 && `💬 ${view.commentCount}`,
+  ].filter(Boolean);
 
   return (
     <Link
@@ -41,18 +43,7 @@ export function MarketCard({
 
       <h3 className="display mt-2 text-2xl font-bold leading-tight">{market.question}</h3>
 
-      {reasons && reasons.length > 0 && (
-        <div className="mt-2 flex flex-wrap gap-1.5">
-          {reasons.map((reason) => (
-            <span
-              key={reason}
-              className="inline-flex items-center rounded bg-gold/20 px-1.5 py-0.5 text-[11px] font-semibold uppercase tracking-wider text-soft"
-            >
-              {reason}
-            </span>
-          ))}
-        </div>
-      )}
+      {social.length > 0 && <p className="mono mt-2 text-xs text-soft">{social.join(" · ")}</p>}
 
       <div className="mt-3">
         <PoolBar yesPoolC={view.yesPoolC} noPoolC={view.noPoolC} lingo={lingo} />

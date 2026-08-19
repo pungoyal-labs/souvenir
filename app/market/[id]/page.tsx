@@ -54,8 +54,16 @@ export default async function MarketPage({ params }: { params: Promise<{ id: str
       <ReactionBar
         marketId={market.id}
         meId={me.id}
-        upvoters={upvoters.map((m) => ({ id: m.id, name: m.name }))}
-        watchers={watchers.map((m) => ({ id: m.id, name: m.name }))}
+        upvoters={upvoters.map((m) => ({
+          id: m.id,
+          name: m.name,
+          avatarUpdatedAt: m.avatarUpdatedAt,
+        }))}
+        watchers={watchers.map((m) => ({
+          id: m.id,
+          name: m.name,
+          avatarUpdatedAt: m.avatarUpdatedAt,
+        }))}
         open={isOpen}
         lingo={me.lingo}
       />
