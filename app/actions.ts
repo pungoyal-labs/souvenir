@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
 import {
   addBill,
+  addComment,
   type BillInput,
   clearAvatar,
   createMarket,
@@ -231,6 +232,19 @@ export async function settleUpAction(
       return {};
     },
     () => ["/bills"],
+  );
+}
+
+export async function commentAction(
+  target: { marketId?: string; billId?: string },
+  body: string,
+): Promise<ActionResult> {
+  return mutate(
+    async (memberId) => {
+      await addComment(memberId, target, body);
+      return {};
+    },
+    () => (target.marketId ? [`/market/${target.marketId}`] : ["/bills"]),
   );
 }
 

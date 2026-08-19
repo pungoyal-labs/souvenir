@@ -3,12 +3,13 @@ import { notFound } from "next/navigation";
 import { ActivityFeed } from "@/components/activity";
 import { Avatar } from "@/components/avatar";
 import { BetPanel } from "@/components/bet-panel";
+import { CommentsSection } from "@/components/comments";
 import { Pies } from "@/components/pies";
 import { PoolBar } from "@/components/pool-bar";
 import { RecordView } from "@/components/record-view";
 import { ResolvePanel } from "@/components/resolve-panel";
 import { SideChip, StatusChip } from "@/components/side-chip";
-import { getMarketView } from "@/lib/data";
+import { getMarketView, listMembers } from "@/lib/data";
 import { env } from "@/lib/env";
 import { fmtDate, timeAgo } from "@/lib/format";
 import { lingoOf } from "@/lib/lingo";
@@ -21,7 +22,8 @@ export default async function MarketPage({ params }: { params: Promise<{ id: str
   const { id } = await params;
   const data = await getMarketView(id, me.id);
   if (!data) notFound();
-  const { view, activity, settlements, watchers } = data;
+  const members = await listMembers();
+  const { view, activity, settlements, comments, watchers } = data;
   const { market, creator } = view;
   const isOpen = market.status === "open";
   const totalPoolC = view.yesPoolC + view.noPoolC;
@@ -145,6 +147,21 @@ export default async function MarketPage({ params }: { params: Promise<{ id: str
           {market.creatorId === me.id && <ResolvePanel marketId={market.id} lingo={me.lingo} />}
         </div>
       )}
+
+      <section className="mt-7">
+        <h2 className="display text-lg font-bold uppercase tracking-wide text-soft">
+          {t.commentsHeading}
+        </h2>
+        <div className="mt-3 card p-4">
+          <CommentsSection
+            target={{ marketId: market.id }}
+            comments={comments}
+            members={members}
+            meId={me.id}
+            lingo={me.lingo}
+          />
+        </div>
+      </section>
 
       <section className="mt-7">
         <h2 className="display text-lg font-bold uppercase tracking-wide text-soft">

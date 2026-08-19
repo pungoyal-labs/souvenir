@@ -1,13 +1,16 @@
+import { sql } from "drizzle-orm";
 import {
   bigint,
   bigserial,
   boolean,
+  check,
   customType,
   date,
   index,
   integer,
   pgEnum,
   pgTable,
+  primaryKey,
   text,
   timestamp,
 } from "drizzle-orm/pg-core";
@@ -167,9 +170,54 @@ export const billEntries = pgTable(
   (t) => [index("bill_entries_revision_idx").on(t.revisionId)],
 );
 
+// ---------- comments (on predictions and on bills) ----------
+
+// Append-only, in the ledger's spirit: table talk stays on the record, no
+// edits or deletes. Exactly one of market_id / bill_id is set (the check
+// below). Mentions in the body are resolved against member names at write
+// time by lib/mentions.ts and snapshotted as comment_mentions rows, so a
+// later rename never rewrites who was tagged. "You were tagged" inbox items
+// are derived from those rows at read time — no notification rows; the only
+// read state is still members.inbox_seen_at.
+export const comments = pgTable(
+  "comments",
+  {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    at: timestamp("at", { withTimezone: true }).notNull().defaultNow(),
+    authorId: text("author_id")
+      .notNull()
+      .references(() => members.id),
+    marketId: text("market_id").references(() => markets.id),
+    billId: text("bill_id").references(() => bills.id),
+    body: text("body").notNull(),
+  },
+  (t) => [
+    index("comments_market_idx").on(t.marketId),
+    index("comments_bill_idx").on(t.billId),
+    check("comments_one_subject", sql`("market_id" IS NULL) <> ("bill_id" IS NULL)`),
+  ],
+);
+
+export const commentMentions = pgTable(
+  "comment_mentions",
+  {
+    commentId: bigint("comment_id", { mode: "number" })
+      .notNull()
+      .references(() => comments.id),
+    memberId: text("member_id")
+      .notNull()
+      .references(() => members.id),
+  },
+  (t) => [
+    primaryKey({ columns: [t.commentId, t.memberId] }),
+    index("comment_mentions_member_idx").on(t.memberId),
+  ],
+);
+
 export type Member = typeof members.$inferSelect;
 export type Market = typeof markets.$inferSelect;
 export type LedgerRow = typeof ledger.$inferSelect;
 export type MarketViewRow = typeof marketViews.$inferSelect;
 export type BillRevisionRow = typeof billRevisions.$inferSelect;
 export type BillEntryRow = typeof billEntries.$inferSelect;
+export type CommentRow = typeof comments.$inferSelect;

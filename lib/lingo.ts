@@ -56,6 +56,9 @@ export interface Lingo {
   brokeEven: string;
   questionPlaceholder: string;
   criteriaPlaceholder: string;
+  commentsHeading: string;
+  commentsEmpty: string;
+  commentPlaceholder: string;
   billsTitle: string;
   billsSub: string;
   billsEmptyTitle: string;

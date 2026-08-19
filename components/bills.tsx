@@ -3,13 +3,14 @@
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { deleteBillAction, settleUpAction } from "@/app/actions";
-import type { BillView, CurrencyBalances } from "@/lib/data";
+import type { BillView, CommentView, CurrencyBalances } from "@/lib/data";
 import type { Member } from "@/lib/db/schema";
 import { fmtDate, timeAgo } from "@/lib/format";
 import { lingoOf } from "@/lib/lingo";
 import { CURRENCY_SYMBOL, type Currency, fmtMoney, parseAmount } from "@/lib/split";
 import { Avatar } from "./avatar";
 import { BillForm, todayLocal } from "./bill-form";
+import { CommentsSection } from "./comments";
 import { EmptyState, tone } from "./ui";
 
 function firstName(member: Member): string {
@@ -42,12 +43,15 @@ export function Bills({
   lingo,
   bills,
   balances,
+  comments,
 }: {
   members: Member[];
   meId: string;
   lingo: string;
   bills: BillView[];
   balances: CurrencyBalances[];
+  /** Each bill's comment thread, keyed by bill id. */
+  comments: Record<string, CommentView[]>;
 }) {
   const t = lingoOf(lingo);
   const router = useRouter();
@@ -242,6 +246,11 @@ export function Bills({
                               } ways`}
                         </p>
                       </div>
+                      {(comments[bill.id]?.length ?? 0) > 0 && (
+                        <span className="whitespace-nowrap text-xs text-soft">
+                          💬 {comments[bill.id].length}
+                        </span>
+                      )}
                       <span className="mono font-bold">{fmtMoney(bill.currency, bill.totalC)}</span>
                     </button>
                     {openId === bill.id && (
@@ -292,6 +301,20 @@ export function Bills({
                           >
                             Delete
                           </button>
+                        </div>
+                        <div className="mt-3 border-t border-dashed border-line pt-3">
+                          <p className="text-[11px] font-semibold uppercase tracking-wider text-soft">
+                            {t.commentsHeading}
+                          </p>
+                          <div className="mt-2">
+                            <CommentsSection
+                              target={{ billId: bill.id }}
+                              comments={comments[bill.id] ?? []}
+                              members={members}
+                              meId={meId}
+                              lingo={lingo}
+                            />
+                          </div>
                         </div>
                       </div>
                     )}

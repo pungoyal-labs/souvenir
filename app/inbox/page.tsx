@@ -36,22 +36,34 @@ export default async function InboxPage() {
 }
 
 function itemKey(item: InboxItem): string {
-  return item.kind === "activity" ? `a-${item.row.id}` : `${item.kind}-${item.market.id}`;
+  if (item.kind === "activity") return `a-${item.row.id}`;
+  if (item.kind === "comment" || item.kind === "mention") return `c-${item.commentId}`;
+  return `${item.kind}-${item.market.id}`;
+}
+
+/** Bill mentions land on /bills; everything else has a prediction page. */
+function itemHref(item: InboxItem): string {
+  return item.market ? `/market/${item.market.id}` : "/bills";
+}
+
+function itemSubject(item: InboxItem): string {
+  if (item.kind === "mention") return item.market?.question ?? item.bill?.label ?? "";
+  return item.market.question;
 }
 
 function Item({ item, t }: { item: InboxItem; t: Lingo }) {
   return (
     <li className={item.unread ? "bg-felt-tint/40" : undefined}>
-      <Link
-        href={`/market/${item.market.id}`}
-        className="flex items-start gap-3 px-4 py-3 hover:bg-paper/60"
-      >
+      <Link href={itemHref(item)} className="flex items-start gap-3 px-4 py-3 hover:bg-paper/60">
         <span className="mt-0.5">
           <Avatar member={item.actor} size={26} />
         </span>
         <span className="min-w-0 flex-1 text-sm">
           <Line item={item} t={t} />
-          <span className="mt-0.5 block truncate text-xs text-soft">{item.market.question}</span>
+          {(item.kind === "comment" || item.kind === "mention") && (
+            <span className="mt-0.5 block truncate text-xs">“{item.body}”</span>
+          )}
+          <span className="mt-0.5 block truncate text-xs text-soft">{itemSubject(item)}</span>
         </span>
         <span className="flex items-center gap-2 whitespace-nowrap text-xs text-soft">
           {item.unread && <span className="h-2 w-2 rounded-full bg-felt" title="Unread" />}
@@ -67,6 +79,14 @@ function Line({ item, t }: { item: InboxItem; t: Lingo }) {
   switch (item.kind) {
     case "new_market":
       return <>{name} opened a new prediction</>;
+    case "comment":
+      return <>{name} commented</>;
+    case "mention":
+      return (
+        <>
+          {name} tagged you{item.bill ? " on a bill" : ""}
+        </>
+      );
     case "activity":
       return (
         <>

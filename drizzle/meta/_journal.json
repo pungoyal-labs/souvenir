@@ -50,6 +50,13 @@
       "when": 1787106513032,
       "tag": "0006_split_bills",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1787111073936,
+      "tag": "0007_comments",
+      "breakpoints": true
     }
   ]
 }

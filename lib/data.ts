@@ -2,7 +2,7 @@
 // locks the rows it checks, and only ever appends to the ledger.
 
 import { randomUUID } from "node:crypto";
-import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNotNull, sql } from "drizzle-orm";
 import { MAX_AVATAR_BYTES, sniffImageType } from "./avatar.ts";
 import { db } from "./db/index.ts";
 import {
@@ -13,6 +13,9 @@ import {
   billEntries,
   billRevisions,
   bills,
+  type CommentRow,
+  commentMentions,
+  comments,
   type LedgerRow,
   ledger,
   type Market,
@@ -25,6 +28,7 @@ import { normalizeEmail } from "./email.ts";
 import { exposure, otherSide, type Position, refundAll, type Side, settle } from "./engine.ts";
 import { env } from "./env.ts";
 import { logger } from "./logger.ts";
+import { parseMentions } from "./mentions.ts";
 import { piesText, toCents } from "./pies.ts";
 import { type CandidateMarket, type MarketHistory, type Reason, recommend } from "./recommend.ts";
 import {
@@ -411,6 +415,7 @@ export async function getMarketView(
   view: MarketView;
   activity: ActivityItem[];
   settlements: ActivityItem[];
+  comments: CommentView[];
   /** Distinct members who have opened this prediction. */
   watchers: number;
 } | null> {
@@ -424,6 +429,11 @@ export async function getMarketView(
     member: memberById.get(row.memberId)!,
     market,
   }));
+  const commentRows = await db
+    .select()
+    .from(comments)
+    .where(eq(comments.marketId, marketId))
+    .orderBy(asc(comments.id));
   const [watch] = await db
     .select({ watchers: sql<number>`count(distinct ${marketViews.memberId})::int` })
     .from(marketViews)
@@ -432,6 +442,7 @@ export async function getMarketView(
     view,
     activity: items.filter((i) => i.row.kind === "bet" || i.row.kind === "switch").reverse(),
     settlements: items.filter((i) => i.row.kind === "payout" || i.row.kind === "refund"),
+    comments: await toCommentViews(commentRows, memberById),
     watchers: watch.watchers,
   };
 }
@@ -798,6 +809,26 @@ export type InboxItem =
       market: Market;
       actor: Member;
       myProfitC: number | null;
+    }
+  | {
+      kind: "comment";
+      at: Date;
+      unread: boolean;
+      market: Market;
+      actor: Member;
+      commentId: number;
+      body: string;
+    }
+  | {
+      kind: "mention";
+      at: Date;
+      unread: boolean;
+      actor: Member;
+      commentId: number;
+      body: string;
+      /** Where I was tagged: exactly one of these is set. */
+      market: Market | null;
+      bill: { id: string; label: string } | null;
     };
 
 export async function inbox(
@@ -868,6 +899,40 @@ export async function inbox(
         actor: creator,
         myProfitC,
       });
+    }
+  }
+
+  // Table talk: comments on predictions that concern me, and — on predictions
+  // or bills — comments that tag me. Both derive straight from the comment
+  // and mention rows; a comment that tags me shows once, as the mention.
+  const commentRows = await db.select().from(comments).orderBy(asc(comments.id));
+  const myMentions = commentRows.length
+    ? await db.select().from(commentMentions).where(eq(commentMentions.memberId, memberId))
+    : [];
+  const taggedIn = new Set(myMentions.map((m) => m.commentId));
+  const wantsBillLabel = commentRows.some(
+    (c) => c.billId && taggedIn.has(c.id) && c.authorId !== memberId,
+  );
+  const billLabelById = wantsBillLabel ? await billLabels() : new Map<string, string>();
+
+  for (const c of commentRows) {
+    if (c.authorId === memberId) continue;
+    const base = {
+      at: c.at,
+      unread: c.at.getTime() > seenAt,
+      actor: memberById.get(c.authorId)!,
+      commentId: c.id,
+      body: c.body,
+    };
+    if (taggedIn.has(c.id)) {
+      items.push({
+        kind: "mention",
+        ...base,
+        market: c.marketId ? (marketById.get(c.marketId) ?? null) : null,
+        bill: c.billId ? { id: c.billId, label: billLabelById.get(c.billId) ?? "a bill" } : null,
+      });
+    } else if (c.marketId && mine.has(c.marketId)) {
+      items.push({ kind: "comment", ...base, market: marketById.get(c.marketId)! });
     }
   }
 
@@ -1160,4 +1225,108 @@ export async function recordSettlement(
       { memberId: input.receiverId, paidC: 0, participant: true, owedC: input.amountC },
     ],
   });
+}
+
+// ---------- comments ----------
+// Table talk on predictions and bills. Append-only like the ledger; mentions
+// in the body are resolved against member names at write time (lib/mentions.ts)
+// and snapshotted as comment_mentions rows. The inbox derives "you were
+// tagged" from those rows at read time — comments store facts, never
+// notifications.
+
+export interface CommentView {
+  id: number;
+  at: Date;
+  author: Member;
+  body: string;
+  /** Members tagged in the body — for highlighting and inbox mentions. */
+  mentions: Member[];
+}
+
+async function toCommentViews(
+  rows: CommentRow[],
+  memberById: Map<string, Member>,
+): Promise<CommentView[]> {
+  if (rows.length === 0) return [];
+  const mentionRows = await db
+    .select()
+    .from(commentMentions)
+    .where(
+      inArray(
+        commentMentions.commentId,
+        rows.map((r) => r.id),
+      ),
+    );
+  const mentionsByComment = new Map<number, Member[]>();
+  for (const row of mentionRows) {
+    const member = memberById.get(row.memberId);
+    if (!member) continue;
+    const list = mentionsByComment.get(row.commentId) ?? [];
+    list.push(member);
+    mentionsByComment.set(row.commentId, list);
+  }
+  return rows.map((row) => ({
+    id: row.id,
+    at: row.at,
+    author: memberById.get(row.authorId)!,
+    body: row.body,
+    mentions: mentionsByComment.get(row.id) ?? [],
+  }));
+}
+
+/** Every bill's comments in one go, keyed by bill id, oldest first. */
+export async function billComments(): Promise<Record<string, CommentView[]>> {
+  const rows = await db
+    .select()
+    .from(comments)
+    .where(isNotNull(comments.billId))
+    .orderBy(asc(comments.id));
+  const views = await toCommentViews(rows, await membersById());
+  const byBill: Record<string, CommentView[]> = {};
+  rows.forEach((row, i) => {
+    const list = byBill[row.billId!] ?? [];
+    list.push(views[i]);
+    byBill[row.billId!] = list;
+  });
+  return byBill;
+}
+
+/** Latest description per bill, for inbox lines about bill comments. */
+async function billLabels(): Promise<Map<string, string>> {
+  const { current } = await currentRevisions();
+  return new Map(current.map((rev) => [rev.billId, rev.description || "a payment"]));
+}
+
+export async function addComment(
+  authorId: string,
+  target: { marketId?: string; billId?: string },
+  body: string,
+): Promise<void> {
+  const trimmed = body.trim();
+  if (trimmed.length === 0) throw new DataError("Write the comment first.");
+  if (trimmed.length > 1000) throw new DataError("Keep the comment under 1000 characters.");
+  const marketId = target.marketId ?? null;
+  const billId = target.billId ?? null;
+  if (marketId) {
+    const [market] = await db.select().from(markets).where(eq(markets.id, marketId));
+    if (!market) throw new DataError("Prediction not found.");
+  } else if (billId) {
+    const [bill] = await db.select().from(bills).where(eq(bills.id, billId));
+    if (!bill) throw new DataError("Bill not found.");
+  } else {
+    throw new DataError("A comment goes on a prediction or a bill.");
+  }
+  const mentionIds = parseMentions(trimmed, await listMembers());
+  await db.transaction(async (tx) => {
+    const [comment] = await tx
+      .insert(comments)
+      .values({ authorId, marketId, billId, body: trimmed })
+      .returning();
+    if (mentionIds.length > 0) {
+      await tx
+        .insert(commentMentions)
+        .values(mentionIds.map((memberId) => ({ commentId: comment.id, memberId })));
+    }
+  });
+  logger.info({ authorId, marketId, billId, mentions: mentionIds.length }, "comment added");
 }
