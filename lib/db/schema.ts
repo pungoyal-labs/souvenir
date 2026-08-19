@@ -27,7 +27,10 @@ export const ledgerKindEnum = pgEnum("ledger_kind", ["grant", "bet", "switch", "
 
 export const members = pgTable("members", {
   id: text("id").primaryKey(),
-  email: text("email").notNull().unique(),
+  // Nullable since invite links arrived: a member who joined by link has no
+  // address anywhere in the system. Google sign-ins still fill it, until the
+  // column goes entirely.
+  email: text("email").unique(),
   name: text("name").notNull(),
   image: text("image"),
   joinedAt: timestamp("joined_at", { withTimezone: true }).notNull().defaultNow(),
@@ -39,6 +42,12 @@ export const members = pgTable("members", {
   // Set when the member uploaded their own picture (see `avatars`); it wins
   // over `image` and doubles as the cache-buster in the avatar URL.
   avatarUpdatedAt: timestamp("avatar_updated_at", { withTimezone: true }),
+  // Who can invite people and mint recovery links. A column rather than a
+  // lookup in FOUNDING_MEMBERS, which could only ever name an address: a
+  // member who joined by link has none, and would have been barred from
+  // founding anything for good. The env var is now only the bootstrap — it
+  // decides who is a founder in an empty table, and nothing after that.
+  isFounder: boolean("is_founder").notNull().default(false),
 });
 
 // Uploaded profile pictures, one per member, overriding the Google `image`.
@@ -53,11 +62,86 @@ export const avatars = pgTable("avatars", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+// Invite links. Two kinds: a personal one, spent by the first person to walk
+// through it, and an open group link anyone in the chat can use. Both are
+// readable capabilities — the code is stored so a founder can re-share what
+// they already sent — and both survive on being short-lived and revocable
+// instead (lib/invites.ts). Acceptance runs in the transaction that creates
+// the member, with the row locked, so a personal link cannot be spent twice.
+export const invites = pgTable("invites", {
+  /** The code from the link, and the only name this row has. */
+  code: text("code").primaryKey(),
+  /** Who the inviter says this is for — a name, so the pending list reads. */
+  label: text("label").notNull(),
+  /** An open link never spends: anyone holding it can join until it expires. */
+  isOpen: boolean("is_open").notNull().default(false),
+  /** What spends a personal invite, and what counts arrivals through an open one. */
+  useCount: integer("use_count").notNull().default(0),
+  invitedBy: text("invited_by")
+    .notNull()
+    .references(() => members.id),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+});
+
+// Recovery links: the way back to an existing seat, minted by a founder for a
+// member who has lost every passkey they held. Nothing like an invite, despite
+// the shape — walking through one makes you somebody who is already at the
+// table, so the trade is the opposite way round and the guards are tighter
+// (lib/recovery.ts): half an hour, one use, one live row per member, and named
+// on the members page the whole time so the table sees it happen.
+// `used_at` is what spends it; a spent row stays as the record.
+export const recoveries = pgTable(
+  "recoveries",
+  {
+    /** The code from the link, and the only name this row has. */
+    code: text("code").primaryKey(),
+    /** Whose seat this link opens. */
+    memberId: text("member_id")
+      .notNull()
+      .references(() => members.id),
+    /** The founder who vouched — null when it came from scripts/recovery-link.ts. */
+    mintedBy: text("minted_by").references(() => members.id),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    /** Set the moment a passkey is added through it; the row is spent from then on. */
+    usedAt: timestamp("used_at", { withTimezone: true }),
+  },
+  (t) => [index("recoveries_member_idx").on(t.memberId)],
+);
+
+/** Superseded by `invites`; kept until Google sign-in goes, for members already on it. */
 export const allowlist = pgTable("allowlist", {
   email: text("email").primaryKey(),
   invitedBy: text("invited_by").references(() => members.id),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
+
+// Passkeys. A member may hold several — laptop, phone, a spare — and any one
+// of them signs them in. Nothing here identifies anyone: a random credential
+// id the authenticator chose, a public key, and a counter. The aaguid (which
+// make and model of authenticator) is deliberately not among them.
+export const credentials = pgTable(
+  "credentials",
+  {
+    /** The authenticator's credential id, base64url — what a sign-in is looked up by. */
+    id: text("id").primaryKey(),
+    memberId: text("member_id")
+      .notNull()
+      .references(() => members.id),
+    /** SPKI DER, as node:crypto exports it (lib/webauthn.ts). */
+    publicKey: bytea("public_key").notNull(),
+    /** COSE algorithm: -7 (ES256) or -257 (RS256). */
+    alg: integer("alg").notNull(),
+    /** Authenticator's own counter; a value that goes backwards means a clone. */
+    signCount: bigint("sign_count", { mode: "number" }).notNull().default(0),
+    /** The key is synced to a credential manager, so losing the device isn't losing it. */
+    backedUp: boolean("backed_up").notNull().default(false),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    lastUsedAt: timestamp("last_used_at", { withTimezone: true }),
+  },
+  (t) => [index("credentials_member_idx").on(t.memberId)],
+);
 
 export const markets = pgTable("markets", {
   id: text("id").primaryKey(),
@@ -240,6 +324,9 @@ export const commentMentions = pgTable(
 );
 
 export type Member = typeof members.$inferSelect;
+export type CredentialRow = typeof credentials.$inferSelect;
+export type InviteRow = typeof invites.$inferSelect;
+export type RecoveryRow = typeof recoveries.$inferSelect;
 export type Market = typeof markets.$inferSelect;
 export type LedgerRow = typeof ledger.$inferSelect;
 export type MarketViewRow = typeof marketViews.$inferSelect;

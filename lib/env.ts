@@ -22,7 +22,13 @@ const envSchema = z.object({
   AUTH_SECRET: z
     .string()
     .min(16, "AUTH_SECRET is required — generate one with `openssl rand -base64 32`"),
-  /** Public base URL. Google callbacks and cookie `secure` both derive from it. */
+  /**
+   * Public base URL. Google callbacks, cookie `secure`, and the passkey rp id
+   * all derive from it. Unlike DATABASE_URL above, this one says `localhost`
+   * and must not be "made consistent" with 127.0.0.1: a relying party id has
+   * to be a domain name, and no browser will register a passkey against an IP
+   * address (lib/auth.ts, passkeysConfigured).
+   */
   AUTH_URL: z
     .url()
     .default("http://localhost:3000")
@@ -36,7 +42,12 @@ const envSchema = z.object({
     .default("false")
     .transform((v) => v === "true"),
 
-  /** Comma-separated emails that may always join (bootstraps the group). */
+  /**
+   * Comma-separated emails that may always join, and that are marked
+   * `members.is_founder` on arrival. Bootstrap only: once someone is a founder
+   * in the table, founders promote each other and this is not consulted again
+   * (lib/data.ts, promoteConfiguredFounders).
+   */
   FOUNDING_MEMBERS: z
     .string()
     .default("")

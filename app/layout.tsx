@@ -4,10 +4,11 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Avatar } from "@/components/avatar";
 import { Logo } from "@/components/logo";
+import { PasskeyNudge } from "@/components/passkey-nudge";
 import { Pies } from "@/components/pies";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { destroySession, getSession } from "@/lib/auth";
-import { getMember, inbox, netOf } from "@/lib/data";
+import { destroySession, getSession, passkeysConfigured } from "@/lib/auth";
+import { getMember, hasPasskey, inbox, netOf } from "@/lib/data";
 import { lingoOf } from "@/lib/lingo";
 import "./globals.css";
 
@@ -32,8 +33,15 @@ export const metadata: Metadata = {
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const session = await getSession();
   const member = session ? await getMember(session.memberId) : null;
-  const netC = member ? await netOf(member.id) : 0;
-  const hasUnread = member ? (await inbox(member.id)).unreadCount > 0 : false;
+  // Independent of each other, so they go together rather than one at a time.
+  const [netC, unread, enrolled] = member
+    ? await Promise.all([
+        netOf(member.id),
+        inbox(member.id).then((i) => i.unreadCount > 0),
+        hasPasskey(member.id),
+      ])
+    : [0, false, true];
+  const needsPasskey = passkeysConfigured && member != null && !enrolled;
   const t = lingoOf(member?.lingo ?? "english");
 
   return (
@@ -75,7 +83,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                 </Link>
                 <Link href="/inbox" className="relative rounded px-2 py-1 hover:bg-white/10">
                   Inbox
-                  {hasUnread && (
+                  {unread && (
                     <span
                       className="absolute right-0 top-0.5 h-2 w-2 rounded-full bg-no"
                       title="Unread activity"
@@ -119,6 +127,9 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           </div>
         </header>
         <div aria-hidden className="zari" />
+        {member && needsPasskey && (
+          <PasskeyNudge memberId={member.id} needsPicture={member.avatarUpdatedAt == null} />
+        )}
         <main className="mx-auto max-w-5xl px-4 py-6">{children}</main>
         <footer className="mx-auto max-w-5xl px-4 pb-8 pt-4 text-xs text-soft">{t.footer}</footer>
       </body>

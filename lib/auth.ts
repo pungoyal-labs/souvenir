@@ -1,5 +1,7 @@
-// Google sign-in and cookie sessions, implemented directly on node:crypto —
-// no auth library.
+// Sign-in and cookie sessions, implemented directly on node:crypto — no auth
+// library. Two ways in: passkeys (challenges minted at the bottom of this
+// file, verified by lib/webauthn.ts) and Google, which passkeys are on their
+// way to replacing.
 //
 // Flow: OAuth 2.0 authorization code + PKCE (S256), with `state` for CSRF and
 // `nonce` bound into the ID token. The code is exchanged server-to-server over
@@ -17,6 +19,7 @@ import { createHash, createHmac, randomBytes, timingSafeEqual } from "node:crypt
 import { cookies } from "next/headers";
 import { env } from "./env.ts";
 import { logger } from "./logger.ts";
+import { relyingPartyFrom } from "./webauthn.ts";
 
 const AUTHORIZE_ENDPOINT = "https://accounts.google.com/o/oauth2/v2/auth";
 const TOKEN_ENDPOINT = "https://oauth2.googleapis.com/token";
@@ -112,7 +115,7 @@ export async function destroySession(): Promise<void> {
 
 // --- Google OAuth -------------------------------------------------------------
 
-export type GoogleProfile = { email: string; name: string | null; image: string | null };
+export type GoogleProfile = { email: string; name: string | null };
 
 function redirectUri(): string {
   return `${env.AUTH_URL}${CALLBACK_PATH}`;
@@ -251,6 +254,85 @@ function verifyIdToken(idToken: string, nonce: string): GoogleProfile | null {
   return {
     email: claims.email,
     name: typeof claims.name === "string" ? claims.name : null,
-    image: typeof claims.picture === "string" ? claims.picture : null,
+  };
+}
+
+// --- passkeys -----------------------------------------------------------------
+//
+// The verification itself is in lib/webauthn.ts, which is pure. What lives here
+// is the part that needs a request: minting the challenge and remembering it
+// between the two round trips. It rides in the same kind of short-lived signed
+// cookie as the OAuth handshake — a challenge is not a secret, it just has to
+// come back unaltered and be usable exactly once.
+
+// Which relying party this deployment is, and whether it can do passkeys at
+// all. The rule is pure URL logic and lives in lib/webauthn.ts with its tests;
+// what belongs here is reading env and saying so at startup.
+const rp = relyingPartyFrom(env.AUTH_URL);
+
+export const RP_ID = rp.rpId;
+export const RP_ORIGIN = rp.origin;
+export const passkeysConfigured = rp.usable;
+
+if (!passkeysConfigured) {
+  logger.warn(
+    { authUrl: env.AUTH_URL, rpId: RP_ID, reason: rp.reason },
+    "passkeys are unavailable for this deployment",
+  );
+}
+
+const PASSKEY_COOKIE = "chiang_pai_passkey";
+const PASSKEY_MAX_AGE_S = 60 * 5; // long enough for a fingerprint prompt
+
+/**
+ * Which ceremony a challenge was minted for; they never cross. Keeping these
+ * apart is what stops a passkey made for a fresh invite from being attached to
+ * someone's existing account, and — the one that would actually cost
+ * something — stops a "recover" ceremony from being finished as a "join", or a
+ * plain "register" from being finished as a recovery of somebody else's seat.
+ */
+export type PasskeyPurpose = "register" | "login" | "join" | "recover";
+
+/**
+ * What a link-borne ceremony remembers between its two steps: the member it is
+ * for — about to be created for a join, already at the table for a recovery —
+ * and the code that authorised it. Both are re-checked against the database
+ * before anything is written, so this is binding, not trust.
+ */
+export interface LinkClaims {
+  memberId: string;
+  code: string;
+}
+
+export interface PasskeyChallenge {
+  challenge: string;
+  link?: LinkClaims;
+}
+
+export async function startPasskeyChallenge(
+  purpose: PasskeyPurpose,
+  link?: LinkClaims,
+): Promise<string> {
+  const challenge = randomBytes(32).toString("base64url");
+  (await cookies()).set(PASSKEY_COOKIE, seal({ ...link, challenge, purpose }, PASSKEY_MAX_AGE_S), {
+    ...cookieDefaults,
+    maxAge: PASSKEY_MAX_AGE_S,
+  });
+  return challenge;
+}
+
+/** Read the pending challenge and burn it, whatever the caller then makes of it. */
+export async function takePasskeyChallenge(
+  purpose: PasskeyPurpose,
+): Promise<PasskeyChallenge | null> {
+  const jar = await cookies();
+  const claims = unseal(jar.get(PASSKEY_COOKIE)?.value);
+  jar.delete(PASSKEY_COOKIE);
+  if (!claims || claims.purpose !== purpose) return null;
+  if (typeof claims.challenge !== "string") return null;
+  const { memberId, code } = claims;
+  return {
+    challenge: claims.challenge,
+    link: typeof memberId === "string" && typeof code === "string" ? { memberId, code } : undefined,
   };
 }

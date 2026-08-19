@@ -2,7 +2,7 @@
 // locks the rows it checks, and only ever appends to the ledger.
 
 import { randomUUID } from "node:crypto";
-import { and, asc, desc, eq, inArray, isNotNull, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNotNull, isNull, lte, or, sql } from "drizzle-orm";
 import { MAX_AVATAR_BYTES, sniffImageType } from "./avatar.ts";
 import { db } from "./db/index.ts";
 import {
@@ -14,8 +14,12 @@ import {
   billRevisions,
   bills,
   type CommentRow,
+  type CredentialRow,
   commentMentions,
   comments,
+  credentials,
+  type InviteRow,
+  invites,
   type LedgerRow,
   ledger,
   type Market,
@@ -26,14 +30,23 @@ import {
   marketViews,
   members,
   type ReactionKind,
+  type RecoveryRow,
+  recoveries,
 } from "./db/schema.ts";
 import { normalizeEmail } from "./email.ts";
 import { exposure, otherSide, type Position, refundAll, type Side, settle } from "./engine.ts";
 import { env } from "./env.ts";
+import { expiresAtFrom, inviteState, newInviteCode } from "./invites.ts";
 import { logger } from "./logger.ts";
 import { parseMentions } from "./mentions.ts";
 import { piesText, toCents } from "./pies.ts";
 import { type CandidateMarket, type MarketHistory, type Reason, recommend } from "./recommend.ts";
+import {
+  newRecoveryCode,
+  recoveryExpiresAt,
+  recoveryState,
+  visibleRecoveries,
+} from "./recovery.ts";
 import {
   type BillEntryInput,
   type BillKind,
@@ -49,6 +62,7 @@ import {
   type Transfer,
 } from "./split.ts";
 import { type MarketResult, marketOutcomes, replay, summarizeResults, toResult } from "./stats.ts";
+import type { VerifiedRegistration } from "./webauthn.ts";
 
 export type { ReactionKind };
 // The pure accounting behind these reads lives in lib/stats.ts; re-exported so
@@ -204,16 +218,15 @@ export async function isAllowed(email: string): Promise<boolean> {
 export async function ensureMember(
   email: string,
   name: string | null,
-  image: string | null,
   opts?: { bypassAllowlist?: boolean },
 ): Promise<Member | null> {
   const normalized = normalizeEmail(email);
   const [existing] = await db.select().from(members).where(eq(members.email, normalized));
   if (existing) {
-    if ((name && name !== existing.name) || (image && image !== existing.image)) {
+    if (name && name !== existing.name) {
       const [updated] = await db
         .update(members)
-        .set({ name: name ?? existing.name, image: image ?? existing.image })
+        .set({ name })
         .where(eq(members.id, existing.id))
         .returning();
       return updated;
@@ -226,7 +239,14 @@ export async function ensureMember(
   try {
     const [created] = await db
       .insert(members)
-      .values({ id: randomUUID(), email: normalized, name: name ?? normalized, image })
+      .values({
+        id: randomUUID(),
+        email: normalized,
+        name: name ?? normalized,
+        // The one thing FOUNDING_MEMBERS still decides: who founds an empty
+        // table. From here on it is the column, and founders promote each other.
+        isFounder: env.FOUNDING_MEMBERS.includes(normalized),
+      })
       .returning();
     logger.info({ memberId: created.id, email: normalized }, "member joined");
     return created;
@@ -238,6 +258,105 @@ export async function ensureMember(
   }
 }
 
+// ---------- passkeys ----------
+//
+// A member may hold several; any of them signs them in. Verification is in
+// lib/webauthn.ts — everything here is storage.
+
+export async function listCredentials(memberId: string): Promise<CredentialRow[]> {
+  return db
+    .select()
+    .from(credentials)
+    .where(eq(credentials.memberId, memberId))
+    .orderBy(asc(credentials.createdAt));
+}
+
+/** Sign-in looks a credential up by the id the authenticator handed the browser. */
+export async function findCredential(id: string): Promise<CredentialRow | null> {
+  const [row] = await db.select().from(credentials).where(eq(credentials.id, id));
+  return row ?? null;
+}
+
+/** The row a verified registration becomes, shared by "add" and "join". */
+function credentialRow(memberId: string, credential: VerifiedRegistration) {
+  return {
+    id: credential.credentialId,
+    memberId,
+    publicKey: credential.publicKey,
+    alg: credential.alg,
+    signCount: credential.signCount,
+    backedUp: credential.backedUp,
+  };
+}
+
+export async function addCredential(
+  memberId: string,
+  credential: VerifiedRegistration,
+): Promise<void> {
+  await db.insert(credentials).values(credentialRow(memberId, credential));
+  logger.info({ memberId, backedUp: credential.backedUp }, "passkey registered");
+}
+
+/** After a verified sign-in: advance the clone counter and note the visit. */
+export async function noteCredentialUse(
+  id: string,
+  signCount: number,
+  backedUp: boolean,
+): Promise<void> {
+  await db
+    .update(credentials)
+    .set({ signCount, backedUp, lastUsedAt: new Date() })
+    .where(eq(credentials.id, id));
+}
+
+/**
+ * Drop one of your own passkeys — unless it is the only way you can still get
+ * in. A member who joined by invite link has no address, so no Google sign-in
+ * to fall back on, and removing their last credential would leave them needing
+ * a founder to mint them a recovery link to undo one click. Enforced here
+ * rather than in the UI: the action is reachable by anyone who can POST.
+ */
+export async function removeCredential(memberId: string, id: string): Promise<void> {
+  const member = await getMember(memberId);
+  if (member && member.email == null) {
+    const held = await listCredentials(memberId);
+    if (held.length <= 1) {
+      throw new DataError("That's your only way in. Add another passkey before removing this one.");
+    }
+  }
+  await db
+    .delete(credentials)
+    .where(and(eq(credentials.id, id), eq(credentials.memberId, memberId)));
+  logger.info({ memberId }, "passkey removed");
+}
+
+/** Whether this member can sign in without Google yet. */
+export async function hasPasskey(memberId: string): Promise<boolean> {
+  const [row] = await db
+    .select({ id: credentials.id })
+    .from(credentials)
+    .where(eq(credentials.memberId, memberId))
+    .limit(1);
+  return Boolean(row);
+}
+
+/** Who holds at least one passkey — the gate on retiring Google sign-in. */
+export async function passkeyHolders(): Promise<Set<string>> {
+  const rows = await db.selectDistinct({ memberId: credentials.memberId }).from(credentials);
+  return new Set(rows.map((r) => r.memberId));
+}
+
+/** What the passkey manager renders. Key material never leaves this module. */
+export async function listPasskeySummaries(memberId: string) {
+  const held = await listCredentials(memberId);
+  return held.map((c) => ({
+    id: c.id,
+    createdAt: c.createdAt,
+    lastUsedAt: c.lastUsedAt,
+    backedUp: c.backedUp,
+  }));
+}
+
 export async function getMember(id: string): Promise<Member | null> {
   const [m] = await db.select().from(members).where(eq(members.id, id));
   return m ?? null;
@@ -247,12 +366,83 @@ export async function listMembers(): Promise<Member[]> {
   return db.select().from(members).orderBy(asc(members.joinedAt));
 }
 
-export async function listInvites() {
+/** Legacy email invites, still honoured by Google sign-in until it goes. */
+export async function listAllowlist() {
   return db.select().from(allowlist).orderBy(asc(allowlist.createdAt));
 }
 
+/** Who may invite, revoke, and mint a recovery link. */
 export function isFounder(member: Member): boolean {
-  return env.FOUNDING_MEMBERS.includes(member.email);
+  return member.isFounder;
+}
+
+/**
+ * Make somebody a founder, or stop them being one. Founders only, and never
+ * down to none: an empty founder list is a table nobody can be invited to and
+ * no lost passkey can be recovered from, with no way back short of the
+ * console. The founder rows are locked for the check, so two people demoting
+ * each other at once cannot both pass it.
+ */
+export async function setFounder(
+  actorId: string,
+  memberId: string,
+  value: boolean,
+): Promise<Member> {
+  const actor = await getMember(actorId);
+  if (!actor || !isFounder(actor)) {
+    throw new DataError("Only founding members can change who founds.");
+  }
+  return db.transaction(async (tx) => {
+    const founders = await tx
+      .select({ id: members.id })
+      .from(members)
+      .where(eq(members.isFounder, true))
+      .for("update");
+    if (!value && founders.length <= 1 && founders.some((f) => f.id === memberId)) {
+      throw new DataError("Someone has to be able to invite. Make another member a founder first.");
+    }
+
+    const [updated] = await tx
+      .update(members)
+      .set({ isFounder: value })
+      .where(eq(members.id, memberId))
+      .returning();
+    if (!updated) throw new DataError("No such member.");
+    logger.warn({ actorId, memberId, isFounder: value }, "founder changed");
+    return updated;
+  });
+}
+
+/**
+ * Bring the column in line with FOUNDING_MEMBERS, once per deploy — run by
+ * scripts/migrate.ts, right after the schema it depends on. Promotion only:
+ * taking an address out of the env var is not a demotion, because who founds
+ * stopped being the env var's business the moment the column existed.
+ */
+export async function promoteConfiguredFounders(): Promise<{
+  promoted: number;
+  founders: number;
+  members: number;
+}> {
+  const promoted =
+    env.FOUNDING_MEMBERS.length === 0
+      ? []
+      : await db
+          .update(members)
+          .set({ isFounder: true })
+          .where(and(inArray(members.email, env.FOUNDING_MEMBERS), eq(members.isFounder, false)))
+          .returning({ id: members.id });
+  if (promoted.length > 0) {
+    logger.warn({ count: promoted.length }, "bootstrap founders promoted from FOUNDING_MEMBERS");
+  }
+
+  const [counts] = await db
+    .select({
+      members: sql<number>`count(*)::int`,
+      founders: sql<number>`count(*) filter (where ${members.isFounder})::int`,
+    })
+    .from(members);
+  return { promoted: promoted.length, founders: counts.founders, members: counts.members };
 }
 
 /**
@@ -298,17 +488,272 @@ export async function getAvatar(
   return row ?? null;
 }
 
-export async function invite(email: string, invitedBy: string): Promise<void> {
-  const inviter = await getMember(invitedBy);
+// ---------- invite links ----------
+
+/**
+ * Mint a link for someone to join with — personal by default, or an open one
+ * the whole group can use. Returns the code, which is also stored, so the
+ * founder can copy the same link again later.
+ */
+export async function mintInvite(
+  inviterId: string,
+  label: string,
+  opts?: { isOpen?: boolean },
+): Promise<string> {
+  const inviter = await getMember(inviterId);
   if (!inviter || !isFounder(inviter)) {
     throw new DataError("Only founding members can invite people.");
   }
-  const normalized = normalizeEmail(email);
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalized)) {
-    throw new DataError("That doesn't look like an email address.");
+  const trimmed = label.trim();
+  if (!trimmed) throw new DataError("Say who the invite is for.");
+  if (trimmed.length > 40) throw new DataError("Keep the name under 40 characters.");
+
+  const isOpen = opts?.isOpen ?? false;
+  const code = newInviteCode();
+  await db.insert(invites).values({
+    code,
+    label: trimmed,
+    isOpen,
+    invitedBy: inviterId,
+    expiresAt: expiresAtFrom(new Date(), isOpen),
+  });
+  logger.info({ invitedBy: inviterId, label: trimmed, isOpen }, "invite link minted");
+  return code;
+}
+
+export async function listInvites(): Promise<InviteRow[]> {
+  return db.select().from(invites).orderBy(desc(invites.createdAt));
+}
+
+/** Look an invite up by the code from a link. Callers check its state. */
+export async function findInvite(code: string): Promise<InviteRow | null> {
+  const [row] = await db.select().from(invites).where(eq(invites.code, code));
+  return row ?? null;
+}
+
+export async function revokeInvite(founderId: string, code: string): Promise<void> {
+  const founder = await getMember(founderId);
+  if (!founder || !isFounder(founder)) {
+    throw new DataError("Only founding members can revoke invites.");
   }
-  await db.insert(allowlist).values({ email: normalized, invitedBy }).onConflictDoNothing();
-  logger.info({ email: normalized, invitedBy }, "member invited");
+  // Spent personal invites stay on the record. An open link is shut whether or
+  // not anyone has walked through it — that is the point of the button.
+  await db
+    .delete(invites)
+    .where(and(eq(invites.code, code), or(eq(invites.useCount, 0), eq(invites.isOpen, true))));
+  logger.info({ founderId }, "invite link revoked");
+}
+
+/**
+ * Accept an invite: create the member, store the passkey that just proved
+ * itself, and spend the link — one transaction, so two people opening the same
+ * link race safely and exactly one of them ends up at the table.
+ */
+export async function joinWithInvite(input: {
+  code: string;
+  memberId: string;
+  name: string;
+  /** Chosen at sign-up; the column default (english) covers the rest. */
+  lingo?: string;
+  credential: VerifiedRegistration;
+}): Promise<Member> {
+  const name = input.name.trim();
+  if (name.length < 2) throw new DataError("Pick a name with at least two characters.");
+  if (name.length > 40) throw new DataError("Keep the name under 40 characters.");
+
+  return db.transaction(async (tx) => {
+    // Names are how @mentions find people (lib/mentions.ts), so they have to be
+    // distinct — email used to do this quietly and no longer can.
+    const [clash] = await tx
+      .select({ id: members.id })
+      .from(members)
+      .where(sql`lower(${members.name}) = lower(${name})`);
+    if (clash) throw new DataError("Someone at the table already goes by that name.");
+
+    const [invite] = await tx
+      .select()
+      .from(invites)
+      .where(eq(invites.code, input.code))
+      .for("update");
+    if (!invite) throw new DataError("That invite link isn't valid.");
+    if (inviteState(invite, new Date()) !== "live") {
+      throw new DataError("That invite link has already been used or has expired.");
+    }
+
+    const [member] = await tx
+      .insert(members)
+      .values({ id: input.memberId, email: null, name, lingo: input.lingo ?? "english" })
+      .returning();
+    await tx.insert(credentials).values(credentialRow(member.id, input.credential));
+    // useCount is what spends a personal link; an open one just keeps count.
+    await tx
+      .update(invites)
+      .set({ useCount: invite.useCount + 1 })
+      .where(eq(invites.code, input.code));
+
+    logger.info({ memberId: member.id, invitedBy: invite.invitedBy }, "member joined by invite");
+    return member;
+  });
+}
+
+// ---------- recovery links ----------
+//
+// The way back to a seat, for a member who has lost every passkey they held.
+// Everything here is deliberately narrower than the invite equivalent above,
+// because the link is worth incomparably more: it does not create a member, it
+// *becomes* one. See lib/recovery.ts for the reasoning; what this file adds is
+// that nothing is ever done quietly — every mint, revoke, and use is a warn,
+// and listRecoveries() feeds a notice every member can read.
+
+/** Whose seat, who vouched, and what the table is told about it. */
+export interface RecoveryView {
+  row: RecoveryRow;
+  member: Member;
+  /** Null when it came from the console rather than from a founder. */
+  mintedBy: Member | null;
+}
+
+async function createRecovery(memberId: string, mintedBy: string | null): Promise<string> {
+  const member = await getMember(memberId);
+  if (!member) throw new DataError("No such member.");
+
+  const code = newRecoveryCode();
+  const now = new Date();
+  await db.transaction(async (tx) => {
+    // One live link per member: minting a second shuts the first, so there is
+    // never more than one key to the same seat in flight. Unused links that
+    // simply ran out go at the same time — nobody came, so nothing is lost.
+    await tx
+      .delete(recoveries)
+      .where(
+        and(
+          isNull(recoveries.usedAt),
+          or(eq(recoveries.memberId, memberId), lte(recoveries.expiresAt, now)),
+        ),
+      );
+    await tx.insert(recoveries).values({
+      code,
+      memberId,
+      mintedBy,
+      expiresAt: recoveryExpiresAt(now),
+    });
+  });
+  // Warn, not info: this is the one action in the app that hands one member's
+  // account to whoever is holding a URL.
+  logger.warn({ memberId, mintedBy }, "recovery link minted");
+  return code;
+}
+
+/**
+ * Mint a link that lets someone add a passkey to `memberId`'s seat. Founders
+ * only, and the real check is the one the code cannot make: that the founder
+ * knows, out of band, who they are talking to.
+ */
+export async function mintRecovery(founderId: string, memberId: string): Promise<string> {
+  const founder = await getMember(founderId);
+  if (!founder || !isFounder(founder)) {
+    throw new DataError("Only founding members can mint a recovery link.");
+  }
+  return createRecovery(memberId, founderId);
+}
+
+/**
+ * The failsafe, and the only path that skips the founder check: for when no
+ * founder can sign in either, and the alternative is the whole table being
+ * locked out for good. Reachable exclusively from scripts/recovery-link.ts —
+ * whoever runs it already holds DATABASE_URL and could write the credentials
+ * row by hand, so this grants nothing new; it only makes it survivable.
+ * Never call it from a server action.
+ */
+export async function mintRecoveryFromConsole(memberId: string): Promise<string> {
+  return createRecovery(memberId, null);
+}
+
+/** Look a recovery link up by its code. Callers check its state. */
+export async function findRecovery(code: string): Promise<RecoveryRow | null> {
+  const [row] = await db.select().from(recoveries).where(eq(recoveries.code, code));
+  return row ?? null;
+}
+
+/**
+ * What the members page announces: links still open, and ones walked through
+ * in the last week. Read by every member, not just founders — being seen is
+ * the check on this whole mechanism.
+ */
+export async function listRecoveries(): Promise<{ live: RecoveryView[]; used: RecoveryView[] }> {
+  const rows = await db.select().from(recoveries).orderBy(desc(recoveries.createdAt));
+  const { live, used } = visibleRecoveries(rows, new Date());
+  if (live.length === 0 && used.length === 0) return { live: [], used: [] };
+
+  const memberById = await membersById();
+  const view = (row: RecoveryRow): RecoveryView | null => {
+    const member = memberById.get(row.memberId);
+    return member ? { row, member, mintedBy: memberById.get(row.mintedBy ?? "") ?? null } : null;
+  };
+  return {
+    live: live.map(view).filter((v) => v != null),
+    used: used.map(view).filter((v) => v != null),
+  };
+}
+
+/**
+ * Shut a live link. Any founder can, and so can the member it names — if a
+ * link is minted for your seat and you never asked for one, you are the person
+ * who most needs to be able to stop it. Spent links stay: they are the record.
+ */
+export async function revokeRecovery(actorId: string, code: string): Promise<void> {
+  const row = await findRecovery(code);
+  if (!row) return;
+  const actor = await getMember(actorId);
+  if (!actor || (actor.id !== row.memberId && !isFounder(actor))) {
+    throw new DataError("Only a founding member, or whoever the link is for, can shut it.");
+  }
+  await db.delete(recoveries).where(and(eq(recoveries.code, code), isNull(recoveries.usedAt)));
+  logger.warn({ actorId, memberId: row.memberId }, "recovery link shut");
+}
+
+/**
+ * Walk through a recovery link: attach the passkey that just proved itself to
+ * the seat the link names, and spend the link — one transaction with the row
+ * locked, so two people holding the same URL cannot both come through.
+ *
+ * Existing passkeys are deliberately left alone. If the member still holds a
+ * working one, they keep it, they see the new arrival on their own page, and
+ * they can remove it — which is the difference between a recovery and a
+ * takeover being undoable.
+ */
+export async function recoverWithLink(input: {
+  code: string;
+  memberId: string;
+  credential: VerifiedRegistration;
+}): Promise<Member> {
+  return db.transaction(async (tx) => {
+    const [row] = await tx
+      .select()
+      .from(recoveries)
+      .where(eq(recoveries.code, input.code))
+      .for("update");
+    if (!row) throw new DataError("That recovery link isn't valid.");
+    if (recoveryState(row, new Date()) !== "live") {
+      throw new DataError("That recovery link has already been used or has expired.");
+    }
+    // The ceremony was started for one seat; the row has to still name it.
+    if (row.memberId !== input.memberId) {
+      throw new DataError("That recovery link isn't valid.");
+    }
+
+    const [member] = await tx.select().from(members).where(eq(members.id, row.memberId));
+    if (!member) throw new DataError("That seat is gone.");
+
+    await tx.insert(credentials).values(credentialRow(member.id, input.credential));
+    await tx.update(recoveries).set({ usedAt: new Date() }).where(eq(recoveries.code, input.code));
+
+    logger.warn(
+      { memberId: member.id, mintedBy: row.mintedBy },
+      "seat recovered — a new passkey was added through a recovery link",
+    );
+    return member;
+  });
 }
 
 // ---------- markets: reads ----------

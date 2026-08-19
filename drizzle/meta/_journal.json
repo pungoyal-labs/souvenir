@@ -64,6 +64,48 @@
       "when": 1787112121883,
       "tag": "0008_vengeful_eternals",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1787114875708,
+      "tag": "0009_passkeys",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1787119558751,
+      "tag": "0010_invite_links",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1787120664516,
+      "tag": "0011_group_invites",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1787122211770,
+      "tag": "0012_invite_code_is_the_key",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1787122665915,
+      "tag": "0013_recovery_links",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1787123342851,
+      "tag": "0014_founders",
+      "breakpoints": true
     }
   ]
 }

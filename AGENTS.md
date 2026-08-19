@@ -7,7 +7,9 @@ allowlist (`lib/auth.ts`).
 **Behavior is specified by the tests.** Every pure module has a `*.test.ts`
 beside it: `lib/engine` (settlement), `lib/stats` (outcomes/roll-ups),
 `lib/recommend` (For-you ranking), `lib/pies` (money math), `lib/email`
-(canonicalization). Read the test before changing a module; change them
+(canonicalization), `lib/webauthn` + `lib/cbor` (passkey verification),
+`lib/avatar` (monograms), `lib/invites` (invite codes), `lib/recovery`
+(recovery links). Read the test before changing a module; change them
 together.
 
 ## Commands (pnpm 11)
@@ -19,6 +21,8 @@ together.
 - `pnpm db:generate` / `pnpm db:migrate` — new Drizzle migration after editing
   `lib/db/schema.ts` / apply (also run by the `migrate` compose service)
 - `pnpm seed` — demo data (dev only)
+- `pnpm recovery:link "<name or id>"` — break-glass recovery link, straight
+  against the database, for when no founder can sign in either
 - `pnpm lingo:gen` — compile `lingo.yaml` → `lib/lingo.data.ts` (`dev` and
   `build` run it for you)
 
@@ -49,6 +53,49 @@ Pre-commit (husky): biome on staged files, tsc, full test suite.
   nav, and rule errors stay plain in every lingo.
 - Emails go through `normalizeEmail` (`lib/email.ts`) before any lookup or
   write — Gmail ignores dots.
+- New members join by invite link — personal (single use, 7 days) or an open
+  group link (30 days, unlimited). The code is the row's primary key and is
+  stored as-is, so a founder can re-share a link; invites survive on being
+  short-lived and revocable rather than unreadable (`lib/invites.ts`).
+  `use_count` is the only record of acceptance — it is what spends a personal
+  link. Accepting one creates the member, their passkey, and spends it in one
+  transaction with the row locked.
+  `members.email` is nullable because of it — a link-joined member has no
+  address at all. The email `allowlist` survives only for members who predate
+  links. New members pick their name and lingo at sign-up.
+- Who founds is `members.is_founder`, never an address — a link-joined member
+  has no email and could otherwise never have become one, while the column it
+  depended on is the column that is meant to go. `FOUNDING_MEMBERS` is only
+  the bootstrap now: it marks those addresses when the member is created, and
+  `scripts/migrate.ts` reconciles it once per deploy. Promotion only —
+  dropping an address from the env var is not a demotion. Founders promote and
+  step down each other (and themselves) from a member's page; stepping down
+  the last founder is refused, since nobody could then invite or recover.
+- Losing every passkey is recovered by a founder-minted *recovery* link
+  (`lib/recovery.ts`, `recoveries` table, `/recover/[code]`) — never by
+  relaxing anything about sign-in. It is a separate table from `invites` on
+  purpose: this link does not create a member, it *becomes* one, so it lasts
+  30 minutes, spends on first use, and only one is live per member at a time.
+  The check that matters is a founder confirming out of band who is asking;
+  what code contributes is that nothing happens quietly — mint, shut, and use
+  are `logger.warn`, and every live and recently-used link is named on
+  `/members` for the whole table, revocable by any founder *and* by the member
+  it names. Recovery adds a passkey and never removes one, so a member who
+  still holds a key keeps it and can drop the intruder. `pnpm recovery:link`
+  is the failsafe under that (`minted_by` null = console), for when no founder
+  can sign in; it needs `DATABASE_URL`, which is where the trust already sat.
+- Names must be distinct: `@mentions` resolve against them (`lib/mentions.ts`)
+  and email used to disambiguate.
+- Two ways in: passkeys (`lib/webauthn.ts`, pure and verified on `node:crypto`)
+  and Google, which passkeys are replacing. Nothing identifying is stored for a
+  passkey — a credential id, a public key, a counter; the aaguid and the
+  attestation statement are deliberately ignored. Challenges live in a signed
+  cookie (`lib/auth.ts`), single use, and carry a `PasskeyPurpose` that never
+  crosses: a `join` ceremony cannot be finished as a `register`, and neither
+  can be finished as a `recover`.
+- Avatars are an upload or a generated monogram — initials on a gradient seeded
+  by member id, never the name, so a rename keeps the same face. Nothing reads
+  `members.image` any more.
 - Vocabulary: UI says *prediction/bet/resolve/pool/pie*; code says
   `market/stake/settle*/amountC`. Don't half-rename either side.
 - pnpm hoisted linker (pnpm-workspace.yaml) keeps standalone output identical
