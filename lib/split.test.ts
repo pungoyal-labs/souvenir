@@ -6,6 +6,8 @@ import {
   buildEntries,
   equalShares,
   fmtMoney,
+  memberBillLine,
+  memberNets,
   nets,
   parseAmount,
   SplitError,
@@ -206,6 +208,64 @@ describe("nets", () => {
   });
 });
 
+describe("memberBillLine", () => {
+  const entries = [
+    { memberId: "a", paidC: 3000, owedC: 1000 },
+    { memberId: "b", paidC: 0, owedC: 2000 },
+    { memberId: "c", paidC: 0, owedC: 0 },
+  ];
+
+  it("reads a member's paid, owed, and net off a bill", () => {
+    expect(memberBillLine(entries, "a")).toEqual({ paidC: 3000, owedC: 1000, netC: 2000 });
+    expect(memberBillLine(entries, "b")).toEqual({ paidC: 0, owedC: 2000, netC: -2000 });
+  });
+
+  it("returns null for members the bill doesn't involve", () => {
+    expect(memberBillLine(entries, "c")).toBeNull();
+    expect(memberBillLine(entries, "nobody")).toBeNull();
+  });
+});
+
+describe("memberNets", () => {
+  const dinner: BillForNets = {
+    currency: "inr",
+    entries: [
+      { memberId: "a", paidC: 3000, owedC: 1500 },
+      { memberId: "b", paidC: 0, owedC: 1500 },
+    ],
+  };
+  const cab: BillForNets = {
+    currency: "thb",
+    entries: [
+      { memberId: "b", paidC: 900, owedC: 450 },
+      { memberId: "c", paidC: 0, owedC: 450 },
+    ],
+  };
+
+  it("nets each currency the member's bills touch, in CURRENCIES order", () => {
+    expect(memberNets([cab, dinner], "b")).toEqual([
+      { currency: "inr", netC: -1500 },
+      { currency: "thb", netC: 450 },
+    ]);
+  });
+
+  it("skips currencies the member was never part of", () => {
+    expect(memberNets([dinner, cab], "a")).toEqual([{ currency: "inr", netC: 1500 }]);
+    expect(memberNets([dinner], "nobody")).toEqual([]);
+  });
+
+  it("keeps a settled currency at zero rather than dropping it", () => {
+    const payback: BillForNets = {
+      currency: "inr",
+      entries: [
+        { memberId: "b", paidC: 1500, owedC: 0 },
+        { memberId: "a", paidC: 0, owedC: 1500 },
+      ],
+    };
+    expect(memberNets([dinner, payback], "b")).toEqual([{ currency: "inr", netC: 0 }]);
+  });
+});
+
 describe("settleUpPlan", () => {
   it("clears every net with at most n−1 transfers", () => {
     const net = new Map([
@@ -234,7 +294,8 @@ describe("settleUpPlan", () => {
         net.set(`m${i}`, c);
         sum += c;
       }
-      net.set(`m${n - 1}`, -sum);
+      // Not -sum: when sum is 0 that's -0, which Object.is-based toBe(0) rejects.
+      net.set(`m${n - 1}`, sum === 0 ? 0 : -sum);
 
       const plan = settleUpPlan(net);
       expect(plan.length).toBeLessThanOrEqual(Math.max(0, n - 1));

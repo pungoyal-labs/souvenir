@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Avatar } from "@/components/avatar";
 import { AvatarPicker } from "@/components/avatar-picker";
+import { billLabel, firstName } from "@/components/bill-label";
 import { LingoPicker } from "@/components/lingo-picker";
 import { Pies } from "@/components/pies";
 import { SideChip } from "@/components/side-chip";
@@ -11,6 +12,7 @@ import {
   listMarkets,
   memberLedger,
   memberResults,
+  memberSplit,
   netOf,
   summarizeResults,
 } from "@/lib/data";
@@ -18,6 +20,7 @@ import { fmtDate, timeAgo } from "@/lib/format";
 import { type Lingo, lingoOf } from "@/lib/lingo";
 import { fmtPct, fmtPies } from "@/lib/pies";
 import { requireMember } from "@/lib/session";
+import { fmtMoney } from "@/lib/split";
 
 export default async function MemberPage({ params }: { params: Promise<{ id: string }> }) {
   const me = await requireMember();
@@ -27,11 +30,12 @@ export default async function MemberPage({ params }: { params: Promise<{ id: str
   const isMe = member.id === me.id;
   const t = lingoOf(me.lingo);
 
-  const [netC, results, ledgerItems, { open }] = await Promise.all([
+  const [netC, results, ledgerItems, { open }, split] = await Promise.all([
     netOf(member.id),
     memberResults(member.id),
     memberLedger(member.id),
     listMarkets(member.id),
+    memberSplit(member.id),
   ]);
   const stats = summarizeResults(results);
   const openPositions = open.filter((v) => v.myStakeC > 0);
@@ -82,6 +86,59 @@ export default async function MemberPage({ params }: { params: Promise<{ id: str
           }
         />
       </div>
+
+      {split.bills.length > 0 && (
+        <section className="mt-7">
+          <div className="flex items-baseline gap-3">
+            <h2 className="display text-xl font-bold uppercase tracking-wide text-soft">
+              Split bills
+            </h2>
+            <Link href="/bills" className="text-xs text-felt hover:underline">
+              settle up →
+            </Link>
+          </div>
+          <div className="mt-3 grid gap-2 sm:grid-cols-2">
+            {split.balances.map((b) => (
+              <div key={b.currency} className="card flex items-center gap-3 px-4 py-2.5 text-sm">
+                <span className="text-soft">
+                  {b.netC > 0
+                    ? `The group owes ${isMe ? "you" : firstName(member)}`
+                    : b.netC < 0
+                      ? `${isMe ? "You owe" : `${firstName(member)} owes`} the group`
+                      : t.allSquare}
+                </span>
+                <span className={`mono ml-auto font-bold ${tone(b.netC)}`}>
+                  {fmtMoney(b.currency, b.netC, { sign: true })}
+                </span>
+              </div>
+            ))}
+          </div>
+          <ul className="mt-3 card list">
+            {split.bills.map(({ bill, line }) => (
+              <li key={bill.id} className="flex items-center gap-3 px-4 py-2.5 text-sm">
+                <div className="min-w-0 flex-1">
+                  <Link href="/bills" className="font-semibold hover:underline">
+                    {billLabel(bill, me.id)}
+                  </Link>
+                  <p className="truncate text-xs text-soft">
+                    {fmtDate(bill.onDate)}
+                    {bill.kind === "settlement"
+                      ? " · payment"
+                      : `${
+                          line.paidC > 0
+                            ? ` · paid ${fmtMoney(bill.currency, line.paidC)} of ${fmtMoney(bill.currency, bill.totalC)}`
+                            : ""
+                        }${line.owedC > 0 ? ` · share ${fmtMoney(bill.currency, line.owedC)}` : ""}`}
+                  </p>
+                </div>
+                <span className={`mono font-bold ${tone(line.netC)}`}>
+                  {fmtMoney(bill.currency, line.netC, { sign: true })}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       {openPositions.length > 0 && (
         <section className="mt-7">

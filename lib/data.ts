@@ -39,6 +39,9 @@ import {
   type BillKind,
   buildEntries,
   type Currency,
+  type MemberBillLine,
+  memberBillLine,
+  memberNets,
   nets,
   SplitError,
   type SplitMode,
@@ -1187,6 +1190,29 @@ export async function billsOverview(): Promise<BillsOverview> {
     }));
 
   return { bills: views, balances };
+}
+
+export interface MemberSplitView {
+  /** Outstanding per currency; positive = the group owes them. Zero = square. */
+  balances: { currency: Currency; netC: number }[];
+  /** Bills they paid on or had a share covered, newest first, with their line. */
+  bills: { bill: BillView; line: MemberBillLine }[];
+}
+
+/** One member's slice of the split bills — assembly over the pure lib/split. */
+export async function memberSplit(memberId: string): Promise<MemberSplitView> {
+  const { bills } = await billsOverview();
+  const forNets = bills.map((b) => ({
+    currency: b.currency,
+    entries: b.entries.map((e) => ({ memberId: e.member.id, paidC: e.paidC, owedC: e.owedC })),
+  }));
+  return {
+    balances: memberNets(forNets, memberId),
+    bills: bills.flatMap((bill, i) => {
+      const line = memberBillLine(forNets[i].entries, memberId);
+      return line ? [{ bill, line }] : [];
+    }),
+  };
 }
 
 /**

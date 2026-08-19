@@ -139,6 +139,43 @@ export function nets(bills: BillForNets[]): Map<Currency, Map<string, number>> {
   return byCurrency;
 }
 
+/** What one bill did to a member: what they put in, their share, the net. */
+export interface MemberBillLine {
+  paidC: number;
+  owedC: number;
+  /** paidC − owedC: positive means this bill left the group owing them. */
+  netC: number;
+}
+
+/**
+ * A member's line on one bill, or null when it doesn't involve them — they
+ * neither put money in nor had a share covered by someone else.
+ */
+export function memberBillLine(
+  entries: { memberId: string; paidC: number; owedC: number }[],
+  memberId: string,
+): MemberBillLine | null {
+  const entry = entries.find((e) => e.memberId === memberId);
+  if (!entry || (entry.paidC === 0 && entry.owedC === 0)) return null;
+  return { paidC: entry.paidC, owedC: entry.owedC, netC: entry.paidC - entry.owedC };
+}
+
+/**
+ * One member's outstanding balance per currency, in CURRENCIES order: every
+ * currency whose bills involve them, with their net over all live bills.
+ * A currency they've settled still appears with net 0 — "all square" is an
+ * answer, not an absence — but currencies they were never part of don't.
+ */
+export function memberNets(
+  bills: BillForNets[],
+  memberId: string,
+): { currency: Currency; netC: number }[] {
+  const byCurrency = nets(bills);
+  return CURRENCIES.filter((currency) =>
+    bills.some((b) => b.currency === currency && memberBillLine(b.entries, memberId) !== null),
+  ).map((currency) => ({ currency, netC: byCurrency.get(currency)?.get(memberId) ?? 0 }));
+}
+
 export interface Transfer {
   fromId: string;
   toId: string;

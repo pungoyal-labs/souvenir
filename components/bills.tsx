@@ -10,27 +10,9 @@ import { lingoOf } from "@/lib/lingo";
 import { CURRENCY_SYMBOL, type Currency, fmtMoney, parseAmount } from "@/lib/split";
 import { Avatar } from "./avatar";
 import { BillForm, todayLocal } from "./bill-form";
+import { billLabel, firstName } from "./bill-label";
 import { CommentsSection } from "./comments";
 import { EmptyState, tone } from "./ui";
-
-function firstName(member: Member): string {
-  return member.name.split(" ")[0];
-}
-
-/** "Bo paid Ana back" — a settlement bill's two sides, read off its entries. */
-function settlementParties(bill: BillView): { payer: Member; receiver: Member } | null {
-  const payer = bill.entries.find((e) => e.paidC > 0)?.member;
-  const receiver = bill.entries.find((e) => e.owedC > 0)?.member;
-  return payer && receiver ? { payer, receiver } : null;
-}
-
-function billLabel(bill: BillView, meId: string): string {
-  if (bill.kind !== "settlement") return bill.description;
-  const parties = settlementParties(bill);
-  if (!parties) return "Settled up";
-  const name = (m: Member) => (m.id === meId ? "You" : firstName(m));
-  return `${name(parties.payer)} paid ${name(parties.receiver)} back`;
-}
 
 /**
  * The whole /bills page below the heading: who's up and down per currency,
