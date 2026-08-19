@@ -67,7 +67,7 @@ export function MarketCard({
                 className="rounded-full ring-2 ring-yes-tint"
                 title={`${p.member.name}: ${piesText(p.stakeC)} on YES`}
               >
-                <Avatar name={p.member.name} image={p.member.image} size={22} />
+                <Avatar member={p.member} size={22} />
               </span>
             ))}
           </div>
@@ -78,7 +78,7 @@ export function MarketCard({
                 className="rounded-full ring-2 ring-no-tint"
                 title={`${p.member.name}: ${piesText(p.stakeC)} on NO`}
               >
-                <Avatar name={p.member.name} image={p.member.image} size={22} />
+                <Avatar member={p.member} size={22} />
               </span>
             ))}
           </div>

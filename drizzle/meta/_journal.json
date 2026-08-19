@@ -36,6 +36,13 @@
       "when": 1787103035181,
       "tag": "0004_rare_zarek",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1787105464497,
+      "tag": "0005_avatars",
+      "breakpoints": true
     }
   ]
 }

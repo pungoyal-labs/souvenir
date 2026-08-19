@@ -38,7 +38,7 @@ export function ActivityFeed({
     <ul className="space-y-2.5">
       {items.map((item) => (
         <li key={item.row.id} className="flex items-start gap-2 text-sm">
-          <Avatar name={item.member.name} image={item.member.image} size={22} />
+          <Avatar member={item.member} size={22} />
           <span className="min-w-0">
             <span className="font-semibold">{item.member.name}</span> {phrase(item, t)}
             {showMarket && item.market && (

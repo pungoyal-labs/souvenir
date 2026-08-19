@@ -47,7 +47,7 @@ function Item({ item, t }: { item: InboxItem; t: Lingo }) {
         className="flex items-start gap-3 px-4 py-3 hover:bg-paper/60"
       >
         <span className="mt-0.5">
-          <Avatar name={item.actor.name} image={item.actor.image} size={26} />
+          <Avatar member={item.actor} size={26} />
         </span>
         <span className="min-w-0 flex-1 text-sm">
           <Line item={item} t={t} />

@@ -92,7 +92,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                     <span className="mono text-sm font-semibold text-[#e8c46a]">
                       <Pies c={netC} sign />
                     </span>
-                    <Avatar name={member.name} image={member.image} size={26} />
+                    <Avatar member={member} size={26} />
                   </Link>
                   <form
                     action={async () => {

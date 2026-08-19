@@ -60,7 +60,7 @@ export default async function LeaderboardPage() {
           <ul className="mt-3 card list">
             {unranked.map((s) => (
               <li key={s.member.id} className="flex items-center gap-3 px-4 py-2.5 text-sm">
-                <Avatar name={s.member.name} image={s.member.image} size={26} />
+                <Avatar member={s.member} size={26} />
                 <Link href={`/member/${s.member.id}`} className="font-semibold hover:underline">
                   {s.member.name}
                   {s.member.id === me.id && <span className="text-soft"> (you)</span>}
@@ -90,7 +90,7 @@ function Row({ s, rank, isMe }: { s: MemberStats; rank: number; isMe: boolean })
           href={`/member/${s.member.id}`}
           className="flex items-center gap-2 font-semibold hover:underline"
         >
-          <Avatar name={s.member.name} image={s.member.image} size={26} />
+          <Avatar member={s.member} size={26} />
           {s.member.name}
           {isMe && <span className="font-normal text-soft">(you)</span>}
         </Link>

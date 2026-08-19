@@ -79,7 +79,7 @@ export default async function MarketPage({ params }: { params: Promise<{ id: str
               <ul className="mt-2 space-y-1.5">
                 {settlements.map((s) => (
                   <li key={s.row.id} className="flex items-center gap-2 text-sm">
-                    <Avatar name={s.member.name} image={s.member.image} size={20} />
+                    <Avatar member={s.member} size={20} />
                     <span className="font-semibold">{s.member.name}</span>
                     <span className="text-soft">
                       {s.row.kind === "payout" ? "collected" : "refunded"}
@@ -116,7 +116,7 @@ export default async function MarketPage({ params }: { params: Promise<{ id: str
           <ul className="mt-2 card list">
             {view.participants.map((p) => (
               <li key={p.member.id} className="flex items-center gap-3 px-4 py-2.5">
-                <Avatar name={p.member.name} image={p.member.image} size={28} />
+                <Avatar member={p.member} size={28} />
                 <Link href={`/member/${p.member.id}`} className="font-semibold hover:underline">
                   {p.member.name}
                   {p.member.id === me.id && <span className="text-soft"> (you)</span>}

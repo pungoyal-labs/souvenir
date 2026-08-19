@@ -1,4 +1,19 @@
-import { bigserial, index, integer, pgEnum, pgTable, text, timestamp } from "drizzle-orm/pg-core";
+import {
+  bigserial,
+  customType,
+  index,
+  integer,
+  pgEnum,
+  pgTable,
+  text,
+  timestamp,
+} from "drizzle-orm/pg-core";
+
+const bytea = customType<{ data: Buffer; driverData: Buffer }>({
+  dataType() {
+    return "bytea";
+  },
+});
 
 export const sideEnum = pgEnum("side", ["yes", "no"]);
 export const marketStatusEnum = pgEnum("market_status", ["open", "yes", "no", "refunded"]);
@@ -15,6 +30,21 @@ export const members = pgTable("members", {
   // Inbox read cursor: events after this instant count as unread. The inbox
   // itself is derived entirely from markets + ledger — no notification rows.
   inboxSeenAt: timestamp("inbox_seen_at", { withTimezone: true }),
+  // Set when the member uploaded their own picture (see `avatars`); it wins
+  // over `image` and doubles as the cache-buster in the avatar URL.
+  avatarUpdatedAt: timestamp("avatar_updated_at", { withTimezone: true }),
+});
+
+// Uploaded profile pictures, one per member, overriding the Google `image`.
+// The bytes live in their own table so the frequent full-members scans in
+// lib/data.ts never drag image data along.
+export const avatars = pgTable("avatars", {
+  memberId: text("member_id")
+    .primaryKey()
+    .references(() => members.id),
+  contentType: text("content_type").notNull(),
+  data: bytea("data").notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
 export const allowlist = pgTable("allowlist", {

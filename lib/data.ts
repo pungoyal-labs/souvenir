@@ -3,9 +3,11 @@
 
 import { randomUUID } from "node:crypto";
 import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
+import { MAX_AVATAR_BYTES, sniffImageType } from "./avatar.ts";
 import { db } from "./db/index.ts";
 import {
   allowlist,
+  avatars,
   type LedgerRow,
   ledger,
   type Market,
@@ -207,6 +209,49 @@ export async function listInvites() {
 
 export function isFounder(member: Member): boolean {
   return env.FOUNDING_MEMBERS.includes(member.email);
+}
+
+/**
+ * Store the member's own profile picture, overriding the Google one at
+ * display time. Type is sniffed from the bytes — the upload's claimed MIME
+ * type is never trusted, since these bytes are served back to browsers.
+ */
+export async function setAvatar(memberId: string, bytes: Buffer): Promise<void> {
+  if (bytes.byteLength === 0) throw new DataError("That file looks empty.");
+  if (bytes.byteLength > MAX_AVATAR_BYTES) {
+    throw new DataError("Keep the picture under 512 KB.");
+  }
+  const contentType = sniffImageType(bytes);
+  if (!contentType) throw new DataError("Use a JPEG, PNG, or WebP image.");
+
+  const now = new Date();
+  await db.transaction(async (tx) => {
+    await tx
+      .insert(avatars)
+      .values({ memberId, contentType, data: bytes, updatedAt: now })
+      .onConflictDoUpdate({
+        target: avatars.memberId,
+        set: { contentType, data: bytes, updatedAt: now },
+      });
+    await tx.update(members).set({ avatarUpdatedAt: now }).where(eq(members.id, memberId));
+  });
+  logger.info({ memberId, contentType, bytes: bytes.byteLength }, "avatar uploaded");
+}
+
+/** Drop the uploaded picture; the member falls back to their Google one. */
+export async function clearAvatar(memberId: string): Promise<void> {
+  await db.transaction(async (tx) => {
+    await tx.delete(avatars).where(eq(avatars.memberId, memberId));
+    await tx.update(members).set({ avatarUpdatedAt: null }).where(eq(members.id, memberId));
+  });
+  logger.info({ memberId }, "avatar removed");
+}
+
+export async function getAvatar(
+  memberId: string,
+): Promise<{ contentType: string; data: Buffer } | null> {
+  const [row] = await db.select().from(avatars).where(eq(avatars.memberId, memberId));
+  return row ?? null;
 }
 
 export async function invite(email: string, invitedBy: string): Promise<void> {

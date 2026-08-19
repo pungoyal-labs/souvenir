@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Avatar } from "@/components/avatar";
+import { AvatarPicker } from "@/components/avatar-picker";
 import { LingoPicker } from "@/components/lingo-picker";
 import { Pies } from "@/components/pies";
 import { SideChip } from "@/components/side-chip";
@@ -47,7 +48,7 @@ export default async function MemberPage({ params }: { params: Promise<{ id: str
   return (
     <div className="mx-auto max-w-3xl">
       <div className="flex items-center gap-4">
-        <Avatar name={member.name} image={member.image} size={56} />
+        <Avatar member={member} size={56} />
         <div>
           <h1 className="display text-4xl font-extrabold">{member.name}</h1>
           <p className="text-sm text-soft">
@@ -56,8 +57,9 @@ export default async function MemberPage({ params }: { params: Promise<{ id: str
           </p>
         </div>
         {isMe && (
-          <div className="ml-auto">
+          <div className="ml-auto flex flex-col items-end gap-2">
             <LingoPicker current={me.lingo} />
+            <AvatarPicker hasCustom={me.avatarUpdatedAt != null} />
           </div>
         )}
       </div>

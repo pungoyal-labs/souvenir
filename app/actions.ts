@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
 import {
+  clearAvatar,
   createMarket,
   DataError,
   getMember,
@@ -11,6 +12,7 @@ import {
   placeBet,
   recordMarketView,
   resolveMarket,
+  setAvatar,
   setLingo,
   switchSides,
 } from "@/lib/data";
@@ -135,6 +137,33 @@ export async function setLingoAction(lingo: string): Promise<ActionResult> {
   if (!isLingoKey(lingo)) return { ok: false, error: "Pick a lingo from the list." };
   await setLingo(memberId, lingo);
   // The lingo colors copy on every page, including the layout's footer.
+  revalidatePath("/", "layout");
+  return { ok: true };
+}
+
+export async function setAvatarAction(formData: FormData): Promise<ActionResult> {
+  const memberId = await requireMemberId();
+  const file = formData.get("avatar");
+  if (!(file instanceof File) || file.size === 0) {
+    return { ok: false, error: "Pick an image first." };
+  }
+  try {
+    await setAvatar(memberId, Buffer.from(await file.arrayBuffer()));
+  } catch (err) {
+    return failure(err);
+  }
+  // The avatar shows in the header on every page.
+  revalidatePath("/", "layout");
+  return { ok: true };
+}
+
+export async function clearAvatarAction(): Promise<ActionResult> {
+  const memberId = await requireMemberId();
+  try {
+    await clearAvatar(memberId);
+  } catch (err) {
+    return failure(err);
+  }
   revalidatePath("/", "layout");
   return { ok: true };
 }

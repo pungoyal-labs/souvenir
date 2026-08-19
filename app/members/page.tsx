@@ -25,7 +25,7 @@ export default async function MembersPage() {
       <ul className="mt-5 card list">
         {all.map((m, i) => (
           <li key={m.id} className="flex items-center gap-3 px-4 py-3">
-            <Avatar name={m.name} image={m.image} size={34} />
+            <Avatar member={m} size={34} />
             <div className="min-w-0">
               <Link href={`/member/${m.id}`} className="font-semibold hover:underline">
                 {m.name}
