@@ -15,11 +15,13 @@ import {
   getMember,
   invite,
   placeBet,
+  type ReactionKind,
   recordMarketView,
   recordSettlement,
   resolveMarket,
   setAvatar,
   setLingo,
+  setReaction,
   switchSides,
 } from "@/lib/data";
 import type { Side } from "@/lib/engine";
@@ -187,6 +189,20 @@ export async function recordViewAction(marketId: string): Promise<void> {
   } catch (err) {
     logger.debug({ err, marketId }, "view not recorded");
   }
+}
+
+export async function reactAction(
+  marketId: string,
+  kind: ReactionKind,
+  on: boolean,
+): Promise<ActionResult> {
+  return mutate(
+    async (memberId) => {
+      await setReaction(memberId, marketId, kind, on);
+      return {};
+    },
+    () => ["/", `/market/${marketId}`],
+  );
 }
 
 export async function addBillAction(input: BillInput): Promise<ActionResult> {

@@ -111,6 +111,31 @@ export const marketViews = pgTable(
   (t) => [index("market_views_member_market_idx").on(t.memberId, t.marketId)],
 );
 
+export const marketReactionEnum = pgEnum("market_reaction", ["upvote", "watch"]);
+
+// Raw member intent on a prediction, one row per live reaction: an `upvote`
+// says "good question", a `watch` says "keep me posted". Toggling off deletes
+// the row — this is presence state like `members.inbox_seen_at`, not history.
+// Counts, ranking boosts, and watch-driven inbox items are derived at read
+// time; nothing aggregated is ever stored.
+export const marketReactions = pgTable(
+  "market_reactions",
+  {
+    marketId: text("market_id")
+      .notNull()
+      .references(() => markets.id),
+    memberId: text("member_id")
+      .notNull()
+      .references(() => members.id),
+    kind: marketReactionEnum("kind").notNull(),
+    at: timestamp("at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.marketId, t.memberId, t.kind] }),
+    index("market_reactions_member_idx").on(t.memberId),
+  ],
+);
+
 // ---------- split bills (real money, separate from the pie ledger) ----------
 
 export const currencyEnum = pgEnum("currency", ["inr", "thb"]);
@@ -218,6 +243,8 @@ export type Member = typeof members.$inferSelect;
 export type Market = typeof markets.$inferSelect;
 export type LedgerRow = typeof ledger.$inferSelect;
 export type MarketViewRow = typeof marketViews.$inferSelect;
+export type MarketReactionRow = typeof marketReactions.$inferSelect;
+export type ReactionKind = MarketReactionRow["kind"];
 export type BillRevisionRow = typeof billRevisions.$inferSelect;
 export type BillEntryRow = typeof billEntries.$inferSelect;
 export type CommentRow = typeof comments.$inferSelect;

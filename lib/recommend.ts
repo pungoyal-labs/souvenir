@@ -3,8 +3,8 @@
 // history, which markets the viewer has looked at) and get back an ordered
 // list of markets the viewer hasn't joined, each with the reasons it ranked.
 //
-// The score is a weighted blend of eight signals, every one derived from the
-// ledger and view log — nothing is stored:
+// The score is a weighted blend of ten signals, every one derived from the
+// ledger, view log, and reaction rows — nothing aggregated is stored:
 //   heat       time-decayed betting action (24h half-life) — busy tables rank
 //   pool       pies on the line
 //   contested  how close the yes/no split is (a 50/50 pot beats a landslide)
@@ -13,6 +13,9 @@
 //   topic      TF-IDF similarity between this question and the viewer's past bets
 //   fresh      newly opened markets get an exploration boost (72h half-life)
 //   unseen     the viewer hasn't even opened the page yet
+//   endorse    upvotes from other members — the group vouches for the question
+//   watching   the viewer flagged interest themselves (watch, or upvote at
+//              half strength) without betting — the strongest personal signal
 // Weights sum to 1 so a score is always in [0, 1].
 
 import type { Side } from "./engine.ts";
@@ -38,6 +41,8 @@ export interface CandidateMarket {
   noPoolC: number;
   stakes: StakeSnapshot[];
   actions: ActionEvent[];
+  upvoterIds: string[];
+  watcherIds: string[];
 }
 
 /** Any market, open or resolved — the affinity and topic corpora. */
@@ -56,7 +61,9 @@ export type Reason =
   | { kind: "friends"; memberIds: string[] }
   | { kind: "topic" }
   | { kind: "fresh" }
-  | { kind: "unseen" };
+  | { kind: "unseen" }
+  | { kind: "endorsed"; upvotes: number }
+  | { kind: "watching" };
 
 export interface Recommendation {
   marketId: string;
@@ -66,14 +73,16 @@ export interface Recommendation {
 }
 
 const WEIGHTS = {
-  heat: 0.28,
-  pool: 0.1,
-  contested: 0.14,
-  crowd: 0.08,
-  social: 0.15,
-  topic: 0.1,
-  fresh: 0.1,
-  unseen: 0.05,
+  heat: 0.25,
+  pool: 0.08,
+  contested: 0.13,
+  crowd: 0.07,
+  social: 0.13,
+  topic: 0.09,
+  fresh: 0.09,
+  unseen: 0.04,
+  endorse: 0.05,
+  watching: 0.07,
 } as const;
 
 const HEAT_HALF_LIFE_H = 24;
@@ -84,6 +93,7 @@ const BIG_POOL_C = 2000; // 20 pies on the line is worth calling out
 const CONTESTED_MIN = 0.8; // yes share between ~28% and ~72%
 const TOPIC_MIN = 0.25;
 const FRIENDS_MIN_AFFINITY = 2;
+const ENDORSED_MIN_UPVOTES = 2; // one upvote nudges the score; two earn a chip
 
 const HOURS = 3_600_000;
 
@@ -233,6 +243,16 @@ export function recommend(input: {
     const fresh = decay(market.createdAt, now, FRESH_HALF_LIFE_H);
     const unseen = viewedMarketIds.has(market.id) ? 0 : 1;
 
+    const upvotes = market.upvoterIds.filter((id) => id !== viewerId).length;
+    const endorse = squash(upvotes, 2);
+    // Watching is a standing "tell me more"; the viewer's own upvote is a
+    // weaker "good question" — both mean interest without a stake yet.
+    const watching = market.watcherIds.includes(viewerId)
+      ? 1
+      : market.upvoterIds.includes(viewerId)
+        ? 0.5
+        : 0;
+
     const parts: { reason: Reason | null; contribution: number }[] = [
       {
         reason: recentActions >= HOT_MIN_ACTIONS ? { kind: "hot", recentActions } : null,
@@ -278,6 +298,14 @@ export function recommend(input: {
             ? { kind: "unseen" }
             : null,
         contribution: WEIGHTS.unseen * unseen,
+      },
+      {
+        reason: upvotes >= ENDORSED_MIN_UPVOTES ? { kind: "endorsed", upvotes } : null,
+        contribution: WEIGHTS.endorse * endorse,
+      },
+      {
+        reason: market.watcherIds.includes(viewerId) ? { kind: "watching" } : null,
+        contribution: WEIGHTS.watching * watching,
       },
     ];
 

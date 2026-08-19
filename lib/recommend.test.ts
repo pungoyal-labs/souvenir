@@ -26,6 +26,8 @@ function candidate(id: string, over: Partial<CandidateMarket> = {}): CandidateMa
     noPoolC: stakes.filter((s) => s.side === "no").reduce((t, s) => t + s.stakeC, 0),
     stakes,
     actions: stakes.map((s) => ({ memberId: s.memberId, at: hoursAgo(48) })),
+    upvoterIds: [],
+    watcherIds: [],
     ...over,
   };
 }
@@ -192,6 +194,45 @@ describe("signals", () => {
     });
     const [rec] = rank([busyAndFresh]);
     expect(rec.reasons.map((r) => r.kind)).toEqual(["hot", "fresh"]);
+  });
+
+  it("ranks an upvoted market over an identical one nobody vouched for", () => {
+    const endorsed = candidate("endorsed", { upvoterIds: ["a", "b"] });
+    const plain = candidate("plain");
+    const out = rank([endorsed, plain]);
+    expect(out.map((r) => r.marketId)).toEqual(["endorsed", "plain"]);
+    expect(out[0].reasons).toContainEqual({ kind: "endorsed", upvotes: 2 });
+  });
+
+  it("needs two upvotes for the endorsed chip, and never counts the viewer's own", () => {
+    const [one] = rank([candidate("one", { upvoterIds: ["a"] })]);
+    expect(one.reasons.some((r) => r.kind === "endorsed")).toBe(false);
+    const [withMine] = rank([candidate("mine-too", { upvoterIds: ["a", "me"] })]);
+    expect(withMine.reasons.some((r) => r.kind === "endorsed")).toBe(false);
+  });
+
+  it("boosts markets the viewer watches, with the watching chip", () => {
+    const watched = candidate("watched", { watcherIds: ["me"] });
+    const ignored = candidate("ignored");
+    const out = rank([watched, ignored]);
+    expect(out.map((r) => r.marketId)).toEqual(["watched", "ignored"]);
+    expect(out[0].reasons).toContainEqual({ kind: "watching" });
+  });
+
+  it("counts the viewer's own upvote as interest — half a watch, no chip", () => {
+    const watched = candidate("watched", { watcherIds: ["me"] });
+    const upvoted = candidate("upvoted", { upvoterIds: ["me"] });
+    const neither = candidate("neither");
+    const out = rank([watched, upvoted, neither]);
+    expect(out.map((r) => r.marketId)).toEqual(["watched", "upvoted", "neither"]);
+    expect(out[1].reasons.some((r) => r.kind === "watching")).toBe(false);
+  });
+
+  it("ignores other members' watches — watching is personal", () => {
+    const othersWatch = candidate("others", { watcherIds: ["a", "b"] });
+    const plain = candidate("plain");
+    const out = rank([othersWatch, plain]);
+    expect(out[0].score).toBeCloseTo(out[1].score, 10);
   });
 
   it("flags older markets the viewer never opened, but not viewed ones", () => {

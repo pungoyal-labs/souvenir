@@ -19,10 +19,13 @@ import {
   type LedgerRow,
   ledger,
   type Market,
+  type MarketReactionRow,
   type Member,
+  marketReactions,
   markets,
   marketViews,
   members,
+  type ReactionKind,
 } from "./db/schema.ts";
 import { normalizeEmail } from "./email.ts";
 import { exposure, otherSide, type Position, refundAll, type Side, settle } from "./engine.ts";
@@ -44,6 +47,7 @@ import {
 } from "./split.ts";
 import { type MarketResult, marketOutcomes, replay, summarizeResults, toResult } from "./stats.ts";
 
+export type { ReactionKind };
 // The pure accounting behind these reads lives in lib/stats.ts; re-exported so
 // pages keep importing everything data-shaped from here.
 export { type MarketResult, summarizeResults };
@@ -133,6 +137,23 @@ async function marketLedger(marketIds: string[]): Promise<Map<string, LedgerRow[
 async function membersById(): Promise<Map<string, Member>> {
   const all = await db.select().from(members);
   return new Map(all.map((m) => [m.id, m]));
+}
+
+/** Live upvote/watch rows for the given markets, keyed by market. */
+async function reactionsByMarket(marketIds: string[]): Promise<Map<string, MarketReactionRow[]>> {
+  const byMarket = new Map<string, MarketReactionRow[]>();
+  if (marketIds.length === 0) return byMarket;
+  const rows = await db
+    .select()
+    .from(marketReactions)
+    .where(inArray(marketReactions.marketId, marketIds))
+    .orderBy(asc(marketReactions.at));
+  for (const row of rows) {
+    const list = byMarket.get(row.marketId) ?? [];
+    list.push(row);
+    byMarket.set(row.marketId, list);
+  }
+  return byMarket;
 }
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
@@ -354,6 +375,10 @@ function reasonLabel(reason: Reason, memberById: Map<string, Member>): string {
       return "just opened";
     case "unseen":
       return "you haven't looked";
+    case "endorsed":
+      return `👍 ${reason.upvotes} upvotes`;
+    case "watching":
+      return "you're watching";
   }
 }
 
@@ -373,19 +398,29 @@ async function recommendFor(
     .select({ marketId: marketViews.marketId })
     .from(marketViews)
     .where(eq(marketViews.memberId, viewerId));
+  const reactions = await reactionsByMarket(open.map((v) => v.market.id));
 
-  const candidates: CandidateMarket[] = open.map((v) => ({
-    id: v.market.id,
-    creatorId: v.market.creatorId,
-    question: v.market.question,
-    createdAt: v.market.createdAt,
-    yesPoolC: v.yesPoolC,
-    noPoolC: v.noPoolC,
-    stakes: v.participants.map((p) => ({ memberId: p.member.id, side: p.side, stakeC: p.stakeC })),
-    actions: (rowsByMarket.get(v.market.id) ?? [])
-      .filter((r) => r.kind === "bet" || r.kind === "switch")
-      .map((r) => ({ memberId: r.memberId, at: r.at })),
-  }));
+  const candidates: CandidateMarket[] = open.map((v) => {
+    const reacted = reactions.get(v.market.id) ?? [];
+    return {
+      id: v.market.id,
+      creatorId: v.market.creatorId,
+      question: v.market.question,
+      createdAt: v.market.createdAt,
+      yesPoolC: v.yesPoolC,
+      noPoolC: v.noPoolC,
+      stakes: v.participants.map((p) => ({
+        memberId: p.member.id,
+        side: p.side,
+        stakeC: p.stakeC,
+      })),
+      actions: (rowsByMarket.get(v.market.id) ?? [])
+        .filter((r) => r.kind === "bet" || r.kind === "switch")
+        .map((r) => ({ memberId: r.memberId, at: r.at })),
+      upvoterIds: reacted.filter((r) => r.kind === "upvote").map((r) => r.memberId),
+      watcherIds: reacted.filter((r) => r.kind === "watch").map((r) => r.memberId),
+    };
+  });
   const history: MarketHistory[] = all.map((m) => ({
     id: m.id,
     creatorId: m.creatorId,
@@ -417,7 +452,10 @@ export async function getMarketView(
   settlements: ActivityItem[];
   comments: CommentView[];
   /** Distinct members who have opened this prediction. */
-  watchers: number;
+  seenBy: number;
+  /** Members who upvoted / are watching, oldest reaction first. */
+  upvoters: Member[];
+  watchers: Member[];
 } | null> {
   const [market] = await db.select().from(markets).where(eq(markets.id, marketId));
   if (!market) return null;
@@ -434,16 +472,24 @@ export async function getMarketView(
     .from(comments)
     .where(eq(comments.marketId, marketId))
     .orderBy(asc(comments.id));
-  const [watch] = await db
-    .select({ watchers: sql<number>`count(distinct ${marketViews.memberId})::int` })
+  const [seen] = await db
+    .select({ seenBy: sql<number>`count(distinct ${marketViews.memberId})::int` })
     .from(marketViews)
     .where(eq(marketViews.marketId, marketId));
+  const reacted = (await reactionsByMarket([marketId])).get(marketId) ?? [];
+  const reactors = (kind: ReactionKind) =>
+    reacted
+      .filter((r) => r.kind === kind)
+      .map((r) => memberById.get(r.memberId))
+      .filter((m): m is Member => !!m);
   return {
     view,
     activity: items.filter((i) => i.row.kind === "bet" || i.row.kind === "switch").reverse(),
     settlements: items.filter((i) => i.row.kind === "payout" || i.row.kind === "refund"),
     comments: await toCommentViews(commentRows, memberById),
-    watchers: watch.watchers,
+    seenBy: seen.seenBy,
+    upvoters: reactors("upvote"),
+    watchers: reactors("watch"),
   };
 }
 
@@ -461,6 +507,36 @@ export async function recordMarketView(memberId: string, marketId: string): Prom
     .limit(1);
   if (last && Date.now() - last.at.getTime() < 5 * 60_000) return;
   await db.insert(marketViews).values({ memberId, marketId });
+}
+
+/**
+ * Set or clear one member's upvote/watch on a prediction. Idempotent — the
+ * client sends the state it wants, so a double-tap can't flip it back.
+ * Resolved predictions keep their reactions but stop accepting new ones.
+ */
+export async function setReaction(
+  memberId: string,
+  marketId: string,
+  kind: ReactionKind,
+  on: boolean,
+): Promise<void> {
+  const [market] = await db.select().from(markets).where(eq(markets.id, marketId));
+  if (!market) throw new DataError("Prediction not found.");
+  if (on) {
+    requireOpen(market);
+    await db.insert(marketReactions).values({ memberId, marketId, kind }).onConflictDoNothing();
+  } else {
+    await db
+      .delete(marketReactions)
+      .where(
+        and(
+          eq(marketReactions.memberId, memberId),
+          eq(marketReactions.marketId, marketId),
+          eq(marketReactions.kind, kind),
+        ),
+      );
+  }
+  logger.info({ memberId, marketId, kind, on }, "reaction set");
 }
 
 export async function recentActivity(limit = 12): Promise<ActivityItem[]> {
@@ -844,7 +920,8 @@ export async function inbox(
   const marketById = new Map(allMarkets.map((m) => [m.id, m]));
   const rowsByMarket = await marketLedger(allMarkets.map((m) => m.id));
 
-  // Markets that concern me: I created them or I hold/held a stake.
+  // Markets that concern me: I created them, I hold/held a stake, or I hit
+  // watch — that's exactly what watching promises.
   const mine = new Set<string>();
   for (const market of allMarkets) {
     if (market.creatorId === memberId) mine.add(market.id);
@@ -854,6 +931,11 @@ export async function inbox(
       mine.add(market.id);
     }
   }
+  const watching = await db
+    .select({ marketId: marketReactions.marketId })
+    .from(marketReactions)
+    .where(and(eq(marketReactions.memberId, memberId), eq(marketReactions.kind, "watch")));
+  for (const w of watching) mine.add(w.marketId);
 
   const items: InboxItem[] = [];
 

@@ -6,6 +6,7 @@ import { BetPanel } from "@/components/bet-panel";
 import { CommentsSection } from "@/components/comments";
 import { Pies } from "@/components/pies";
 import { PoolBar } from "@/components/pool-bar";
+import { ReactionBar } from "@/components/reaction-bar";
 import { RecordView } from "@/components/record-view";
 import { ResolvePanel } from "@/components/resolve-panel";
 import { SideChip, StatusChip } from "@/components/side-chip";
@@ -23,7 +24,7 @@ export default async function MarketPage({ params }: { params: Promise<{ id: str
   const data = await getMarketView(id, me.id);
   if (!data) notFound();
   const members = await listMembers();
-  const { view, activity, settlements, comments, watchers } = data;
+  const { view, activity, settlements, comments, seenBy, upvoters, watchers } = data;
   const { market, creator } = view;
   const isOpen = market.status === "open";
   const totalPoolC = view.yesPoolC + view.noPoolC;
@@ -31,7 +32,7 @@ export default async function MarketPage({ params }: { params: Promise<{ id: str
     view.participants.length > 0 &&
       `${view.participants.length} backer${view.participants.length === 1 ? "" : "s"}`,
     activity.length > 0 && `${activity.length} bet${activity.length === 1 ? "" : "s"}`,
-    watchers > 0 && `watched by ${watchers}`,
+    seenBy > 0 && `seen by ${seenBy}`,
   ].filter(Boolean);
 
   return (
@@ -49,6 +50,15 @@ export default async function MarketPage({ params }: { params: Promise<{ id: str
       </div>
 
       <h1 className="display mt-2 text-4xl font-extrabold leading-tight">{market.question}</h1>
+
+      <ReactionBar
+        marketId={market.id}
+        meId={me.id}
+        upvoters={upvoters.map((m) => ({ id: m.id, name: m.name }))}
+        watchers={watchers.map((m) => ({ id: m.id, name: m.name }))}
+        open={isOpen}
+        lingo={me.lingo}
+      />
 
       <div className="mt-3 card p-4">
         <p className="text-[11px] font-semibold uppercase tracking-wider text-soft">Resolves how</p>
