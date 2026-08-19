@@ -1,4 +1,4 @@
-import { bigserial, integer, pgEnum, pgTable, text, timestamp } from "drizzle-orm/pg-core";
+import { bigserial, index, integer, pgEnum, pgTable, text, timestamp } from "drizzle-orm/pg-core";
 
 export const sideEnum = pgEnum("side", ["yes", "no"]);
 export const marketStatusEnum = pgEnum("market_status", ["open", "yes", "no", "refunded"]);
@@ -57,6 +57,25 @@ export const ledger = pgTable("ledger", {
   note: text("note"),
 });
 
+// Append-only, like the ledger: one row each time a member opens a prediction
+// page. Pure telemetry — never touches settlement. The "For you" ranking and
+// the watcher count are derived from it at read time.
+export const marketViews = pgTable(
+  "market_views",
+  {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    at: timestamp("at", { withTimezone: true }).notNull().defaultNow(),
+    memberId: text("member_id")
+      .notNull()
+      .references(() => members.id),
+    marketId: text("market_id")
+      .notNull()
+      .references(() => markets.id),
+  },
+  (t) => [index("market_views_member_market_idx").on(t.memberId, t.marketId)],
+);
+
 export type Member = typeof members.$inferSelect;
 export type Market = typeof markets.$inferSelect;
 export type LedgerRow = typeof ledger.$inferSelect;
+export type MarketViewRow = typeof marketViews.$inferSelect;

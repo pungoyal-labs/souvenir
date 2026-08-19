@@ -32,6 +32,16 @@ describe("computePositions", () => {
       ]),
     ).toThrow();
   });
+
+  it("rejects negative amounts", () => {
+    expect(() =>
+      computePositions([{ memberId: "a", kind: "bet", side: "yes", amountC: -100 }]),
+    ).toThrow();
+  });
+
+  it("returns an empty map for no events", () => {
+    expect(computePositions([]).size).toBe(0);
+  });
 });
 
 describe("settle", () => {
@@ -64,6 +74,31 @@ describe("settle", () => {
     expect(res.autoRefunded).toBe(true);
     expect(res.payoutsC.get("a")).toBe(500);
     expect(res.payoutsC.get("b")).toBe(300);
+  });
+
+  it("hands a lone winner the entire pool", () => {
+    const pos = computePositions([bet("a", "yes", 3), bet("b", "no", 7)]);
+    const res = settle(pos, "yes");
+    expect(res.payoutsC.get("a")).toBe(1000);
+    expect(res.payoutsC.size).toBe(1);
+  });
+
+  it("settles an empty market to an empty result", () => {
+    const res = settle(new Map(), "yes");
+    expect(res.totalPoolC).toBe(0);
+    expect(res.payoutsC.size).toBe(0);
+  });
+
+  it("breaks equal remainders deterministically by member id", () => {
+    // a and b hold identical YES stakes; pool of 301 leaves one leftover cent.
+    const pos = computePositions([
+      { memberId: "b", kind: "bet", side: "yes", amountC: 100 },
+      { memberId: "a", kind: "bet", side: "yes", amountC: 100 },
+      { memberId: "c", kind: "bet", side: "no", amountC: 101 },
+    ]);
+    const res = settle(pos, "yes");
+    expect(res.payoutsC.get("a")).toBe(151);
+    expect(res.payoutsC.get("b")).toBe(150);
   });
 
   it("stays zero-sum under fuzzing", () => {
@@ -103,5 +138,9 @@ describe("refundAll", () => {
     const refunds = refundAll(pos);
     expect(refunds.get("a")).toBe(700);
     expect(refunds.get("b")).toBe(200);
+  });
+
+  it("returns an empty map for an empty market", () => {
+    expect(refundAll(new Map()).size).toBe(0);
   });
 });

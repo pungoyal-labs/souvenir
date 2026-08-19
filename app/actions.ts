@@ -9,6 +9,7 @@ import {
   getMember,
   invite,
   placeBet,
+  recordMarketView,
   resolveMarket,
   setLingo,
   switchSides,
@@ -136,6 +137,20 @@ export async function setLingoAction(lingo: string): Promise<ActionResult> {
   // The lingo colors copy on every page, including the layout's footer.
   revalidatePath("/", "layout");
   return { ok: true };
+}
+
+/**
+ * Telemetry, not a mutation: log that the signed-in member opened a
+ * prediction. Best-effort — a lost view must never break the page.
+ */
+export async function recordViewAction(marketId: string): Promise<void> {
+  const session = await getSession();
+  if (!session) return;
+  try {
+    await recordMarketView(session.memberId, marketId);
+  } catch (err) {
+    logger.debug({ err, marketId }, "view not recorded");
+  }
 }
 
 export async function inviteAction(email: string): Promise<ActionResult> {

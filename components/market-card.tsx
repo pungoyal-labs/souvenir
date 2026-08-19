@@ -12,11 +12,14 @@ import { tone } from "./ui";
 export function MarketCard({
   view,
   myProfitC,
+  reasons,
   lingo = "english",
 }: {
   view: MarketView;
   /** For resolved predictions: the viewer's net result, if they took part. */
   myProfitC?: number;
+  /** For recommended predictions: why this one is being pitched. */
+  reasons?: string[];
   lingo?: string;
 }) {
   const t = lingoOf(lingo);
@@ -37,6 +40,19 @@ export function MarketCard({
       </div>
 
       <h3 className="display mt-2 text-2xl font-bold leading-tight">{market.question}</h3>
+
+      {reasons && reasons.length > 0 && (
+        <div className="mt-2 flex flex-wrap gap-1.5">
+          {reasons.map((reason) => (
+            <span
+              key={reason}
+              className="inline-flex items-center rounded bg-gold/20 px-1.5 py-0.5 text-[11px] font-semibold uppercase tracking-wider text-soft"
+            >
+              {reason}
+            </span>
+          ))}
+        </div>
+      )}
 
       <div className="mt-3">
         <PoolBar yesPoolC={view.yesPoolC} noPoolC={view.noPoolC} lingo={lingo} />

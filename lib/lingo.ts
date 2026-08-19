@@ -30,6 +30,8 @@ export interface Lingo {
   openEmptyTitle: string;
   openEmptySub: string;
   resolvedEmpty: string;
+  forYouHeading: string;
+  forYouSub: string;
   openBetsEmpty: string;
   betsEmpty: string;
   poolEmpty: string;

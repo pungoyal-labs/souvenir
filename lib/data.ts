@@ -11,22 +11,20 @@ import {
   type Market,
   type Member,
   markets,
+  marketViews,
   members,
 } from "./db/schema.ts";
 import { normalizeEmail } from "./email.ts";
-import {
-  computePositions,
-  exposure,
-  type MarketEvent,
-  otherSide,
-  type Position,
-  refundAll,
-  type Side,
-  settle,
-} from "./engine.ts";
+import { exposure, otherSide, type Position, refundAll, type Side, settle } from "./engine.ts";
 import { env } from "./env.ts";
 import { logger } from "./logger.ts";
-import { toCents } from "./pies.ts";
+import { piesText, toCents } from "./pies.ts";
+import { type CandidateMarket, type MarketHistory, type Reason, recommend } from "./recommend.ts";
+import { type MarketResult, marketOutcomes, replay, summarizeResults, toResult } from "./stats.ts";
+
+// The pure accounting behind these reads lives in lib/stats.ts; re-exported so
+// pages keep importing everything data-shaped from here.
+export { type MarketResult, summarizeResults };
 
 /** User-facing failures (insufficient pies, market closed, …). */
 export class DataError extends Error {}
@@ -55,13 +53,11 @@ export interface ActivityItem {
   market: Market | null;
 }
 
-export interface MarketResult {
-  market: Market;
-  side: Side;
-  stakeC: number;
-  returnedC: number;
-  profitC: number;
-  noContest: boolean; // voided or auto-refunded: stake returned, no stats impact
+/** An open market the viewer hasn't joined, with why it's being pitched. */
+export interface RecommendedMarket {
+  view: MarketView;
+  /** Display-ready chip labels, strongest signal first. */
+  reasons: string[];
 }
 
 export interface MemberStats {
@@ -80,21 +76,6 @@ export interface MemberStats {
 }
 
 // ---------- replay helpers ----------
-
-function toEvents(rows: LedgerRow[]): MarketEvent[] {
-  return rows
-    .filter((r) => r.kind === "bet" || r.kind === "switch")
-    .map((r) => ({
-      memberId: r.memberId,
-      kind: r.kind as "bet" | "switch",
-      side: r.side as Side,
-      amountC: r.amountC,
-    }));
-}
-
-function replay(rows: LedgerRow[]): Map<string, Position> {
-  return computePositions(toEvents(rows));
-}
 
 function positionsToParticipants(
   positions: Map<string, Position>,
@@ -273,6 +254,8 @@ function buildView(
 export async function listMarkets(viewerId: string): Promise<{
   open: MarketView[];
   resolved: MarketView[];
+  /** Open markets the viewer hasn't joined, ranked by lib/recommend. */
+  forYou: RecommendedMarket[];
 }> {
   const all = await db.select().from(markets).orderBy(desc(markets.createdAt));
   const memberById = await membersById();
@@ -282,13 +265,94 @@ export async function listMarkets(viewerId: string): Promise<{
   const resolved = views
     .filter((v) => v.market.status !== "open")
     .sort((a, b) => (b.market.resolvedAt?.getTime() ?? 0) - (a.market.resolvedAt?.getTime() ?? 0));
-  return { open, resolved };
+  const forYou = await recommendFor(viewerId, open, all, rowsByMarket, memberById);
+  return { open, resolved, forYou };
+}
+
+function reasonLabel(reason: Reason, memberById: Map<string, Member>): string {
+  switch (reason.kind) {
+    case "hot":
+      return `🔥 ${reason.recentActions} bets in 2 days`;
+    case "pool":
+      return `${piesText(reason.poolC)} on the line`;
+    case "contested":
+      return "dead heat";
+    case "friends": {
+      const names = reason.memberIds.map(
+        (id) => memberById.get(id)?.name.split(" ")[0] ?? "someone",
+      );
+      return `${names.join(" & ")} ${names.length === 1 ? "is" : "are"} in`;
+    }
+    case "topic":
+      return "your kind of bet";
+    case "fresh":
+      return "just opened";
+    case "unseen":
+      return "you haven't looked";
+  }
+}
+
+/**
+ * Feed lib/recommend from data `listMarkets` already loaded, plus the viewer's
+ * slice of the view log. Everything is derived at read time — no scores or
+ * profiles are ever stored.
+ */
+async function recommendFor(
+  viewerId: string,
+  open: MarketView[],
+  all: Market[],
+  rowsByMarket: Map<string, LedgerRow[]>,
+  memberById: Map<string, Member>,
+): Promise<RecommendedMarket[]> {
+  const viewed = await db
+    .select({ marketId: marketViews.marketId })
+    .from(marketViews)
+    .where(eq(marketViews.memberId, viewerId));
+
+  const candidates: CandidateMarket[] = open.map((v) => ({
+    id: v.market.id,
+    creatorId: v.market.creatorId,
+    question: v.market.question,
+    createdAt: v.market.createdAt,
+    yesPoolC: v.yesPoolC,
+    noPoolC: v.noPoolC,
+    stakes: v.participants.map((p) => ({ memberId: p.member.id, side: p.side, stakeC: p.stakeC })),
+    actions: (rowsByMarket.get(v.market.id) ?? [])
+      .filter((r) => r.kind === "bet" || r.kind === "switch")
+      .map((r) => ({ memberId: r.memberId, at: r.at })),
+  }));
+  const history: MarketHistory[] = all.map((m) => ({
+    id: m.id,
+    creatorId: m.creatorId,
+    question: m.question,
+    participantIds: [...replay(rowsByMarket.get(m.id) ?? [])]
+      .filter(([, pos]) => exposure(pos) > 0)
+      .map(([memberId]) => memberId),
+  }));
+
+  const viewById = new Map(open.map((v) => [v.market.id, v]));
+  return recommend({
+    viewerId,
+    now: new Date(),
+    candidates,
+    history,
+    viewedMarketIds: new Set(viewed.map((r) => r.marketId)),
+  }).map((rec) => ({
+    view: viewById.get(rec.marketId)!,
+    reasons: rec.reasons.slice(0, 2).map((r) => reasonLabel(r, memberById)),
+  }));
 }
 
 export async function getMarketView(
   marketId: string,
   viewerId: string,
-): Promise<{ view: MarketView; activity: ActivityItem[]; settlements: ActivityItem[] } | null> {
+): Promise<{
+  view: MarketView;
+  activity: ActivityItem[];
+  settlements: ActivityItem[];
+  /** Distinct members who have opened this prediction. */
+  watchers: number;
+} | null> {
   const [market] = await db.select().from(markets).where(eq(markets.id, marketId));
   if (!market) return null;
   const memberById = await membersById();
@@ -299,11 +363,32 @@ export async function getMarketView(
     member: memberById.get(row.memberId)!,
     market,
   }));
+  const [watch] = await db
+    .select({ watchers: sql<number>`count(distinct ${marketViews.memberId})::int` })
+    .from(marketViews)
+    .where(eq(marketViews.marketId, marketId));
   return {
     view,
     activity: items.filter((i) => i.row.kind === "bet" || i.row.kind === "switch").reverse(),
     settlements: items.filter((i) => i.row.kind === "payout" || i.row.kind === "refund"),
+    watchers: watch.watchers,
   };
+}
+
+/**
+ * Append "this member opened this prediction" to the view log, throttled so a
+ * refresh spree counts once. Fired from the market page after real navigation
+ * (never on link prefetch — see components/record-view.tsx).
+ */
+export async function recordMarketView(memberId: string, marketId: string): Promise<void> {
+  const [last] = await db
+    .select()
+    .from(marketViews)
+    .where(and(eq(marketViews.memberId, memberId), eq(marketViews.marketId, marketId)))
+    .orderBy(desc(marketViews.id))
+    .limit(1);
+  if (last && Date.now() - last.at.getTime() < 5 * 60_000) return;
+  await db.insert(marketViews).values({ memberId, marketId });
 }
 
 export async function recentActivity(limit = 12): Promise<ActivityItem[]> {
@@ -544,35 +629,6 @@ export async function memberLedger(memberId: string): Promise<ActivityItem[]> {
   }));
 }
 
-/** Per-participant outcome of one market: final side/stake plus what came back. */
-interface MemberOutcome {
-  side: Side;
-  stakeC: number;
-  payoutC: number;
-  refundC: number;
-}
-
-function marketOutcomes(rows: LedgerRow[]): Map<string, MemberOutcome> {
-  const outcomes = new Map<string, MemberOutcome>();
-  for (const [memberId, pos] of replay(rows)) {
-    const stakeC = exposure(pos);
-    if (stakeC === 0) continue;
-    outcomes.set(memberId, {
-      side: pos.yesC > 0 ? "yes" : "no",
-      stakeC,
-      payoutC: 0,
-      refundC: 0,
-    });
-  }
-  for (const row of rows) {
-    const outcome = outcomes.get(row.memberId);
-    if (!outcome) continue;
-    if (row.kind === "payout") outcome.payoutC += row.amountC;
-    if (row.kind === "refund") outcome.refundC += row.amountC;
-  }
-  return outcomes;
-}
-
 /** One member's outcome in every resolved market they took part in. */
 export async function memberResults(memberId: string): Promise<MarketResult[]> {
   const resolved = await db
@@ -586,34 +642,9 @@ export async function memberResults(memberId: string): Promise<MarketResult[]> {
   for (const market of resolved) {
     const outcome = marketOutcomes(rowsByMarket.get(market.id) ?? []).get(memberId);
     if (!outcome) continue;
-    const noContest = market.status === "refunded" || outcome.refundC > 0;
-    results.push({
-      market,
-      side: outcome.side,
-      stakeC: outcome.stakeC,
-      returnedC: outcome.payoutC + outcome.refundC,
-      profitC: noContest ? 0 : outcome.payoutC - outcome.stakeC,
-      noContest,
-    });
+    results.push(toResult(market, outcome));
   }
   return results;
-}
-
-/** Pure roll-up of a member's resolved results, for profile/home stat strips. */
-export function summarizeResults(results: MarketResult[]) {
-  const contested = results.filter((r) => !r.noContest);
-  const wageredC = contested.reduce((s, r) => s + r.stakeC, 0);
-  const profitC = contested.reduce((s, r) => s + r.profitC, 0);
-  return {
-    resolvedCount: contested.length,
-    wins: contested.filter((r) => r.profitC > 0).length,
-    losses: contested.filter((r) => r.profitC <= 0).length,
-    wageredC,
-    profitC,
-    roi: wageredC > 0 ? profitC / wageredC : null,
-    biggestWinC: contested.reduce((m, r) => Math.max(m, r.profitC), 0),
-    biggestLossC: contested.reduce((m, r) => Math.min(m, r.profitC), 0),
-  };
 }
 
 // ---------- leaderboard ----------
@@ -766,23 +797,8 @@ export async function inbox(
 
     // The verdict, with my result if I had a stake.
     if (market.status !== "open" && market.resolvedAt && market.creatorId !== memberId) {
-      const rows = rowsByMarket.get(market.id) ?? [];
-      const pos = replay(rows).get(memberId);
-      const stakeC = pos ? exposure(pos) : 0;
-      let myProfitC: number | null = null;
-      if (stakeC > 0) {
-        let backC = 0;
-        let refunded = market.status === "refunded";
-        for (const row of rows) {
-          if (row.memberId !== memberId) continue;
-          if (row.kind === "payout") backC += row.amountC;
-          if (row.kind === "refund") {
-            backC += row.amountC;
-            refunded = true;
-          }
-        }
-        myProfitC = refunded ? 0 : backC - stakeC;
-      }
+      const outcome = marketOutcomes(rowsByMarket.get(market.id) ?? []).get(memberId);
+      const myProfitC = outcome ? toResult(market, outcome).profitC : null;
       items.push({
         kind: "resolved",
         at: market.resolvedAt,

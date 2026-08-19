@@ -14,7 +14,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ v
   const { view } = await searchParams;
   const showSettled = view === "settled";
 
-  const [{ open, resolved }, netC, results, activity] = await Promise.all([
+  const [{ open, resolved, forYou }, netC, results, activity] = await Promise.all([
     listMarkets(me.id),
     netOf(me.id),
     memberResults(me.id),
@@ -51,6 +51,28 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ v
             }
           />
         </div>
+
+        {/* Ranked pitches: open predictions the viewer hasn't joined yet */}
+        {!showSettled && forYou.length > 0 && (
+          <section className="mt-7">
+            <div className="flex items-baseline gap-3">
+              <h2 className="display text-lg font-bold uppercase tracking-wide text-soft">
+                {t.forYouHeading}
+              </h2>
+              <p className="text-xs text-soft">{t.forYouSub}</p>
+            </div>
+            <div className="mt-3 grid gap-4 sm:grid-cols-2">
+              {forYou.map((rec) => (
+                <MarketCard
+                  key={rec.view.market.id}
+                  view={rec.view}
+                  reasons={rec.reasons}
+                  lingo={me.lingo}
+                />
+              ))}
+            </div>
+          </section>
+        )}
 
         <div className="mt-7 flex flex-wrap items-center justify-between gap-3">
           <div className="display flex items-end gap-4 text-2xl font-bold uppercase tracking-wide">

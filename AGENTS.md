@@ -4,53 +4,58 @@ Private zero-sum prediction game for one friend group. Next.js 16 App Router +
 server actions, Postgres via Drizzle, dependency-free Google OAuth + invite
 allowlist (`lib/auth.ts`).
 
+**Behavior is specified by the tests.** Every pure module has a `*.test.ts`
+beside it: `lib/engine` (settlement), `lib/stats` (outcomes/roll-ups),
+`lib/recommend` (For-you ranking), `lib/pies` (money math), `lib/email`
+(canonicalization). Read the test before changing a module; change them
+together.
+
 ## Commands (pnpm 11)
 
 - `pnpm dev` — dev server (needs `docker compose up -d db` and a `.env`)
-- `pnpm test` — vitest; the only tests are `lib/engine.test.ts` (settlement math). Keep it that way — no UI tests.
+- `pnpm test` — vitest, pure logic only; never add UI/component/page tests
 - `pnpm lint` / `pnpm format` — Biome (2-space, 100 cols, double quotes)
 - `pnpm tsc --noEmit` — typecheck
-- `pnpm db:generate` — new Drizzle migration after editing `lib/db/schema.ts`
-- `pnpm db:migrate` — apply migrations (also run by the `migrate` compose service)
+- `pnpm db:generate` / `pnpm db:migrate` — new Drizzle migration after editing
+  `lib/db/schema.ts` / apply (also run by the `migrate` compose service)
 - `pnpm seed` — demo data (dev only)
-- `pnpm lingo:gen` — compile `lingo.yaml` into `lib/lingo.data.ts` (`dev` and
-  `build` run it first, so you rarely call it by hand)
+- `pnpm lingo:gen` — compile `lingo.yaml` → `lib/lingo.data.ts` (`dev` and
+  `build` run it for you)
 
-Pre-commit (husky): biome on staged files, tsc, engine tests.
+Pre-commit (husky): biome on staged files, tsc, full test suite.
 
-## Architecture rules
+## Rules
 
-- `lib/ledger` model: the `ledger` table is append-only; balances and positions
-  are always derived by replaying it. Never store or overwrite a balance.
-- All settlement math lives in `lib/engine.ts` (pure, tested). Zero-sum is the
-  invariant: payouts must sum exactly to the pool (largest-remainder rounding).
+- The `ledger` is append-only; balances, positions, pools, results are derived
+  by replay. `market_views` (page-open telemetry) is append-only too. Never
+  store a balance, score, or profile.
+- Pure math lives in tested modules (`engine`, `stats`, `recommend`);
+  `lib/data.ts` does I/O + assembly only. New derivation logic goes in a pure
+  module with tests — `data.ts`'s import chain needs env + a DB pool, so
+  inline logic there is untestable.
+- Zero-sum is the invariant: payouts sum exactly to the pool
+  (largest-remainder rounding, fuzz-tested).
 - Pies are integer centi-pies end to end; format only at the edge (`lib/pies.ts`).
-- `lib/env.ts` is the only file that reads `process.env` — everything else
-  imports `env` from there (zod-validated).
-- Relative imports inside `lib/` and `scripts/` carry explicit `.ts` extensions
-  so plain `node scripts/*.ts` runs them (Node type stripping).
-- Members have an infinite bank: no starting grant, net can go negative, the
-  per-market exposure cap (`MAX_STAKE_PIES`) is the only brake.
-- The inbox is derived from markets + ledger at read time; the only stored
-  notification state is `members.inbox_seen_at`.
-- Every flavored string lives in `lingo.yaml` (edited by hand), never in a
-  component. `lib/lingo.data.ts` is generated from it and gitignored
-  (`postinstall`, `dev`, and `build` all regenerate it); `english` is the
-  reference — the generator rejects a lingo whose fields don't match it.
-- Addresses are canonicalized through `normalizeEmail` (`lib/email.ts`) before
-  any lookup or write: Gmail ignores dots, so the allowlist, `members.email`,
-  and `FOUNDING_MEMBERS` all key off the dotless spelling.
-- The UI says *prediction*, *bet*, *resolve*, *pool*, *pie*; the code and schema
-  say `market`, `stake`, `settle*`, `amountC`. Don't half-rename either side.
-- pnpm uses the hoisted node linker (see pnpm-workspace.yaml) so Next.js
-  standalone output works identically locally and in Docker.
-- One Docker image serves the app AND runs migrations: next.config.ts
-  (`outputFileTracingIncludes`) bundles scripts/, drizzle/, lib/, and the raw
-  drizzle-orm/pg/zod packages into the standalone output. Everything is arm64
-  (GitHub arm runners, OCI arm host, Apple Silicon dev).
-- Honor pnpm's supply-chain `minimumReleaseAge` policy: if an install fails on a
-  too-fresh package, pin an older version — never add exclusions without the
-  owner's approval.
+- Infinite bank: no grant, net can go negative; the per-market exposure cap
+  (`MAX_STAKE_PIES`) is the only brake — never gate betting UI on balance.
+- Inbox and the For-you rail are derived at read time. Stored state is only
+  `members.inbox_seen_at` plus raw view rows; views are recorded by a client
+  effect (`components/record-view.tsx`) so link prefetches never count.
+- `lib/env.ts` is the only file reading `process.env` (zod-validated).
+- Relative imports in `lib/` and `scripts/` carry explicit `.ts` extensions so
+  plain `node scripts/*.ts` runs (Node type stripping).
+- Every flavored string lives in `lingo.yaml`, never in a component; all
+  lingos must define exactly `english`'s fields (generator enforces). Buttons,
+  nav, and rule errors stay plain in every lingo.
+- Emails go through `normalizeEmail` (`lib/email.ts`) before any lookup or
+  write — Gmail ignores dots.
+- Vocabulary: UI says *prediction/bet/resolve/pool/pie*; code says
+  `market/stake/settle*/amountC`. Don't half-rename either side.
+- pnpm hoisted linker (pnpm-workspace.yaml) keeps standalone output identical
+  locally and in Docker; one arm64 image serves the app and runs migrations
+  (`next.config.ts` `outputFileTracingIncludes`).
+- Honor pnpm's `minimumReleaseAge`: pin an older version if an install fails on
+  a too-fresh package — never add exclusions without the owner's approval.
 
 <!-- BEGIN:nextjs-agent-rules -->
 

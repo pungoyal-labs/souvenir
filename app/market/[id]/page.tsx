@@ -5,6 +5,7 @@ import { Avatar } from "@/components/avatar";
 import { BetPanel } from "@/components/bet-panel";
 import { Pies } from "@/components/pies";
 import { PoolBar } from "@/components/pool-bar";
+import { RecordView } from "@/components/record-view";
 import { ResolvePanel } from "@/components/resolve-panel";
 import { SideChip, StatusChip } from "@/components/side-chip";
 import { getMarketView } from "@/lib/data";
@@ -20,13 +21,20 @@ export default async function MarketPage({ params }: { params: Promise<{ id: str
   const { id } = await params;
   const data = await getMarketView(id, me.id);
   if (!data) notFound();
-  const { view, activity, settlements } = data;
+  const { view, activity, settlements, watchers } = data;
   const { market, creator } = view;
   const isOpen = market.status === "open";
   const totalPoolC = view.yesPoolC + view.noPoolC;
+  const pulse = [
+    view.participants.length > 0 &&
+      `${view.participants.length} backer${view.participants.length === 1 ? "" : "s"}`,
+    activity.length > 0 && `${activity.length} bet${activity.length === 1 ? "" : "s"}`,
+    watchers > 0 && `watched by ${watchers}`,
+  ].filter(Boolean);
 
   return (
     <div className="mx-auto max-w-3xl">
+      <RecordView marketId={market.id} />
       <Link href="/" className="text-sm text-soft hover:text-ink">
         ← All predictions
       </Link>
@@ -93,6 +101,9 @@ export default async function MarketPage({ params }: { params: Promise<{ id: str
           <p className="mono mt-1 text-center text-xs text-soft">
             <Pies c={totalPoolC} /> in the pool
           </p>
+        )}
+        {pulse.length > 0 && (
+          <p className="mt-1 text-center text-xs text-soft">{pulse.join(" · ")}</p>
         )}
       </div>
 

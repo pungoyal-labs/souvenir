@@ -1,56 +1,48 @@
 # Chiang Pai
 
-A private, social, peer-to-peer prediction market for one fixed group of
-friends. Virtual pies only, strictly zero-sum, no house. Every prediction
-creates a position, every position has consequences, every outcome is recorded —
-and over time the leaderboard reveals who is actually good at predicting things.
+A private, zero-sum prediction market for one fixed group of friends. Virtual
+pies (π) only, no house: winners split exactly what losers put in, everything
+is on the record, and over time the leaderboard reveals who can actually
+predict things.
 
 ## The game
 
-- Any member opens a **prediction**: one binary question plus explicit resolution
-  criteria. The creator resolves it later as **YES**, **NO**, or **void**.
-- Members bet on either side, up to **10 pies** total exposure per prediction
-  (`MAX_STAKE_PIES`). One side at a time; a **switch** moves your whole bet
-  across before resolution.
-- On resolution the winning side splits the **entire pool** pro-rata. Rounding
-  uses the largest-remainder method so payouts sum to the pool exactly. Voided
-  predictions (and resolutions where nobody held the winning side) refund every bet.
-- Members have an **infinite bank**: there is no starting balance and no
-  balance check — your headline number is lifetime net, and it can go negative.
-- The **leaderboard** ranks by return on pies bet, and only once you have
-  `RANKED_MIN_RESOLVED` (default 5) resolved predictions; before that you're
-  "calibrating". No odds or implied probabilities are ever displayed.
-- Each member has an **inbox**: new predictions, bets on the ones they're in, and
-  verdicts when those resolve. It is derived from the ledger at read time — the
-  only stored state is a per-member "seen" timestamp.
+- Any member opens a **prediction** (binary question + explicit resolution
+  criteria) and later resolves it **YES**, **NO**, or **void**.
+- Bet either side, up to `MAX_STAKE_PIES` exposure per prediction; a **switch**
+  moves your whole bet across before resolution.
+- Resolution splits the entire pool pro-rata among the winning side
+  (largest-remainder rounding, exactly zero-sum). Voids — and resolutions where
+  nobody held the winning side — refund every bet.
+- **Infinite bank**: no starting balance, no balance check; your number is
+  lifetime net and it can go negative.
+- The **leaderboard** ranks by ROI once you have `RANKED_MIN_RESOLVED`
+  verdicts; before that you're "calibrating". No odds are ever displayed.
+- The **inbox** and the home page's **"Picked for you"** rail (open predictions
+  you haven't joined, ranked by heat, pool, split, table-mates, topic, and
+  freshness — each pick labeled with why) are derived per request from the
+  append-only `ledger` and view log. No stored notifications, scores, or
+  profiles.
 
-**Vocabulary.** The UI says *prediction*, *bet*, *resolve*, *pool*, and *pie*
-(the π unit). The code and schema say `market`, `stake`, `settle*`, and
-`amountC` — routes, tables, and the engine's settlement math keep those names.
-Keep the two vocabularies apart rather than half-renaming either.
+**The tests are the spec.** Each pure module carries its documentation as a
+test file: `lib/engine.test.ts` (settlement, fuzz-tested zero-sum),
+`lib/stats.test.ts` (outcomes, win/loss/ROI), `lib/recommend.test.ts` (ranking
+and reason chips), `lib/pies.test.ts` (centi-pie math and formatting),
+`lib/email.test.ts` (Gmail-dot canonicalization).
 
-**Lingo.** Each member picks the dialect the app speaks to them in. Every
-flavored string lives in [`lingo.yaml`](lingo.yaml) — edit that file and run
-`pnpm lingo:gen` (or just `pnpm dev`) to compile it into `lib/lingo.data.ts`.
-`english` is the reference: a dialect missing one of its fields fails the build
-rather than rendering blank.
+**Vocabulary.** UI: *prediction, bet, resolve, pool, pie*. Code and schema:
+`market`, `stake`, `settle*`, `amountC`. Keep them apart.
 
-## Accounting
-
-The `ledger` table is append-only and is the single source of truth. Every pie
-movement is a row (`bet`, `switch`, `payout`, `refund`); balances, positions,
-pools, results, and the leaderboard are all derived by replaying it. Nothing is
-ever overwritten, so every historical market and every member's full pie
-history can be reconstructed. Pies are stored as integer centi-pies so the
-zero-sum property survives fractional payouts; `lib/engine.ts` holds the pure
-settlement math and `lib/engine.test.ts` fuzz-tests the invariant.
+**Lingo.** Members pick the dialect the app speaks to them in. All flavored
+copy lives in [`lingo.yaml`](lingo.yaml); `english` is the reference and a
+dialect missing one of its fields fails the build.
 
 ## Stack
 
 Next.js 16 (App Router, server actions) · React 19 · TypeScript 7 ·
 Tailwind CSS 4 · Google OAuth (no auth library) · Postgres 18 · Drizzle ORM ·
-Biome · Vitest · pnpm 11 · Docker. Optional LLM polish of prediction drafts via any
-Anthropic-compatible API (configured for MiniMax M3).
+Biome · Vitest · pnpm 11 · Docker. Optional LLM polish of prediction drafts via
+any Anthropic-compatible API.
 
 ## Local development
 
@@ -63,63 +55,57 @@ pnpm seed                     # optional demo data
 pnpm dev                      # http://localhost:3000
 ```
 
-Without Google OAuth credentials, set `AUTH_DEV_LOGIN=true` to get a
-passwordless dev login (any email, bypasses the invite list). **Never enable it
-in production.**
-
-Full stack in Docker instead: `docker compose up -d --build` (db → one-shot
-`migrate` container → app).
+Without Google credentials, `AUTH_DEV_LOGIN=true` enables a passwordless dev
+login (any email, bypasses the invite list). **Never in production.** Full
+stack in Docker instead: `docker compose up -d --build` (db → one-shot
+`migrate` → app).
 
 ## Configuration
 
-All environment variables are validated in one place, `lib/env.ts` — see
-`.env.example` for the complete annotated list. Highlights:
+Every variable is validated in `lib/env.ts`; `.env.example` is the annotated
+list. Highlights:
 
 | Variable | Purpose |
 | --- | --- |
 | `DATABASE_URL` | Postgres connection (dev default matches compose) |
-| `AUTH_URL` | Public base URL / domain; Google OAuth callbacks derive from it |
+| `AUTH_URL` | Public base URL; Google OAuth callbacks derive from it |
 | `AUTH_GOOGLE_ID/SECRET` | Google OAuth app (redirect URI `{AUTH_URL}/api/auth/callback/google`) |
-| `FOUNDING_MEMBERS` | Comma-separated emails: always allowed in, and the only members who can invite |
+| `FOUNDING_MEMBERS` | Comma-separated emails: always allowed in, and the only inviters |
 | `MAX_STAKE_PIES` | Per-member exposure cap per market (default 10) |
-| `RANKED_MIN_RESOLVED` | Resolved predictions needed to appear ranked (default 5) |
-| `DB_PORT` / `APP_PORT` / `APP_BIND` / `PORT` | Fully configurable database and HTTP ports |
-| `LLM_BASE_URL` / `LLM_API_KEY` / `LLM_MODEL` | Optional Anthropic-compatible endpoint for draft polish (hidden when unset) |
+| `RANKED_MIN_RESOLVED` | Verdicts needed to appear ranked (default 5) |
+| `DB_PORT` / `APP_PORT` / `APP_BIND` / `PORT` | Database and HTTP ports |
+| `LLM_BASE_URL` / `LLM_API_KEY` / `LLM_MODEL` | Optional draft-polish endpoint (hidden when unset) |
 
-Membership is controlled: Google sign-in is only accepted for emails in
-`FOUNDING_MEMBERS` or invited via the members page (founders only).
+Membership is invite-only: Google sign-in is accepted only for
+`FOUNDING_MEMBERS` or emails invited on the members page (founders only).
 
 ## Quality gates
 
-- `pnpm test` — settlement-engine tests (the only tests, by design)
-- `pnpm lint` / `pnpm tsc --noEmit`
-- Pre-commit hook (husky): Biome on staged files + typecheck + engine tests
-- CI (`.github/workflows/ci.yml`): Biome → typecheck → tests → build, then
-  a Docker image to GHCR, then deploy
+`pnpm test` (pure logic only — no UI tests, by design) · `pnpm lint` ·
+`pnpm tsc --noEmit`. Pre-commit runs all three; CI
+(`.github/workflows/ci.yml`) runs them, builds an arm64 image to GHCR, and
+deploys.
 
 ## Deployment (OCI over SSH)
 
-Push to `main` runs the pipeline on arm64 runners (matching the arm64 OCI
-host): verify → build & push one arm64 GHCR image (`:short-sha` + `:latest`) → SSH into the OCI
-box, pull the pinned tag, and `docker compose up -d` (compose runs the one-shot
-`migrate` container from the same image, then bounces `app`).
+Push to `main`: verify → build & push one arm64 GHCR image (`:short-sha` +
+`:latest`) → SSH to the OCI box, pull the pinned tag, `docker compose up -d`
+(one-shot `migrate` container, then `app`).
 
-Configure a GitHub **environment named `oracle-cloud`** with:
+Configure a GitHub **environment named `oracle-cloud`**:
 
 | Kind | Name | Value |
 | --- | --- | --- |
 | var | `OCI_HOST` | server hostname/IP |
 | var | `OCI_USER` | ssh user |
 | var | `OCI_SSH_PORT` | optional, defaults to 22 |
-| var | `DEPLOY_DIR` | directory on the server holding `docker-compose.yml` + `.env` |
+| var | `DEPLOY_DIR` | server directory holding `docker-compose.yml` + `.env` |
 | secret | `OCI_SSH_KEY` | private key for the ssh user |
 
-No registry credentials are needed: the deploy job logs the server into GHCR
-with its own ephemeral `GITHUB_TOKEN` (`packages: read`), which is valid for
-exactly as long as the deploy runs.
+No registry credentials needed: the deploy job logs the server into GHCR with
+its ephemeral `GITHUB_TOKEN` (`packages: read`).
 
-One-time server setup: install Docker, create `DEPLOY_DIR` containing this
-repo's `docker-compose.yml` and a production `.env` (strong `AUTH_SECRET` and
-`POSTGRES_PASSWORD`, real `AUTH_URL` domain, Google credentials,
-`FOUNDING_MEMBERS`), and point your reverse proxy at
-`127.0.0.1:${APP_PORT:-3000}`.
+One-time server setup: install Docker, create `DEPLOY_DIR` with this repo's
+`docker-compose.yml` and a production `.env` (strong `AUTH_SECRET` and
+`POSTGRES_PASSWORD`, real `AUTH_URL`, Google credentials, `FOUNDING_MEMBERS`),
+and point your reverse proxy at `127.0.0.1:${APP_PORT:-3000}`.
