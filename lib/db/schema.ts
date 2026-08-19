@@ -1,6 +1,9 @@
 import {
+  bigint,
   bigserial,
+  boolean,
   customType,
+  date,
   index,
   integer,
   pgEnum,
@@ -105,7 +108,68 @@ export const marketViews = pgTable(
   (t) => [index("market_views_member_market_idx").on(t.memberId, t.marketId)],
 );
 
+// ---------- split bills (real money, separate from the pie ledger) ----------
+
+export const currencyEnum = pgEnum("currency", ["inr", "thb"]);
+export const billKindEnum = pgEnum("bill_kind", ["expense", "settlement"]);
+export const billSplitEnum = pgEnum("bill_split", ["equal", "custom"]);
+
+/** Identity only — everything about a bill lives in its revisions. */
+export const bills = pgTable("bills", {
+  id: text("id").primaryKey(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+// Append-only, in the ledger's spirit: every add, edit, or delete of a bill is
+// a new full snapshot here, so any member can change any bill and the whole
+// trail stays on the record. A bill's current state is its latest revision;
+// `deleted: true` retires it. A `settlement` is a bill where the payer paid
+// and the receiver owes — the same replay that nets expenses cancels it.
+export const billRevisions = pgTable(
+  "bill_revisions",
+  {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    billId: text("bill_id")
+      .notNull()
+      .references(() => bills.id),
+    editorId: text("editor_id")
+      .notNull()
+      .references(() => members.id),
+    at: timestamp("at", { withTimezone: true }).notNull().defaultNow(),
+    deleted: boolean("deleted").notNull().default(false),
+    kind: billKindEnum("kind").notNull().default("expense"),
+    // The day the money moved, as the member stated it — no timezone games.
+    onDate: date("on_date", { mode: "string" }).notNull(),
+    description: text("description").notNull(),
+    currency: currencyEnum("currency").notNull(),
+    split: billSplitEnum("split").notNull().default("equal"),
+  },
+  (t) => [index("bill_revisions_bill_idx").on(t.billId)],
+);
+
+// One member's line on one revision. Owed shares are computed at write time by
+// lib/split.ts (largest-remainder, like engine's settle) so paid and owed each
+// sum to the bill total and historical bills never re-split.
+export const billEntries = pgTable(
+  "bill_entries",
+  {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    revisionId: bigint("revision_id", { mode: "number" })
+      .notNull()
+      .references(() => billRevisions.id),
+    memberId: text("member_id")
+      .notNull()
+      .references(() => members.id),
+    paidC: integer("paid_c").notNull().default(0),
+    owedC: integer("owed_c").notNull().default(0),
+    participant: boolean("participant").notNull().default(true),
+  },
+  (t) => [index("bill_entries_revision_idx").on(t.revisionId)],
+);
+
 export type Member = typeof members.$inferSelect;
 export type Market = typeof markets.$inferSelect;
 export type LedgerRow = typeof ledger.$inferSelect;
 export type MarketViewRow = typeof marketViews.$inferSelect;
+export type BillRevisionRow = typeof billRevisions.$inferSelect;
+export type BillEntryRow = typeof billEntries.$inferSelect;

@@ -1,0 +1,338 @@
+"use client";
+
+import { useRouter } from "next/navigation";
+import { useEffect, useState, useTransition } from "react";
+import { addBillAction, editBillAction } from "@/app/actions";
+import type { BillView } from "@/lib/data";
+import type { Member } from "@/lib/db/schema";
+import { lingoOf } from "@/lib/lingo";
+import {
+  type BillEntryInput,
+  CURRENCY_SYMBOL,
+  type Currency,
+  fmtMoney,
+  parseAmount,
+  type SplitMode,
+} from "@/lib/split";
+import { Avatar } from "./avatar";
+
+/** Today in the member's own timezone, as the YYYY-MM-DD a date input wants. */
+export function todayLocal(): string {
+  return new Date().toLocaleDateString("en-CA");
+}
+
+function centsToText(c: number): string {
+  return c % 100 === 0 ? String(c / 100) : (c / 100).toFixed(2);
+}
+
+function firstName(member: Member): string {
+  return member.name.split(" ")[0];
+}
+
+const CURRENCY_KEY = "billCurrency";
+
+const chip = (on: boolean) =>
+  `flex items-center gap-1.5 rounded-full border px-2.5 py-1.5 text-sm font-semibold ${
+    on ? "border-felt bg-felt-tint" : "border-line bg-surface text-soft"
+  }`;
+
+const field =
+  "w-full rounded-md border border-line bg-surface px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-felt";
+
+/**
+ * Add or edit one bill. The fast path is one screen: amount, what for, who
+ * paid (you, prefilled), split equally with everyone (prefilled). Multiple
+ * payers and unequal shares unfold only when asked for.
+ */
+export function BillForm({
+  members,
+  meId,
+  lingo,
+  initial,
+  onDone,
+}: {
+  members: Member[];
+  meId: string;
+  lingo: string;
+  /** Editing an existing bill; omitted when adding. */
+  initial?: BillView;
+  onDone: () => void;
+}) {
+  const t = lingoOf(lingo);
+  const router = useRouter();
+  const [pending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+
+  const [onDate, setOnDate] = useState(initial?.onDate ?? todayLocal());
+  const [description, setDescription] = useState(initial?.description ?? "");
+  const [currency, setCurrency] = useState<Currency>(initial?.currency ?? "inr");
+  const [payerIds, setPayerIds] = useState<string[]>(() =>
+    initial ? initial.entries.filter((e) => e.paidC > 0).map((e) => e.member.id) : [meId],
+  );
+  const [paidText, setPaidText] = useState<Record<string, string>>(() =>
+    initial
+      ? Object.fromEntries(
+          initial.entries
+            .filter((e) => e.paidC > 0)
+            .map((e) => [e.member.id, centsToText(e.paidC)]),
+        )
+      : {},
+  );
+  const [inSplit, setInSplit] = useState<Record<string, boolean>>(() =>
+    Object.fromEntries(
+      members.map((m) => [
+        m.id,
+        initial ? (initial.entries.find((e) => e.member.id === m.id)?.participant ?? false) : true,
+      ]),
+    ),
+  );
+  const [split, setSplit] = useState<SplitMode>(initial?.split ?? "equal");
+  const [owedText, setOwedText] = useState<Record<string, string>>(() =>
+    initial && initial.split === "custom"
+      ? Object.fromEntries(
+          initial.entries
+            .filter((e) => e.participant)
+            .map((e) => [e.member.id, centsToText(e.owedC)]),
+        )
+      : {},
+  );
+
+  // Remember the last currency for the next new bill; never fight an edit.
+  useEffect(() => {
+    if (initial) return;
+    const saved = localStorage.getItem(CURRENCY_KEY);
+    if (saved === "inr" || saved === "thb") setCurrency(saved);
+  }, [initial]);
+  const pickCurrency = (c: Currency) => {
+    setCurrency(c);
+    if (!initial) localStorage.setItem(CURRENCY_KEY, c);
+  };
+
+  const togglePayer = (id: string) =>
+    setPayerIds((ids) => (ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]));
+  const singlePayer = payerIds.length === 1;
+
+  const paidCOf = (id: string) => parseAmount(paidText[id] ?? "") ?? 0;
+  const totalC = payerIds.reduce((sum, id) => sum + paidCOf(id), 0);
+  const participantIds = members.map((m) => m.id).filter((id) => inSplit[id]);
+  const perHeadC = participantIds.length > 0 ? Math.round(totalC / participantIds.length) : 0;
+  const owedCOf = (id: string) => parseAmount(owedText[id] ?? "") ?? 0;
+  const assignedC = participantIds.reduce((sum, id) => sum + owedCOf(id), 0);
+  const remainingC = totalC - assignedC;
+
+  const submit = () =>
+    startTransition(async () => {
+      setError(null);
+      const entries: BillEntryInput[] = members
+        .map((m) => ({
+          memberId: m.id,
+          paidC: payerIds.includes(m.id) ? paidCOf(m.id) : 0,
+          participant: Boolean(inSplit[m.id]),
+          ...(split === "custom" && inSplit[m.id] ? { owedC: owedCOf(m.id) } : {}),
+        }))
+        .filter((e) => e.paidC > 0 || e.participant);
+      const input = { onDate, description, currency, split, entries };
+      const res = initial ? await editBillAction(initial.id, input) : await addBillAction(input);
+      if (!res.ok) setError(res.error ?? t.oops);
+      else {
+        onDone();
+        router.refresh();
+      }
+    });
+
+  return (
+    <div className="card p-4">
+      <h3 className="display text-lg font-bold uppercase tracking-wide text-soft">
+        {initial ? "Edit bill" : "Add a bill"}
+      </h3>
+
+      <div className="mt-3 grid gap-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex overflow-hidden rounded-md border border-line">
+            {(["inr", "thb"] as const).map((c) => (
+              <button
+                key={c}
+                type="button"
+                onClick={() => pickCurrency(c)}
+                aria-pressed={currency === c}
+                className={`px-3 py-2 text-sm font-bold ${
+                  currency === c ? "bg-felt text-white" : "bg-surface text-soft hover:text-ink"
+                }`}
+              >
+                {CURRENCY_SYMBOL[c]} {c.toUpperCase()}
+              </button>
+            ))}
+          </div>
+          {singlePayer ? (
+            <input
+              value={paidText[payerIds[0]] ?? ""}
+              onChange={(e) => setPaidText({ ...paidText, [payerIds[0]]: e.target.value })}
+              inputMode="decimal"
+              placeholder="0"
+              aria-label="Amount"
+              className="mono w-32 rounded-md border border-line bg-surface px-3 py-2 text-lg font-bold focus:outline-none focus:ring-2 focus:ring-felt"
+            />
+          ) : (
+            <span className="mono text-lg font-bold">{fmtMoney(currency, totalC)}</span>
+          )}
+          <input
+            type="date"
+            value={onDate}
+            max={todayLocal()}
+            onChange={(e) => setOnDate(e.target.value)}
+            aria-label="Date"
+            className="rounded-md border border-line bg-surface px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-felt"
+          />
+        </div>
+
+        <input
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          placeholder="Dinner at the night market"
+          maxLength={200}
+          aria-label="What was it for?"
+          className={field}
+        />
+
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wide text-soft">Paid by</p>
+          <div className="mt-1.5 flex flex-wrap gap-1.5">
+            {members.map((m) => (
+              <button
+                key={m.id}
+                type="button"
+                onClick={() => togglePayer(m.id)}
+                aria-pressed={payerIds.includes(m.id)}
+                className={chip(payerIds.includes(m.id))}
+              >
+                <Avatar member={m} size={18} />
+                {m.id === meId ? "You" : firstName(m)}
+              </button>
+            ))}
+          </div>
+          {!singlePayer && (
+            <div className="mt-2 grid gap-1.5">
+              {payerIds.map((id) => {
+                const m = members.find((x) => x.id === id);
+                if (!m) return null;
+                return (
+                  <label key={id} className="flex items-center gap-2 text-sm">
+                    <span className="w-24 truncate">{firstName(m)} paid</span>
+                    <input
+                      value={paidText[id] ?? ""}
+                      onChange={(e) => setPaidText({ ...paidText, [id]: e.target.value })}
+                      inputMode="decimal"
+                      placeholder="0"
+                      className="mono w-28 rounded-md border border-line bg-surface px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-felt"
+                    />
+                    <span className="text-soft">{CURRENCY_SYMBOL[currency]}</span>
+                  </label>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        <div>
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-xs font-semibold uppercase tracking-wide text-soft">Split between</p>
+            <div className="flex overflow-hidden rounded-md border border-line text-xs">
+              {(
+                [
+                  ["equal", "Equally"],
+                  ["custom", "Unequally"],
+                ] as const
+              ).map(([mode, label]) => (
+                <button
+                  key={mode}
+                  type="button"
+                  onClick={() => setSplit(mode)}
+                  aria-pressed={split === mode}
+                  className={`px-2.5 py-1 font-semibold ${
+                    split === mode ? "bg-felt text-white" : "bg-surface text-soft hover:text-ink"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="mt-1.5 flex flex-wrap gap-1.5">
+            {members.map((m) => (
+              <button
+                key={m.id}
+                type="button"
+                onClick={() => setInSplit({ ...inSplit, [m.id]: !inSplit[m.id] })}
+                aria-pressed={Boolean(inSplit[m.id])}
+                className={chip(Boolean(inSplit[m.id]))}
+              >
+                <Avatar member={m} size={18} />
+                {m.id === meId ? "You" : firstName(m)}
+              </button>
+            ))}
+          </div>
+          {split === "equal" ? (
+            totalC > 0 &&
+            participantIds.length > 0 && (
+              <p className="mt-1.5 text-xs text-soft">
+                ≈ {fmtMoney(currency, perHeadC)} each, {participantIds.length}{" "}
+                {participantIds.length === 1 ? "person" : "people"}
+              </p>
+            )
+          ) : (
+            <div className="mt-2 grid gap-1.5">
+              {participantIds.map((id) => {
+                const m = members.find((x) => x.id === id);
+                if (!m) return null;
+                return (
+                  <label key={id} className="flex items-center gap-2 text-sm">
+                    <span className="w-24 truncate">{firstName(m)} owes</span>
+                    <input
+                      value={owedText[id] ?? ""}
+                      onChange={(e) => setOwedText({ ...owedText, [id]: e.target.value })}
+                      inputMode="decimal"
+                      placeholder="0"
+                      className="mono w-28 rounded-md border border-line bg-surface px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-felt"
+                    />
+                    <span className="text-soft">{CURRENCY_SYMBOL[currency]}</span>
+                  </label>
+                );
+              })}
+              <p
+                className={`text-xs ${remainingC === 0 ? "text-soft" : "font-semibold text-no-deep"}`}
+              >
+                {remainingC === 0
+                  ? "Shares match the total."
+                  : remainingC > 0
+                    ? `${fmtMoney(currency, remainingC)} left to assign`
+                    : `${fmtMoney(currency, -remainingC)} over the total`}
+              </p>
+            </div>
+          )}
+        </div>
+
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            disabled={pending || totalC <= 0 || (split === "custom" && remainingC !== 0)}
+            onClick={submit}
+            className="display rounded-md bg-felt px-4 py-2 text-base font-bold uppercase text-white hover:bg-felt-deep disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            {initial ? "Save changes" : "Add bill"}
+          </button>
+          <button
+            type="button"
+            disabled={pending}
+            onClick={onDone}
+            className="rounded-md px-3 py-2 text-sm text-soft hover:underline disabled:opacity-40"
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+
+      {error && <p className="mt-2 text-sm font-semibold text-no-deep">{error}</p>}
+      {pending && <p className="mt-2 text-sm text-soft">{t.recording}</p>}
+    </div>
+  );
+}

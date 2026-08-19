@@ -43,6 +43,13 @@
       "when": 1787105464497,
       "tag": "0005_avatars",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1787106513032,
+      "tag": "0006_split_bills",
+      "breakpoints": true
     }
   ]
 }

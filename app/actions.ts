@@ -4,13 +4,18 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
 import {
+  addBill,
+  type BillInput,
   clearAvatar,
   createMarket,
   DataError,
+  deleteBill,
+  editBill,
   getMember,
   invite,
   placeBet,
   recordMarketView,
+  recordSettlement,
   resolveMarket,
   setAvatar,
   setLingo,
@@ -20,6 +25,7 @@ import type { Side } from "@/lib/engine";
 import { isLingoKey, lingoOf } from "@/lib/lingo";
 import { llmEnabled, type PolishedDraft, polishMarketDraft } from "@/lib/llm";
 import { logger } from "@/lib/logger";
+import type { Currency } from "@/lib/split";
 
 export interface ActionResult {
   ok: boolean;
@@ -180,6 +186,52 @@ export async function recordViewAction(marketId: string): Promise<void> {
   } catch (err) {
     logger.debug({ err, marketId }, "view not recorded");
   }
+}
+
+export async function addBillAction(input: BillInput): Promise<ActionResult> {
+  return mutate(
+    async (memberId) => {
+      await addBill(memberId, input);
+      return {};
+    },
+    () => ["/bills"],
+  );
+}
+
+export async function editBillAction(billId: string, input: BillInput): Promise<ActionResult> {
+  return mutate(
+    async (memberId) => {
+      await editBill(memberId, billId, input);
+      return {};
+    },
+    () => ["/bills"],
+  );
+}
+
+export async function deleteBillAction(billId: string): Promise<ActionResult> {
+  return mutate(
+    async (memberId) => {
+      await deleteBill(memberId, billId);
+      return {};
+    },
+    () => ["/bills"],
+  );
+}
+
+export async function settleUpAction(
+  payerId: string,
+  receiverId: string,
+  currency: Currency,
+  amountC: number,
+  onDate: string,
+): Promise<ActionResult> {
+  return mutate(
+    async (memberId) => {
+      await recordSettlement(memberId, { payerId, receiverId, currency, amountC, onDate });
+      return {};
+    },
+    () => ["/bills"],
+  );
 }
 
 export async function inviteAction(email: string): Promise<ActionResult> {

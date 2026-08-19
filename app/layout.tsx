@@ -70,6 +70,9 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                 <Link href="/members" className="rounded px-2 py-1 hover:bg-white/10">
                   Members
                 </Link>
+                <Link href="/bills" className="rounded px-2 py-1 hover:bg-white/10">
+                  Bills
+                </Link>
                 <Link href="/inbox" className="relative rounded px-2 py-1 hover:bg-white/10">
                   Inbox
                   {hasUnread && (

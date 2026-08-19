@@ -8,6 +8,11 @@ import { db } from "./db/index.ts";
 import {
   allowlist,
   avatars,
+  type BillEntryRow,
+  type BillRevisionRow,
+  billEntries,
+  billRevisions,
+  bills,
   type LedgerRow,
   ledger,
   type Market,
@@ -22,6 +27,17 @@ import { env } from "./env.ts";
 import { logger } from "./logger.ts";
 import { piesText, toCents } from "./pies.ts";
 import { type CandidateMarket, type MarketHistory, type Reason, recommend } from "./recommend.ts";
+import {
+  type BillEntryInput,
+  type BillKind,
+  buildEntries,
+  type Currency,
+  nets,
+  SplitError,
+  type SplitMode,
+  settleUpPlan,
+  type Transfer,
+} from "./split.ts";
 import { type MarketResult, marketOutcomes, replay, summarizeResults, toResult } from "./stats.ts";
 
 // The pure accounting behind these reads lives in lib/stats.ts; re-exported so
@@ -869,4 +885,279 @@ export async function setLingo(memberId: string, lingo: string): Promise<void> {
 
 export async function markInboxSeen(memberId: string): Promise<void> {
   await db.update(members).set({ inboxSeenAt: new Date() }).where(eq(members.id, memberId));
+}
+
+// ---------- split bills ----------
+// Real money (INR/THB), fully separate from the pie ledger. Bills are
+// append-only revisions (see schema); the current state of a bill is its
+// latest revision, and every balance below is derived by replay at read time.
+// The pure math lives in lib/split.ts.
+
+export interface BillEntryView {
+  member: Member;
+  paidC: number;
+  owedC: number;
+  participant: boolean;
+}
+
+export interface BillView {
+  id: string;
+  kind: BillKind;
+  onDate: string;
+  description: string;
+  currency: Currency;
+  split: SplitMode;
+  totalC: number;
+  entries: BillEntryView[];
+  createdBy: Member;
+  createdAt: Date;
+  /** Who last touched it, when it isn't the creator's original. */
+  editedBy: Member | null;
+  editedAt: Date | null;
+}
+
+export interface CurrencyBalances {
+  currency: Currency;
+  /** Nonzero nets, biggest creditor first. Positive = the group owes them. */
+  nets: { member: Member; netC: number }[];
+  /** Shortest who-pays-whom plan that clears those nets. */
+  plan: (Transfer & { from: Member; to: Member })[];
+}
+
+export interface BillsOverview {
+  bills: BillView[];
+  balances: CurrencyBalances[];
+}
+
+export interface BillInput {
+  kind?: BillKind;
+  onDate: string;
+  description: string;
+  currency: Currency;
+  split: SplitMode;
+  entries: BillEntryInput[];
+}
+
+function requireBillInput(input: BillInput): BillInput {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(input.onDate)) throw new DataError("Pick a date for the bill.");
+  const description = input.description.trim();
+  if ((input.kind ?? "expense") === "expense" && description.length === 0) {
+    throw new DataError("Say what the bill was for.");
+  }
+  if (description.length > 200) throw new DataError("Keep the description under 200 characters.");
+  return { ...input, description };
+}
+
+/** Latest revision per bill, oldest first; callers filter deleted ones. */
+async function currentRevisions(): Promise<{
+  current: BillRevisionRow[];
+  firstByBill: Map<string, BillRevisionRow>;
+  revisionCount: Map<string, number>;
+}> {
+  const rows = await db.select().from(billRevisions).orderBy(asc(billRevisions.id));
+  const latest = new Map<string, BillRevisionRow>();
+  const firstByBill = new Map<string, BillRevisionRow>();
+  const revisionCount = new Map<string, number>();
+  for (const row of rows) {
+    latest.set(row.billId, row);
+    if (!firstByBill.has(row.billId)) firstByBill.set(row.billId, row);
+    revisionCount.set(row.billId, (revisionCount.get(row.billId) ?? 0) + 1);
+  }
+  return { current: [...latest.values()], firstByBill, revisionCount };
+}
+
+export async function billsOverview(): Promise<BillsOverview> {
+  const memberById = await membersById();
+  const { current, firstByBill, revisionCount } = await currentRevisions();
+  const live = current.filter((r) => !r.deleted);
+
+  const entryRows = live.length
+    ? await db
+        .select()
+        .from(billEntries)
+        .where(
+          inArray(
+            billEntries.revisionId,
+            live.map((r) => r.id),
+          ),
+        )
+        .orderBy(asc(billEntries.id))
+    : [];
+  const entriesByRevision = new Map<number, BillEntryRow[]>();
+  for (const row of entryRows) {
+    const list = entriesByRevision.get(row.revisionId) ?? [];
+    list.push(row);
+    entriesByRevision.set(row.revisionId, list);
+  }
+
+  const views: BillView[] = live.map((rev) => {
+    const rows = entriesByRevision.get(rev.id) ?? [];
+    const first = firstByBill.get(rev.billId)!;
+    const edited = (revisionCount.get(rev.billId) ?? 1) > 1;
+    return {
+      id: rev.billId,
+      kind: rev.kind,
+      onDate: rev.onDate,
+      description: rev.description,
+      currency: rev.currency,
+      split: rev.split,
+      totalC: rows.reduce((sum, e) => sum + e.paidC, 0),
+      entries: rows.map((e) => ({
+        member: memberById.get(e.memberId)!,
+        paidC: e.paidC,
+        owedC: e.owedC,
+        participant: e.participant,
+      })),
+      createdBy: memberById.get(first.editorId)!,
+      createdAt: first.at,
+      editedBy: edited ? (memberById.get(rev.editorId) ?? null) : null,
+      editedAt: edited ? rev.at : null,
+    };
+  });
+  views.sort(
+    (a, b) => b.onDate.localeCompare(a.onDate) || b.createdAt.getTime() - a.createdAt.getTime(),
+  );
+
+  const netsByCurrency = nets(
+    views.map((v) => ({
+      currency: v.currency,
+      entries: v.entries.map((e) => ({ memberId: e.member.id, paidC: e.paidC, owedC: e.owedC })),
+    })),
+  );
+  const balances: CurrencyBalances[] = [...netsByCurrency]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([currency, net]) => ({
+      currency,
+      nets: [...net]
+        .filter(([, netC]) => netC !== 0)
+        .map(([memberId, netC]) => ({ member: memberById.get(memberId)!, netC }))
+        .sort((a, b) => b.netC - a.netC || a.member.name.localeCompare(b.member.name)),
+      plan: settleUpPlan(net).map((t) => ({
+        ...t,
+        from: memberById.get(t.fromId)!,
+        to: memberById.get(t.toId)!,
+      })),
+    }));
+
+  return { bills: views, balances };
+}
+
+/**
+ * Insert one revision (plus its entries) for a bill — the single write shape
+ * behind add, edit, and delete. Validation happens in lib/split.ts; its
+ * errors carry member-facing messages, so they surface as rule violations.
+ */
+async function appendRevision(
+  editorId: string,
+  billId: string,
+  input: BillInput,
+  opts?: { deleted?: boolean },
+): Promise<void> {
+  const checked = requireBillInput(input);
+  let entryValues: ReturnType<typeof buildEntries> = [];
+  if (!opts?.deleted) {
+    try {
+      entryValues = buildEntries(checked.split, checked.entries);
+    } catch (err) {
+      if (err instanceof SplitError) throw new DataError(err.message);
+      throw err;
+    }
+  }
+
+  await db.transaction(async (tx) => {
+    const [bill] = await tx.select().from(bills).where(eq(bills.id, billId)).for("update");
+    if (!bill) throw new DataError("Bill not found.");
+    const [revision] = await tx
+      .insert(billRevisions)
+      .values({
+        billId,
+        editorId,
+        deleted: opts?.deleted ?? false,
+        kind: checked.kind ?? "expense",
+        onDate: checked.onDate,
+        description: checked.description,
+        currency: checked.currency,
+        split: checked.split,
+      })
+      .returning();
+    if (entryValues.length > 0) {
+      await tx.insert(billEntries).values(
+        entryValues.map((e) => ({
+          revisionId: revision.id,
+          memberId: e.memberId,
+          paidC: e.paidC,
+          owedC: e.owedC,
+          participant: e.participant,
+        })),
+      );
+    }
+  });
+}
+
+export async function addBill(memberId: string, input: BillInput): Promise<string> {
+  const id = randomUUID();
+  await db.insert(bills).values({ id });
+  await appendRevision(memberId, id, input);
+  logger.info({ billId: id, memberId, kind: input.kind ?? "expense" }, "bill added");
+  return id;
+}
+
+/** Anyone in the group can edit any bill; the revision trail keeps it honest. */
+export async function editBill(memberId: string, billId: string, input: BillInput): Promise<void> {
+  await appendRevision(memberId, billId, input);
+  logger.info({ billId, memberId }, "bill edited");
+}
+
+export async function deleteBill(memberId: string, billId: string): Promise<void> {
+  const [last] = await db
+    .select()
+    .from(billRevisions)
+    .where(eq(billRevisions.billId, billId))
+    .orderBy(desc(billRevisions.id))
+    .limit(1);
+  if (!last) throw new DataError("Bill not found.");
+  await appendRevision(
+    memberId,
+    billId,
+    {
+      kind: last.kind,
+      onDate: last.onDate,
+      description: last.description,
+      currency: last.currency,
+      split: last.split,
+      entries: [],
+    },
+    { deleted: true },
+  );
+  logger.info({ billId, memberId }, "bill deleted");
+}
+
+/** "X paid Y back" — recorded as a settlement bill so replay cancels the debt. */
+export async function recordSettlement(
+  memberId: string,
+  input: {
+    payerId: string;
+    receiverId: string;
+    currency: Currency;
+    amountC: number;
+    onDate: string;
+  },
+): Promise<string> {
+  if (input.payerId === input.receiverId) {
+    throw new DataError("A payment needs two different people.");
+  }
+  if (!Number.isInteger(input.amountC) || input.amountC <= 0) {
+    throw new DataError("Enter the amount that was paid back.");
+  }
+  return addBill(memberId, {
+    kind: "settlement",
+    onDate: input.onDate,
+    description: "",
+    currency: input.currency,
+    split: "custom",
+    entries: [
+      { memberId: input.payerId, paidC: input.amountC, participant: false },
+      { memberId: input.receiverId, paidC: 0, participant: true, owedC: input.amountC },
+    ],
+  });
 }
