@@ -29,7 +29,11 @@ export function replay(rows: LedgerRow[]): Map<string, Position> {
   return computePositions(toEvents(rows));
 }
 
-/** Per-participant outcome of one market: final side/stake plus what came back. */
+/**
+ * Per-participant outcome of one market: final side/stake plus what came back.
+ * `rows` must be in ledger order — a `reversal` only means "forget the
+ * settlement so far" if what came before it is known.
+ */
 export interface MemberOutcome {
   side: Side;
   stakeC: number;
@@ -54,6 +58,14 @@ export function marketOutcomes(rows: LedgerRow[]): Map<string, MemberOutcome> {
     if (!outcome) continue;
     if (row.kind === "payout") outcome.payoutC += row.amountC;
     if (row.kind === "refund") outcome.refundC += row.amountC;
+    // Reopening hands the whole settlement back, so a market resolved twice
+    // counts only what the resolution that stands paid out. Rows arrive in
+    // ledger order, which is what makes "everything before this" the right
+    // thing to forget.
+    if (row.kind === "reversal") {
+      outcome.payoutC = 0;
+      outcome.refundC = 0;
+    }
   }
   return outcomes;
 }

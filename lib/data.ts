@@ -927,7 +927,11 @@ export async function getMarketView(
   return {
     view,
     activity: items.filter((i) => i.row.kind === "bet" || i.row.kind === "switch").reverse(),
-    settlements: items.filter((i) => i.row.kind === "payout" || i.row.kind === "refund"),
+    // Only the settlement that stands: anything before the last reopen was
+    // handed back and is no longer where the pool went.
+    settlements: items
+      .slice(items.findLastIndex((i) => i.row.kind === "reversal") + 1)
+      .filter((i) => i.row.kind === "payout" || i.row.kind === "refund"),
     comments: await toCommentViews(commentRows, memberById),
     seenBy: seen.seenBy,
     upvoters: reactors("upvote"),
@@ -985,7 +989,7 @@ export async function recentActivity(limit = 12): Promise<ActivityItem[]> {
   const rows = await db
     .select()
     .from(ledger)
-    .where(inArray(ledger.kind, ["bet", "switch", "payout", "refund"]))
+    .where(inArray(ledger.kind, ["bet", "switch", "payout", "refund", "reversal"]))
     .orderBy(desc(ledger.id))
     .limit(limit);
   const memberById = await membersById();
@@ -1187,6 +1191,75 @@ export async function resolveMarket(
       autoRefunded: settled?.autoRefunded ?? false,
     },
     "market resolved",
+  );
+}
+
+/**
+ * Take a resolution back, so the table can settle it again.
+ *
+ * Resolving is the creator's call, but a wrong call is everybody's problem and
+ * the creator is often the one who got it wrong — so this is a founder's, the
+ * same hands that invite and recover. Nothing is deleted: the payouts and
+ * refunds are handed in as `reversal` rows, which is what leaves the ledger
+ * append-only and the trail readable. Stakes are never touched — the bet and
+ * switch rows still replay to the same positions — so whoever backed what
+ * still backs it, and re-resolving pays the same pool out to whoever is right
+ * this time. Like a recovery link, reopening is loud: it goes in the log.
+ */
+export async function reopenMarket(marketId: string, actorId: string): Promise<void> {
+  const actor = await getMember(actorId);
+  if (!actor || !isFounder(actor)) {
+    throw new DataError("Only a founding member can reopen a resolved prediction.");
+  }
+  let handedBack = { rows: 0, totalC: 0 };
+  let wasStatus = "";
+  await db.transaction(async (tx) => {
+    const market = await lockMarket(tx, marketId);
+    if (market.status === "open") throw new DataError("This prediction is already open.");
+    wasStatus = market.status;
+
+    // What each member is still holding from the resolution: everything paid
+    // out or refunded, less whatever an earlier reopen already took back.
+    const rows = await tx
+      .select()
+      .from(ledger)
+      .where(
+        and(eq(ledger.marketId, marketId), inArray(ledger.kind, ["payout", "refund", "reversal"])),
+      )
+      .orderBy(asc(ledger.id));
+    const outstanding = new Map<string, number>();
+    for (const row of rows) {
+      const delta = row.kind === "reversal" ? -row.amountC : row.amountC;
+      outstanding.set(row.memberId, (outstanding.get(row.memberId) ?? 0) + delta);
+    }
+
+    for (const [memberId, amountC] of outstanding) {
+      if (amountC === 0) continue;
+      await tx.insert(ledger).values({
+        memberId,
+        marketId,
+        kind: "reversal",
+        amountC,
+        balanceDeltaC: -amountC,
+        note: "Resolution reopened — settlement handed back",
+      });
+      handedBack = { rows: handedBack.rows + 1, totalC: handedBack.totalC + amountC };
+    }
+
+    await tx
+      .update(markets)
+      .set({ status: "open", resolvedAt: null, resolutionNote: null })
+      .where(eq(markets.id, marketId));
+  });
+  logger.warn(
+    {
+      marketId,
+      actorId,
+      wasStatus,
+      ledgerRows: handedBack.rows,
+      handedBackC: handedBack.totalC,
+    },
+    "market reopened",
   );
 }
 

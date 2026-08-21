@@ -8,6 +8,7 @@ import { Pies } from "@/components/pies";
 import { PoolBar } from "@/components/pool-bar";
 import { ReactionBar } from "@/components/reaction-bar";
 import { RecordView } from "@/components/record-view";
+import { ReopenPanel } from "@/components/reopen-panel";
 import { ResolvePanel } from "@/components/resolve-panel";
 import { SideChip, StatusChip } from "@/components/side-chip";
 import { getMarketView, listMembers } from "@/lib/data";
@@ -112,6 +113,7 @@ export default async function MarketPage({ params }: { params: Promise<{ id: str
               </ul>
             </div>
           )}
+          {me.isFounder && <ReopenPanel marketId={market.id} />}
         </div>
       )}
 

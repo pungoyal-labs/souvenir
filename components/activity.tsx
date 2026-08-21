@@ -16,6 +16,8 @@ function phrase(item: ActivityItem, t: Lingo): string {
       return `collected ${amount}`;
     case "refund":
       return `was refunded ${amount}`;
+    case "reversal":
+      return `handed ${amount} back when the call reopened`;
     case "grant":
       return t.joinedFeed;
   }

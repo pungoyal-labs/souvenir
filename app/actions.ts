@@ -38,6 +38,7 @@ import {
   recordSettlement,
   recoverWithLink,
   removeCredential,
+  reopenMarket,
   resolveMarket,
   revokeInvite,
   revokeRecovery,
@@ -145,6 +146,17 @@ export async function resolveAction(
   return mutate(
     async (memberId) => {
       await resolveMarket(marketId, memberId, outcome, note);
+      return {};
+    },
+    () => ["/", `/market/${marketId}`, "/leaderboard"],
+  );
+}
+
+/** Founders only (lib/data.ts): the settlement is handed back and the call reopens. */
+export async function reopenAction(marketId: string): Promise<ActionResult> {
+  return mutate(
+    async (memberId) => {
+      await reopenMarket(marketId, memberId);
       return {};
     },
     () => ["/", `/market/${marketId}`, "/leaderboard"],

@@ -23,7 +23,14 @@ const bytea = customType<{ data: Buffer; driverData: Buffer }>({
 
 export const sideEnum = pgEnum("side", ["yes", "no"]);
 export const marketStatusEnum = pgEnum("market_status", ["open", "yes", "no", "refunded"]);
-export const ledgerKindEnum = pgEnum("ledger_kind", ["grant", "bet", "switch", "payout", "refund"]);
+export const ledgerKindEnum = pgEnum("ledger_kind", [
+  "grant",
+  "bet",
+  "switch",
+  "payout",
+  "refund",
+  "reversal",
+]);
 
 export const members = pgTable("members", {
   id: text("id").primaryKey(),
@@ -163,6 +170,10 @@ export const markets = pgTable("markets", {
 //   switch   0        stake moved to the other side (side = destination)
 //   payout  +amount   winning share of a resolved market's pool
 //   refund  +amount   stake returned (voided market or empty winning side)
+//   reversal -amount  a resolution taken back: the payout or refund handed in
+//                     again so the market can be resolved afresh. The stakes
+//                     are untouched, so replaying bet/switch still gives the
+//                     same positions and re-resolving pays the same pool out.
 export const ledger = pgTable("ledger", {
   id: bigserial("id", { mode: "number" }).primaryKey(),
   at: timestamp("at", { withTimezone: true }).notNull().defaultNow(),

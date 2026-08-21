@@ -39,6 +39,8 @@ const payout = (memberId: string, side: Side, amountC: number) =>
   row(memberId, "payout", { side, amountC, balanceDeltaC: amountC });
 const refund = (memberId: string, amountC: number) =>
   row(memberId, "refund", { amountC, balanceDeltaC: amountC });
+const reversal = (memberId: string, amountC: number) =>
+  row(memberId, "reversal", { amountC, balanceDeltaC: -amountC });
 
 describe("toEvents", () => {
   it("keeps only bets and switches, in order, with engine fields", () => {
@@ -65,6 +67,40 @@ describe("marketOutcomes", () => {
     ]);
     expect(outcomes.get("a")).toEqual({ side: "yes", stakeC: 500, payoutC: 900, refundC: 0 });
     expect(outcomes.get("b")).toEqual({ side: "no", stakeC: 400, payoutC: 0, refundC: 0 });
+  });
+
+  it("forgets a settlement that was handed back when the call reopened", () => {
+    const outcomes = marketOutcomes([
+      bet("a", "yes", 3),
+      bet("b", "no", 4),
+      payout("a", "yes", 700),
+      reversal("a", 700),
+    ]);
+    expect(outcomes.get("a")).toEqual({ side: "yes", stakeC: 300, payoutC: 0, refundC: 0 });
+  });
+
+  it("counts only the resolution that stands after a reopen", () => {
+    const outcomes = marketOutcomes([
+      bet("a", "yes", 3),
+      bet("b", "no", 4),
+      payout("a", "yes", 700),
+      reversal("a", 700),
+      payout("b", "no", 700),
+    ]);
+    expect(outcomes.get("a")).toEqual({ side: "yes", stakeC: 300, payoutC: 0, refundC: 0 });
+    expect(outcomes.get("b")).toEqual({ side: "no", stakeC: 400, payoutC: 700, refundC: 0 });
+  });
+
+  it("clears a refund too, so a voided-then-reopened market is no longer no-contest", () => {
+    const rows = [
+      bet("a", "yes", 3),
+      refund("a", 300),
+      reversal("a", 300),
+      payout("a", "yes", 700),
+    ];
+    const outcomes = marketOutcomes(rows);
+    expect(outcomes.get("a")).toEqual({ side: "yes", stakeC: 300, payoutC: 700, refundC: 0 });
+    expect(toResult(market(), outcomes.get("a")!).noContest).toBe(false);
   });
 
   it("reports the final side after a switch", () => {
