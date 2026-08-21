@@ -81,6 +81,13 @@ export function BillForm({
         )
       : {},
   );
+  // The one-payer fast path types the bill's total, not a person's share, so it
+  // is kept apart from the per-payer amounts: unticking yourself to tick
+  // somebody else changes who paid, not how much the dinner cost.
+  const [soloText, setSoloText] = useState<string>(() => {
+    const paid = initial?.entries.filter((e) => e.paidC > 0) ?? [];
+    return paid.length === 1 ? centsToText(paid[0].paidC) : "";
+  });
   const [inSplit, setInSplit] = useState<Record<string, boolean>>(() =>
     Object.fromEntries(
       members.map((m) => [
@@ -111,11 +118,25 @@ export function BillForm({
     if (!initial) localStorage.setItem(CURRENCY_KEY, c);
   };
 
-  const togglePayer = (id: string) =>
-    setPayerIds((ids) => (ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]));
   const singlePayer = payerIds.length === 1;
+  /**
+   * Tick a payer on or off, handing the amount over as the form crosses
+   * between the one-payer field and the per-payer rows — in either direction
+   * the number stays on screen instead of starting again.
+   */
+  const togglePayer = (id: string) => {
+    const next = payerIds.includes(id) ? payerIds.filter((x) => x !== id) : [...payerIds, id];
+    if (payerIds.length === 1 && next.length === 2) {
+      setPaidText({ ...paidText, [payerIds[0]]: paidText[payerIds[0]] || soloText });
+    } else if (payerIds.length === 2 && next.length === 1) {
+      setSoloText(paidText[next[0]] || soloText);
+    }
+    setPayerIds(next);
+  };
 
-  const paidCOf = (id: string) => parseAmount(paidText[id] ?? "") ?? 0;
+  const amountTextOf = (id: string) =>
+    (singlePayer && id === payerIds[0] ? soloText : paidText[id]) ?? "";
+  const paidCOf = (id: string) => parseAmount(amountTextOf(id)) ?? 0;
   const totalC = payerIds.reduce((sum, id) => sum + paidCOf(id), 0);
   const participantIds = members.map((m) => m.id).filter((id) => inSplit[id]);
   const perHeadC = participantIds.length > 0 ? Math.round(totalC / participantIds.length) : 0;
@@ -168,8 +189,8 @@ export function BillForm({
           </div>
           {singlePayer ? (
             <input
-              value={paidText[payerIds[0]] ?? ""}
-              onChange={(e) => setPaidText({ ...paidText, [payerIds[0]]: e.target.value })}
+              value={soloText}
+              onChange={(e) => setSoloText(e.target.value)}
               inputMode="decimal"
               placeholder="0"
               aria-label="Amount"
@@ -178,11 +199,23 @@ export function BillForm({
           ) : (
             <span className="mono text-lg font-bold">{fmtMoney(currency, totalC)}</span>
           )}
+          {/* Uncontrolled on purpose. A date input reads as "" from the first
+              keystroke until the last, and committing that emptied the date
+              the form was going to save — leaving "Pick a date for the bill."
+              as the answer to pressing Add. Only whole dates are committed;
+              blurring a half-typed one puts the committed date back on screen,
+              so what is showing is always what saves. Controlling the value
+              instead would write that "" back into the field mid-edit. */}
           <input
             type="date"
-            value={onDate}
+            defaultValue={onDate}
             max={todayLocal()}
-            onChange={(e) => setOnDate(e.target.value)}
+            onChange={(e) => {
+              if (e.target.value) setOnDate(e.target.value);
+            }}
+            onBlur={(e) => {
+              if (!e.target.value) e.target.value = onDate;
+            }}
             aria-label="Date"
             className="rounded-md border border-line bg-surface px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-felt"
           />
