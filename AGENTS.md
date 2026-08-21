@@ -48,6 +48,13 @@ Pre-commit (husky): biome on staged files, tsc, full test suite.
 - Inbox and the For-you rail are derived at read time. Stored state is only
   `members.inbox_seen_at` plus raw view rows; views are recorded by a client
   effect (`components/record-view.tsx`) so link prefetches never count.
+- The group and the leaderboard are one page (`/members`): a single ranked
+  table, calibrating members under a divider row rather than in a list of their
+  own, with the invite and recovery machinery below it. Who somebody is and how
+  they have predicted is one fact about them, so it is one row. `/leaderboard`
+  is a redirect in `next.config.ts`, kept for old links. The page's only stats
+  source is `leaderboard()`, which already replays every balance — never add a
+  `netOf` per member beside it.
 - `lib/env.ts` is the only file reading `process.env` (zod-validated).
 - Relative imports in `lib/` and `scripts/` carry explicit `.ts` extensions so
   plain `node scripts/*.ts` runs (Node type stripping).

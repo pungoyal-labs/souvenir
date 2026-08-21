@@ -73,9 +73,6 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                 <Link href="/" className="rounded px-2 py-1 hover:bg-white/10">
                   Predictions
                 </Link>
-                <Link href="/leaderboard" className="rounded px-2 py-1 hover:bg-white/10">
-                  Leaderboard
-                </Link>
                 <Link href="/members" className="rounded px-2 py-1 hover:bg-white/10">
                   Members
                 </Link>

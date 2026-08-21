@@ -148,7 +148,7 @@ export async function resolveAction(
       await resolveMarket(marketId, memberId, outcome, note);
       return {};
     },
-    () => ["/", `/market/${marketId}`, "/leaderboard"],
+    () => ["/", `/market/${marketId}`, "/members"],
   );
 }
 
@@ -159,7 +159,7 @@ export async function reopenAction(marketId: string): Promise<ActionResult> {
       await reopenMarket(marketId, memberId);
       return {};
     },
-    () => ["/", `/market/${marketId}`, "/leaderboard"],
+    () => ["/", `/market/${marketId}`, "/members"],
   );
 }
 

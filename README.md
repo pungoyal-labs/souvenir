@@ -16,8 +16,9 @@ predict things.
   nobody held the winning side — refund every bet.
 - **Infinite bank**: no starting balance, no balance check; your number is
   lifetime net and it can go negative.
-- The **leaderboard** ranks by ROI once you have `RANKED_MIN_RESOLVED`
-  verdicts; before that you're "calibrating". No odds are ever displayed.
+- **Members** is one table of the whole group, ranked by ROI once you have
+  `RANKED_MIN_RESOLVED` verdicts; before that you sit under the line,
+  "calibrating". No odds are ever displayed.
 - The **inbox** and the home page's **"Picked for you"** rail (open predictions
   you haven't joined, ranked by heat, pool, split, table-mates, topic, and
   freshness — each pick labeled with why) are derived per request from the

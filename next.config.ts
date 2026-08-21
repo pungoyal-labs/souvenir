@@ -2,6 +2,11 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   output: "standalone",
+  // The leaderboard is the members page now — the group and how it's doing are
+  // one table. Old links (and anyone's bookmark) land there instead of a 404.
+  async redirects() {
+    return [{ source: "/leaderboard", destination: "/members", permanent: true }];
+  },
   // Keep pino out of the server bundle: its dynamic requires don't bundle
   // cleanly, and as an external it gets traced into standalone node_modules,
   // where `node scripts/migrate.ts` can also resolve it.
