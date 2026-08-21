@@ -29,6 +29,8 @@ import {
   markets,
   marketViews,
   members,
+  type PhraseRow,
+  phrases,
   type ReactionKind,
   type RecoveryRow,
   recoveries,
@@ -39,6 +41,7 @@ import { env } from "./env.ts";
 import { expiresAtFrom, inviteState, newInviteCode } from "./invites.ts";
 import { logger } from "./logger.ts";
 import { parseMentions } from "./mentions.ts";
+import { MAX_PHRASE_NAME, MAX_PHRASES, type SavedPhrase, uniqueSlug } from "./phrases.ts";
 import { toCents } from "./pies.ts";
 import { type CandidateMarket, type MarketHistory, recommend } from "./recommend.ts";
 import {
@@ -62,9 +65,10 @@ import {
   type Transfer,
 } from "./split.ts";
 import { type MarketResult, marketOutcomes, replay, summarizeResults, toResult } from "./stats.ts";
+import { clampUtterance, type Side as TalkSide, worthSaying } from "./talk.ts";
 import type { VerifiedRegistration } from "./webauthn.ts";
 
-export type { ReactionKind };
+export type { ReactionKind, SavedPhrase };
 // The pure accounting behind these reads lives in lib/stats.ts; re-exported so
 // pages keep importing everything data-shaped from here.
 export { type MarketResult, summarizeResults };
@@ -1962,4 +1966,95 @@ export async function addComment(
     }
   });
   logger.info({ authorId, marketId, billId, mentions: mentionIds.length }, "comment added");
+}
+
+// ---------- kept phrases ----------
+
+function toPhrase(row: PhraseRow): SavedPhrase {
+  return {
+    id: row.id,
+    slug: row.slug,
+    side: row.side,
+    heard: row.heard,
+    said: row.said,
+    roman: row.roman ?? undefined,
+    literal: row.literal ?? undefined,
+    language: row.language,
+    tag: row.tag,
+  };
+}
+
+/** One member's phrasebook, newest first — the order they were kept in. */
+export async function listPhrases(memberId: string): Promise<SavedPhrase[]> {
+  const rows = await db
+    .select()
+    .from(phrases)
+    .where(eq(phrases.memberId, memberId))
+    .orderBy(desc(phrases.createdAt), desc(phrases.id));
+  return rows.map(toPhrase);
+}
+
+export interface PhraseInput {
+  /** What the member typed. The slug is made from it, not sent by the browser. */
+  name: string;
+  side: TalkSide;
+  heard: string;
+  said: string;
+  roman?: string;
+  literal?: string;
+  /** Named by the pair, on the server — the browser asserts no language. */
+  language: string;
+  tag: string;
+}
+
+/**
+ * Keep one turn under a name. The slug is decided here, against the slugs this
+ * member already holds and inside the transaction that inserts, so two taps in
+ * the same second get two phrases rather than one collision.
+ */
+export async function savePhrase(memberId: string, input: PhraseInput): Promise<SavedPhrase> {
+  const name = input.name.trim().slice(0, MAX_PHRASE_NAME);
+  const said = input.said.trim().slice(0, 600);
+  if (!worthSaying(said)) throw new DataError("There's nothing here to keep.");
+  return await db.transaction(async (tx) => {
+    const held = await tx
+      .select({ slug: phrases.slug })
+      .from(phrases)
+      .where(eq(phrases.memberId, memberId));
+    if (held.length >= MAX_PHRASES) {
+      throw new DataError(`You've kept ${MAX_PHRASES} phrases. Delete one to keep another.`);
+    }
+    const slug = uniqueSlug(
+      name,
+      held.map((row) => row.slug),
+    );
+    if (!slug) throw new DataError("Give it a name you'll recognise later.");
+    const [row] = await tx
+      .insert(phrases)
+      .values({
+        id: randomUUID(),
+        memberId,
+        slug,
+        side: input.side,
+        heard: clampUtterance(input.heard),
+        said,
+        roman: input.roman?.trim().slice(0, 600) || null,
+        literal: input.literal?.trim().slice(0, 600) || null,
+        language: input.language,
+        tag: input.tag,
+      })
+      .returning();
+    logger.info({ memberId, slug, language: input.language }, "phrase kept");
+    return toPhrase(row);
+  });
+}
+
+/** Theirs alone to delete — a phrase nobody else can see, nobody else can drop. */
+export async function deletePhrase(memberId: string, id: string): Promise<void> {
+  const dropped = await db
+    .delete(phrases)
+    .where(and(eq(phrases.memberId, memberId), eq(phrases.id, id)))
+    .returning({ slug: phrases.slug });
+  if (dropped.length === 0) throw new DataError("That phrase is already gone.");
+  logger.info({ memberId, slug: dropped[0].slug }, "phrase dropped");
 }

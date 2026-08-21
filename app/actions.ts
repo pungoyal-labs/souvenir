@@ -22,6 +22,7 @@ import {
   createMarket,
   DataError,
   deleteBill,
+  deletePhrase,
   editBill,
   findCredential,
   findInvite,
@@ -42,6 +43,8 @@ import {
   resolveMarket,
   revokeInvite,
   revokeRecovery,
+  type SavedPhrase,
+  savePhrase,
   setAvatar,
   setFounder,
   setLingo,
@@ -64,7 +67,14 @@ import {
 import { logger } from "@/lib/logger";
 import { recoveryState, recoveryUrl } from "@/lib/recovery";
 import type { Currency } from "@/lib/split";
-import { clampUtterance, type Particle, type Side as TalkSide, worthSaying } from "@/lib/talk";
+import {
+  clampUtterance,
+  otherSide as otherTalkSide,
+  type Particle,
+  speakerOf,
+  type Side as TalkSide,
+  worthSaying,
+} from "@/lib/talk";
 import {
   type PasskeyRegistrationOptions,
   type PasskeySignInOptions,
@@ -228,6 +238,51 @@ export async function interpretAction(
     logger.error({ err, to }, "interpreting failed");
     return { ok: false, error: "That didn't come back. Try it again." };
   }
+}
+
+/**
+ * Keep one turn, under a name the member picked.
+ *
+ * The browser hands over the words and which side said them, and nothing else:
+ * which language the phrase is in is read off the configured pair here, the
+ * same trade interpretAction and /api/speak make. It is stored with the
+ * phrase, so a replay years later is still read in the language it was said
+ * in and not in whatever this deploy is pointed at by then.
+ */
+export async function keepPhraseAction(
+  name: string,
+  turn: { side: TalkSide; heard: string; said: string; roman?: string; literal?: string },
+): Promise<ActionResult & { phrase?: SavedPhrase }> {
+  const memberId = await requireMemberId();
+  const said: TalkSide = turn.side === "them" ? "them" : "us";
+  const spoken = speakerOf(pair, otherTalkSide(said));
+  try {
+    const phrase = await savePhrase(memberId, {
+      name,
+      side: said,
+      heard: turn.heard,
+      said: turn.said,
+      roman: turn.roman,
+      literal: turn.literal,
+      language: spoken.language,
+      tag: spoken.tag,
+    });
+    revalidatePath("/talk");
+    return { ok: true, phrase };
+  } catch (err) {
+    return failure(err);
+  }
+}
+
+export async function dropPhraseAction(id: string): Promise<ActionResult> {
+  const memberId = await requireMemberId();
+  try {
+    await deletePhrase(memberId, id);
+  } catch (err) {
+    return failure(err);
+  }
+  revalidatePath("/talk");
+  return { ok: true };
 }
 
 export async function setLingoAction(lingo: string): Promise<ActionResult> {

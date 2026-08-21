@@ -10,11 +10,22 @@
 // Listening is the browser's own recogniser, which is the only one there is:
 // it is solid on Android Chrome and absent on some iPhones, and where it is
 // absent the page says so and you type instead. Speaking prefers the device's
-// own voice and falls back to the server's. Everything is component state —
-// close the tab and the conversation is gone.
+// own voice and falls back to the server's. The conversation is component
+// state — close the tab and it is gone.
+//
+// The one thing that outlives the tab is a phrase somebody deliberately kept:
+// tap the star, give it a name, and it joins their own phrasebook below, ready
+// to be said again on a night nobody feels like explaining themselves twice.
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { interpretAction } from "@/app/actions";
+import { dropPhraseAction, interpretAction, keepPhraseAction } from "@/app/actions";
+import {
+  MAX_PHRASE_NAME,
+  type PhraseVoice,
+  type SavedPhrase,
+  slugify,
+  voiceFor,
+} from "@/lib/phrases";
 import {
   appendTurn,
   clampUtterance,
@@ -62,11 +73,16 @@ export function Talk({
   pair,
   canInterpret,
   serverSpeaks,
+  phrases,
+  phrasebookHeading,
 }: {
   pair: Pair;
   canInterpret: boolean;
   /** A voice service is configured, for phones with no voice of their own. */
   serverSpeaks: boolean;
+  /** This member's phrasebook, as it stood when the page was rendered. */
+  phrases: SavedPhrase[];
+  phrasebookHeading: string;
 }) {
   const [particle, setParticle] = useState<Particle>("khrap");
   const [turns, setTurns] = useState<Turn[]>([]);
@@ -77,6 +93,11 @@ export function Talk({
   const [typed, setTyped] = useState("");
   const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
   const [canListen, setCanListen] = useState(false);
+  // The phrasebook, kept in state so a save shows up without a round trip.
+  const [kept, setKept] = useState<SavedPhrase[]>(phrases);
+  // Which turn is being named, if any. One at a time, wherever it was tapped.
+  const [naming, setNaming] = useState<Turn | null>(null);
+  const [keeping, setKeeping] = useState(false);
 
   const active = useRef<RecognitionLike | null>(null);
   const primed = useRef(false);
@@ -101,10 +122,18 @@ export function Talk({
   const busy = listening !== null || thinking;
   const latest = turns[turns.length - 1];
 
-  const speak = useCallback(
-    async (text: string, side: Side) => {
+  /** Reading a live turn: whichever side's language it landed in. */
+  const sideVoice = useCallback(
+    (side: Side): PhraseVoice => {
       const speaker = speakerOf(pair, side);
-      const chosen = pickVoice(voices, speaker.tag, speaker.voice);
+      return { tag: speaker.tag, prefer: speaker.voice, side };
+    },
+    [pair],
+  );
+
+  const speak = useCallback(
+    async (text: string, target: PhraseVoice) => {
+      const chosen = pickVoice(voices, target.tag, target.prefer);
       if (chosen) {
         window.speechSynthesis.cancel();
         const utterance = new SpeechSynthesisUtterance(text);
@@ -115,11 +144,14 @@ export function Talk({
         window.speechSynthesis.speak(utterance);
         return;
       }
-      if (!serverSpeaks) return;
+      // The voice service is told a side and looks the language up itself, so
+      // a phrase kept somewhere this deploy no longer goes has nothing true to
+      // tell it: the device's own voice or nothing at all.
+      if (!serverSpeaks || !target.side) return;
       const response = await fetch("/api/speak", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text, side }),
+        body: JSON.stringify({ text, side: target.side }),
       });
       if (!response.ok) return;
       const url = URL.createObjectURL(await response.blob());
@@ -127,7 +159,7 @@ export function Talk({
       audio.onended = () => URL.revokeObjectURL(url);
       await audio.play().catch(() => URL.revokeObjectURL(url));
     },
-    [pair, voices, serverSpeaks],
+    [voices, serverSpeaks],
   );
 
   /** One utterance all the way through: heard, interpreted, said back. */
@@ -156,13 +188,44 @@ export function Talk({
           literal: result.said.literal || undefined,
         };
         setTurns((current) => appendTurn(current, turn));
-        await speak(turn.said, to);
+        await speak(turn.said, sideVoice(to));
       } finally {
         setThinking(false);
       }
     },
-    [pair, particle, speak],
+    [pair, particle, speak, sideVoice],
   );
+
+  /** Keep a turn under a name. The server decides the slug and the language. */
+  const keep = useCallback(async (turn: Turn, name: string) => {
+    setError(null);
+    setKeeping(true);
+    const result = await keepPhraseAction(name, {
+      side: turn.side,
+      heard: turn.heard,
+      said: turn.said,
+      roman: turn.roman,
+      literal: turn.literal,
+    });
+    setKeeping(false);
+    const phrase = result.phrase;
+    if (!result.ok || !phrase) {
+      setError(result.error ?? "That didn't save.");
+      return;
+    }
+    setKept((current) => [phrase, ...current]);
+    setNaming(null);
+  }, []);
+
+  const forget = useCallback(async (phrase: SavedPhrase) => {
+    if (!confirm(`Forget “${phrase.slug}”?`)) return;
+    const result = await dropPhraseAction(phrase.id);
+    if (!result.ok) {
+      setError(result.error ?? "Couldn't forget that one.");
+      return;
+    }
+    setKept((current) => current.filter((row) => row.id !== phrase.id));
+  }, []);
 
   const press = (side: Side) => {
     setError(null);
@@ -228,11 +291,64 @@ export function Talk({
     void put(text, "us");
   };
 
+  /** The phrasebook, which needs no interpreter — only a voice. */
+  const phrasebook = kept.length > 0 && (
+    <section className="space-y-2">
+      <h2 className="eyebrow">{phrasebookHeading}</h2>
+      <div className="card list">
+        {kept.map((phrase) => {
+          const voice = voiceFor(phrase, pair);
+          return (
+            <div key={phrase.id} className="flex items-center">
+              <button
+                type="button"
+                onClick={() => speak(phrase.said, voice)}
+                className="flex min-w-0 flex-1 items-center gap-3 px-4 py-3 text-left hover:bg-paper"
+              >
+                <span aria-hidden>🔊</span>
+                <span className="min-w-0 flex-1">
+                  {/* The slug exactly as it is stored — not shouted into caps
+                      like the labels around it, since it is the name the
+                      member holds on to. */}
+                  <span className="mono block truncate text-[11px] tracking-wider text-gold">
+                    {phrase.slug}
+                    {/* Kept somewhere this deploy is no longer pointed at. */}
+                    {voice.side === null && ` · ${phrase.language}`}
+                  </span>
+                  <span
+                    lang={phrase.tag.split("-")[0]}
+                    className="block truncate text-sm font-semibold"
+                  >
+                    {phrase.said}
+                  </span>
+                  <span className="block truncate text-xs text-soft">
+                    {phrase.roman || phrase.heard}
+                  </span>
+                </span>
+              </button>
+              <button
+                type="button"
+                onClick={() => forget(phrase)}
+                aria-label={`Forget ${phrase.slug}`}
+                className="shrink-0 self-stretch px-4 text-soft hover:bg-paper"
+              >
+                ✕
+              </button>
+            </div>
+          );
+        })}
+      </div>
+    </section>
+  );
+
   if (!canInterpret) {
     return (
-      <div className="rounded-lg border border-dashed border-line bg-surface p-6 text-sm text-soft">
-        Interpreting isn't switched on for this deploy — it needs an LLM endpoint in the
-        environment.
+      <div className="space-y-4">
+        <div className="rounded-lg border border-dashed border-line bg-surface p-6 text-sm text-soft">
+          Interpreting isn't switched on for this deploy — it needs an LLM endpoint in the
+          environment. Phrases already kept still play.
+        </div>
+        {phrasebook}
       </div>
     );
   }
@@ -302,11 +418,23 @@ export function Talk({
       )}
 
       {latest && (
-        <Card
-          pair={pair}
-          turn={latest}
-          onReplay={() => speak(latest.said, otherSide(latest.side))}
-        />
+        <div className="space-y-2">
+          <Card
+            pair={pair}
+            turn={latest}
+            onReplay={() => speak(latest.said, sideVoice(otherSide(latest.side)))}
+            onKeep={() => setNaming(latest)}
+          />
+          {naming?.id === latest.id && (
+            <div className="card p-3">
+              <KeepForm
+                busy={keeping}
+                onKeep={(name) => keep(latest, name)}
+                onCancel={() => setNaming(null)}
+              />
+            </div>
+          )}
+        </div>
       )}
 
       <div className="flex gap-2">
@@ -331,29 +459,51 @@ export function Talk({
 
       {note && <p className="text-center text-xs text-soft">{note}</p>}
 
+      {phrasebook}
+
       {turns.length > 1 && (
         <div className="card list">
           {[...turns]
             .slice(0, -1)
             .reverse()
             .map((turn) => (
-              <button
-                key={turn.id}
-                type="button"
-                onClick={() => speak(turn.said, otherSide(turn.side))}
-                className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-paper"
-              >
-                <span
-                  className={`h-2 w-2 shrink-0 rounded-full ${
-                    turn.side === "us" ? "bg-felt" : "bg-gold"
-                  }`}
-                />
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-sm font-semibold">{turn.said}</span>
-                  <span className="block truncate text-xs text-soft">{turn.heard}</span>
-                </span>
-                <span aria-hidden>🔊</span>
-              </button>
+              <div key={turn.id}>
+                <div className="flex items-center">
+                  <button
+                    type="button"
+                    onClick={() => speak(turn.said, sideVoice(otherSide(turn.side)))}
+                    className="flex min-w-0 flex-1 items-center gap-3 px-4 py-3 text-left hover:bg-paper"
+                  >
+                    <span
+                      className={`h-2 w-2 shrink-0 rounded-full ${
+                        turn.side === "us" ? "bg-felt" : "bg-gold"
+                      }`}
+                    />
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-sm font-semibold">{turn.said}</span>
+                      <span className="block truncate text-xs text-soft">{turn.heard}</span>
+                    </span>
+                    <span aria-hidden>🔊</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setNaming(naming?.id === turn.id ? null : turn)}
+                    aria-label="Keep this one"
+                    className="shrink-0 self-stretch px-4 text-soft hover:bg-paper"
+                  >
+                    ☆
+                  </button>
+                </div>
+                {naming?.id === turn.id && (
+                  <div className="px-4 pb-3">
+                    <KeepForm
+                      busy={keeping}
+                      onKeep={(name) => keep(turn, name)}
+                      onCancel={() => setNaming(null)}
+                    />
+                  </div>
+                )}
+              </div>
             ))}
         </div>
       )}
@@ -396,8 +546,69 @@ function Mic({
   );
 }
 
+/**
+ * Naming the thing you are keeping. The slug is shown as it is typed, because
+ * it is the name the phrasebook will actually call it — better to see "no-
+ * peanuts" now than to go looking for "No peanuts!!" later.
+ */
+function KeepForm({
+  busy,
+  onKeep,
+  onCancel,
+}: {
+  busy: boolean;
+  onKeep: (name: string) => void;
+  onCancel: () => void;
+}) {
+  const [name, setName] = useState("");
+  const slug = slugify(name);
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <input
+        // biome-ignore lint/a11y/noAutofocus: the form only exists because it was just asked for.
+        autoFocus
+        value={name}
+        maxLength={MAX_PHRASE_NAME}
+        onChange={(e) => setName(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" && slug && !busy) onKeep(name);
+          if (e.key === "Escape") onCancel();
+        }}
+        placeholder="Call it something — “no peanuts”"
+        className="min-w-0 flex-1 rounded-md border border-line bg-surface px-3 py-2 text-sm"
+      />
+      <button
+        type="button"
+        onClick={() => onKeep(name)}
+        disabled={busy || !slug}
+        className="shrink-0 rounded-md bg-felt px-3 py-2 text-sm font-semibold text-[#f1eee4] disabled:opacity-40"
+      >
+        Keep
+      </button>
+      <button
+        type="button"
+        onClick={onCancel}
+        className="shrink-0 rounded-md border border-line px-3 py-2 text-sm font-semibold hover:bg-paper"
+      >
+        Cancel
+      </button>
+      <p className="mono w-full text-xs text-soft">{slug ? `Kept as ${slug}` : " "}</p>
+    </div>
+  );
+}
+
 /** The turn being held out to somebody, at the size that survives a night market. */
-function Card({ pair, turn, onReplay }: { pair: Pair; turn: Turn; onReplay: () => void }) {
+function Card({
+  pair,
+  turn,
+  onReplay,
+  onKeep,
+}: {
+  pair: Pair;
+  turn: Turn;
+  onReplay: () => void;
+  onKeep: () => void;
+}) {
   const outbound = turn.side === "us";
   const target = speakerOf(pair, otherSide(turn.side));
   return (
@@ -416,13 +627,22 @@ function Card({ pair, turn, onReplay }: { pair: Pair; turn: Turn; onReplay: () =
           {outbound ? `You said “${turn.heard}”` : `They said “${turn.heard}”`}
           {turn.literal && outbound && ` · literally: ${turn.literal}`}
         </p>
-        <button
-          type="button"
-          onClick={onReplay}
-          className="mt-4 rounded-md border border-line px-3 py-1.5 text-sm font-semibold hover:bg-paper"
-        >
-          🔊 Again
-        </button>
+        <div className="mt-4 flex justify-center gap-2">
+          <button
+            type="button"
+            onClick={onReplay}
+            className="rounded-md border border-line px-3 py-1.5 text-sm font-semibold hover:bg-paper"
+          >
+            🔊 Again
+          </button>
+          <button
+            type="button"
+            onClick={onKeep}
+            className="rounded-md border border-line px-3 py-1.5 text-sm font-semibold hover:bg-paper"
+          >
+            ☆ Keep it
+          </button>
+        </div>
       </div>
     </div>
   );

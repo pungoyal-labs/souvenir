@@ -66,6 +66,7 @@ export interface Lingo {
   allSquare: string;
   talkTitle: (language: string) => string;
   talkSub: (language: string) => string;
+  phrasebookHeading: string;
 }
 
 /**

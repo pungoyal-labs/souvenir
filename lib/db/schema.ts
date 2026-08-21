@@ -13,6 +13,7 @@ import {
   primaryKey,
   text,
   timestamp,
+  uniqueIndex,
 } from "drizzle-orm/pg-core";
 
 const bytea = customType<{ data: Buffer; driverData: Buffer }>({
@@ -334,6 +335,46 @@ export const commentMentions = pgTable(
   ],
 );
 
+// ---------- kept phrases (the one thing /talk writes down) ----------
+
+export const talkSideEnum = pgEnum("talk_side", ["us", "them"]);
+
+// A turn from the talk page that one member decided to keep, under a name they
+// chose. Everything else about a conversation with a stranger still dies with
+// the tab — no turn, no clip, no transcript; this is the exception somebody
+// asked for by name, one row per deliberate tap, and theirs alone to delete.
+//
+// `language` and `tag` are snapshots, like bill_entries snapshot their split:
+// which two languages this deploy interprets between is configuration and
+// configuration moves, and a Thai line replayed next year has to be read by a
+// Thai voice or by none (lib/phrases.ts).
+export const phrases = pgTable(
+  "phrases",
+  {
+    id: text("id").primaryKey(),
+    memberId: text("member_id")
+      .notNull()
+      .references(() => members.id),
+    /** Slug of the name they typed; unique per member, and how they refer to it. */
+    slug: text("slug").notNull(),
+    /** Who said it — the phrase itself is in the other side's language. */
+    side: talkSideEnum("side").notNull(),
+    heard: text("heard").notNull(),
+    said: text("said").notNull(),
+    roman: text("roman"),
+    literal: text("literal"),
+    /** What `said` is in, named as the pair named it the day it was saved. */
+    language: text("language").notNull(),
+    /** BCP-47 for `said`, for picking a voice long after the trip. */
+    tag: text("tag").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index("phrases_member_idx").on(t.memberId),
+    uniqueIndex("phrases_member_slug_idx").on(t.memberId, t.slug),
+  ],
+);
+
 export type Member = typeof members.$inferSelect;
 export type CredentialRow = typeof credentials.$inferSelect;
 export type InviteRow = typeof invites.$inferSelect;
@@ -346,3 +387,4 @@ export type ReactionKind = MarketReactionRow["kind"];
 export type BillRevisionRow = typeof billRevisions.$inferSelect;
 export type BillEntryRow = typeof billEntries.$inferSelect;
 export type CommentRow = typeof comments.$inferSelect;
+export type PhraseRow = typeof phrases.$inferSelect;

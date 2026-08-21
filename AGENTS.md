@@ -9,7 +9,8 @@ beside it: `lib/engine` (settlement), `lib/stats` (outcomes/roll-ups),
 `lib/recommend` (For-you ranking), `lib/pies` (money math), `lib/email`
 (canonicalization), `lib/webauthn` + `lib/cbor` (passkey verification),
 `lib/avatar` (monograms), `lib/invites` (invite codes), `lib/recovery`
-(recovery links), `lib/talk` (the language pair, turn-taking, voice choice).
+(recovery links), `lib/talk` (the language pair, turn-taking, voice choice),
+`lib/phrases` (kept phrases: slugs and which voice says one again).
 Read the test before changing a module; change them together.
 
 ## Commands (pnpm 11)
@@ -110,9 +111,20 @@ Pre-commit (husky): biome on staged files, tsc, full test suite.
   `market/stake/settle*/amountC`. Don't half-rename either side.
 - `/talk` is the one page pointed *outward*, at somebody who is not in the
   group: tap a side, speak, and the phone says it in the other language.
-  Nothing about it is stored — no turn, no clip, no transcript. The
-  conversation is component state and dies with the tab, which is why there is
-  no table and no session behind it.
+  The conversation is not stored — no turn, no clip, no transcript. It is
+  component state and dies with the tab, which is the only sensible lifetime
+  for a stranger's words and why there is no session behind it.
+  The one exception is a phrase a member deliberately kept: they point at a
+  turn, name it, and it lands in `phrases` under a slug of that name
+  (`lib/phrases.ts`), unique per member, theirs alone to play again or delete.
+  That is a phrasebook somebody wrote, not a transcript the app took — so the
+  test for anything new here is whether a member asked for it by tapping,
+  one row per tap. Never widen it into saving turns automatically.
+  A kept phrase carries the language it is in (`language`, `tag`) because the
+  pair is configuration and configuration moves: a Thai line replayed after
+  the group has flown home is read by a Thai voice or by none — `voiceFor`
+  refuses the voice service a side it can no longer tell the truth about,
+  since that service is told a side and looks the language up itself.
   Which two languages is configuration, not code: `GROUP_LANGUAGE` and
   `GROUP_DESTINATION` resolve through `lib/talk` at boot, and the destination
   decides the voice, the prompt, and the currency a bill defaults to. A new

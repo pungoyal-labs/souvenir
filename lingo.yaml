@@ -59,6 +59,7 @@ english:
   allSquare: "All square. Nobody owes anybody anything."
   talkTitle: "Say it in {language}"
   talkSub: "Tap your side, speak, then hand the phone over. It says the rest out loud."
+  phrasebookHeading: "Phrases you kept"
 bangalore:
   name: "South Bangalore"
   register: "Bangalore English with natural Kannada seasoning and dry friend-group banter. Conversational, understated, locally recognisable — not a caricature."
@@ -107,6 +108,7 @@ bangalore:
   allSquare: "All square, guru. Yaaru yaarigu enu kodbekagilla."
   talkTitle: "Swalpa {language} adjust maadi"
   talkSub: "Tap, speak, pass the phone, guru. It says your line out loud — the confidence you bring yourself."
+  phrasebookHeading: "Save maadida lines"
 hyderabad:
   name: "Hyderabadi"
   register: "Hyderabadi English with natural Deccani seasoning. Casual, dry and teasing; use local expressions where they sound spoken, not pasted on."
@@ -155,6 +157,7 @@ hyderabad:
   allSquare: "Sab barabar, miyan. Koi kisi ka kuch nahi dena."
   talkTitle: "{language} mein bolo"
   talkSub: "Tap karo, bolo, phone unko ghumao. Zor se bahar aati hai — nakko sharam, they have heard worse."
+  phrasebookHeading: "Rakhe hue lines, miyan"
 mumbai:
   name: "Bambaiyya"
   register: "Mumbai English with natural Bambaiyya. Fast, dry, cocky, conversational. Use boss, bhidu, apun, scene, vaat and related slang without turning every line into a movie dialogue."
@@ -203,6 +206,7 @@ mumbai:
   allSquare: "Sab settle, boss. Koi kisi ka kuch nahi deta."
   talkTitle: "{language} mein set kar"
   talkSub: "Tap, bol, phone aage kar bhidu. Loud and clear bahar aayega — vaat lagne ka chance kam."
+  phrasebookHeading: "Apun ke saved lines"
 delhi:
   name: "Dilli"
   register: "Delhi English with natural Dilli speech. Blunt, cocky, sarcastic and matey. Use bhai, scene, bawaal, bakchodi, phattu and similar slang naturally rather than as decoration."
@@ -251,6 +255,7 @@ delhi:
   allSquare: "Hisaab barabar. Koi kisi ka kuch nahi nikalta."
   talkTitle: "{language} mein bol de"
   talkSub: "Tap kar, bol, phone unki taraf ghuma. Bahar aa jaayegi — bhai, ab bakchodi bhi tarjuma hoti hai."
+  phrasebookHeading: "Sambhaal ke rakhi lines"
 chennai:
   name: "Chennai Tanglish"
   register: "Chennai English with natural Tanglish. Dry, affectionate and cutting. Use da, machan, semma, mokka and similar expressions where a Chennai friend would actually use them."
@@ -299,6 +304,7 @@ chennai:
   allSquare: "All square, machan. Yaarum yaarukkum onnum tharanum illa."
   talkTitle: "{language}-la sollu da"
   talkSub: "Tap pannu, sollu, phone-a thirupu machan. Loud-ah varum — semma easy, mokka accent kooda thaangum."
+  phrasebookHeading: "Save panna lines, machan"
 kolkata:
   name: "Kolkata"
   register: "Kolkata English with natural Bangla seasoning. Conversational, dry, slightly theatrical only when it feels organic. Use dada, ki re, lyadh, fatafati and similar slang sparingly."
@@ -347,6 +353,7 @@ kolkata:
   allSquare: "Shob shoman, dada. Keu karor kachhe kichhu paye na."
   talkTitle: "{language} te bolo"
   talkSub: "Tap koro, bolo, phone ta ghuriye dao dada. Jore beriye ashbe — baaki ta tomar charm."
+  phrasebookHeading: "Tule rakha line, dada"
 kochi:
   name: "Kochi Manglish"
   register: "Kochi English with natural Manglish. Casual, teasing and understated. Use machane, aliya, poli, mwone and related Malayalam expressions where they feel like actual speech."
@@ -395,6 +402,7 @@ kochi:
   allSquare: "Ellaam settle, machane. Aarkkum aarodum kadam illa."
   talkTitle: "{language}-il parayu"
   talkSub: "Tap cheythu parayu, ennittu phone thirichu kodu machane. Urakke varum — baakki ninte aatm-vishwasam."
+  phrasebookHeading: "Save cheytha lines, machane"
 ahmedabad:
   name: "Amdavadi"
   register: "Ahmedabad English with natural Amdavadi Gujarati seasoning. Casual, entrepreneurial, teasing and economical. Use bhai, su, jalsa, dhando, locha and similar phrases naturally."
@@ -443,6 +451,7 @@ ahmedabad:
   allSquare: "Badhu sarbhar, bhai. Koi nu kai nathi nikaltu."
   talkTitle: "{language} ma bol"
   talkSub: "Tap kar, bol, phone temni baju firav bhai. Motethi bahar aavse — bhaav-taal to pachhi tamaru kaam."
+  phrasebookHeading: "Saachvi rakheli lines"
 pune:
   name: "Puneri"
   register: "Pune English with light Marathi seasoning and dry Puneri signboard energy. Polite on the surface, savage underneath. The humour is in understatement and administrative disapproval."
@@ -491,6 +500,7 @@ pune:
   allSquare: "All accounts settled. Nobody owes anybody. Kindly keep it that way. — Management"
   talkTitle: "{language} madhe bola"
   talkSub: "Tap kara, bola, phone tyanchyakade phirva. Motyane baher yete. Kripaya ek-ek vakya. Ekdum sagle bolnyachi garaj naahi."
+  phrasebookHeading: "Phrase register. Kindly refer."
 unhinged:
   name: "Unhinged"
   register: "Mega-offensive private-group banter between four adult college friends who have explicitly opted into ruthless roasting. Natural Indian English/Hinglish with actual gaali — chutiya, bakchod, gaandu, harami, nalayak, dhakkan, bhosdi ke — dropped where it lands, plus dry contempt, personal digs, absurd escalation and deadpan humiliation. Use current slang only when it sounds natural: aura, mog, cooked, delulu, BFFR, clocked, touch grass, etc. The joke should come from the situation or the person's decision — gaali is seasoning, not the meal, so never stuff it in place of an actual burn. No slurs, no protected-class attacks."
@@ -539,3 +549,4 @@ unhinged:
   allSquare: "Sab barabar. Kisi pe kisi ka udhaar nahi. Ek durlabh moment of financial izzat."
   talkTitle: "Bol de {language} mein"
   talkSub: "Tap kar, bol, phone ghuma de. Teri bakwaas fluent {language} mein bahar aayegi — honestly tum log kabhi itne padhe-likhe nahi lage."
+  phrasebookHeading: "Lines tu bhool nahi sakta"
