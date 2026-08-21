@@ -28,6 +28,8 @@ describe("the pair", () => {
   it("resolves the default", () => {
     expect(THAI.us.language).toBe("English");
     expect(THAI.them.language).toBe("Thai");
+    expect(THAI.us.voice).toBe("female");
+    expect(THAI.them.voice).toBe("male");
     expect(THAI.them.tag).toBe("th-TH");
     expect(THAI.place).toBe("Thailand");
     expect(THAI.currency).toBe("thb");
@@ -182,6 +184,43 @@ describe("pickVoice", () => {
       voice("th-TH", "First", { localService: true, default: true }),
     ];
     expect(pickVoice(voices, "th-TH")?.name).toBe("First");
+  });
+
+  it("takes the voice the group asked for when the device says which is which", () => {
+    const voices = [
+      voice("en-IN", "Rishi", { localService: true, default: true }),
+      voice("en-IN", "Veena", { localService: true }),
+    ];
+    expect(pickVoice(voices, "en-IN", "female")?.name).toBe("Veena");
+    expect(pickVoice(voices, "en-IN", "male")?.name).toBe("Rishi");
+    expect(pickVoice(voices, "en-IN")?.name).toBe("Rishi");
+  });
+
+  it("reads the word out of a name as readily as the name itself", () => {
+    const voices = [
+      voice("th-TH", "Google Thai Male"),
+      voice("th-TH", "Google Thai Female", { default: true }),
+    ];
+    expect(pickVoice(voices, "th-TH", "male")?.name).toBe("Google Thai Male");
+  });
+
+  it("would rather have the right language than the asked-for voice", () => {
+    const voices = [voice("th", "Google Thai Female"), voice("th-TH", "Premwadee")];
+    expect(pickVoice(voices, "th-TH", "male")?.name).toBe("Premwadee");
+  });
+
+  it("leaves a voice that says nothing about itself ahead of the wrong one", () => {
+    const voices = [
+      voice("th-TH", "Kanya"),
+      voice("th-TH", "th-TH-language"),
+      voice("th-TH", "Niwat"),
+    ];
+    expect(pickVoice(voices, "th-TH", "male")?.name).toBe("Niwat");
+    expect(pickVoice([voices[0], voices[1]], "th-TH", "male")?.name).toBe("th-TH-language");
+  });
+
+  it("still answers when the phone carries only the other one", () => {
+    expect(pickVoice([voice("th-TH", "Kanya")], "th-TH", "male")?.name).toBe("Kanya");
   });
 
   it("says so rather than returning a voice for the wrong language", () => {

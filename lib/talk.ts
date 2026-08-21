@@ -16,6 +16,9 @@
 /** Whose turn it is. `them` is always the local side. */
 export type Side = "us" | "them";
 
+/** Which of a device's several voices for a language to reach for. */
+export type VoicePreference = "female" | "male";
+
 export interface Speaker {
   /** Two-letter code, for the translator. */
   code: string;
@@ -25,6 +28,14 @@ export interface Speaker {
   language: string;
   /** Unicode script name, for telling one side's transcript from the other's. */
   script: string;
+  /**
+   * Who should read it. A phone usually carries more than one voice per
+   * language and picks its own default between them, which is a coin toss —
+   * this is the group saying which one they meant. A preference, not a
+   * promise: plenty of phones carry exactly one voice for a language, and
+   * plenty more do not say in the name which it is.
+   */
+  voice: VoicePreference;
 }
 
 export interface Pair {
@@ -45,8 +56,20 @@ export interface Pair {
 /** Currencies `bills.currency` can hold (lib/split.ts and the drizzle enum). */
 const SCHEMA_CURRENCIES = ["inr", "thb"];
 
-const EN: Speaker = { code: "en", tag: "en-IN", language: "English", script: "Latin" };
-const HI: Speaker = { code: "hi", tag: "hi-IN", language: "Hindi", script: "Devanagari" };
+const EN: Speaker = {
+  code: "en",
+  tag: "en-IN",
+  language: "English",
+  script: "Latin",
+  voice: "female",
+};
+const HI: Speaker = {
+  code: "hi",
+  tag: "hi-IN",
+  language: "Hindi",
+  script: "Devanagari",
+  voice: "female",
+};
 
 /** What the group speaks among themselves. */
 export const HOME: Record<string, Speaker> = { en: EN, hi: HI };
@@ -54,7 +77,7 @@ export const HOME: Record<string, Speaker> = { en: EN, hi: HI };
 /** Where they are. Adding one is a line here, plus a migration if its money is new. */
 export const DESTINATIONS: Record<string, Omit<Pair, "us">> = {
   TH: {
-    them: { code: "th", tag: "th-TH", language: "Thai", script: "Thai" },
+    them: { code: "th", tag: "th-TH", language: "Thai", script: "Thai", voice: "male" },
     place: "Thailand",
     particles: true,
     currency: "thb",
@@ -176,14 +199,45 @@ export interface Voice {
 }
 
 /**
+ * Whether a voice announces itself as a woman's or a man's, or says nothing.
+ *
+ * There is no field for it — `SpeechSynthesisVoice` carries a name and a tag
+ * and nothing else — so the name is all there is to read. Chrome and Windows
+ * put the word in ("Google UK English Female", "Microsoft Heera"); Apple uses
+ * first names; Android frequently says neither, and those are left alone
+ * rather than guessed at. Only the names for the languages this app has any
+ * business speaking are listed, and being wrong about one costs a preference,
+ * not a voice.
+ */
+const FEMALE_NAMES =
+  /\b(veena|isha|heera|kanya|kalpana|lekha|swara|neerja|shruti|aditi|priya|raveena|ananya|premwadee|achara)\b/;
+const MALE_NAMES = /\b(rishi|ravi|hemant|madhur|prabhat|niwat|kritsada|sarawut)\b/;
+
+function genderOf(name: string): VoicePreference | null {
+  const n = name.toLowerCase();
+  if (/\b(female|woman|girl)\b/.test(n)) return "female";
+  if (/\b(male|man|boy)\b/.test(n)) return "male";
+  if (FEMALE_NAMES.test(n)) return "female";
+  if (MALE_NAMES.test(n)) return "male";
+  return null;
+}
+
+/**
  * The best voice on this device for a language, or null when it has none.
  *
  * Browsers disagree about all of it: the tag can be `th-TH`, `th_TH` or `th`,
  * names differ between devices, and a phone with no voice for a language just
- * omits it. Region match first, then language, preferring a voice that lives
- * on the device — a network voice is the first thing to fail on hotel wifi.
+ * omits it. Region match first, then the language, then the voice the group
+ * asked for where the device says which is which, then one that lives on the
+ * device — a network voice is the first thing to fail on hotel wifi. The
+ * preference sorts below the language on purpose: the wrong voice saying the
+ * right language is understood, and the reverse is not.
  */
-export function pickVoice(voices: readonly Voice[], tag: string): Voice | null {
+export function pickVoice(
+  voices: readonly Voice[],
+  tag: string,
+  prefer?: VoicePreference,
+): Voice | null {
   const want = tag.toLowerCase().replace("_", "-");
   const base = want.split("-")[0];
   const rank = (v: Voice) => {
@@ -191,11 +245,18 @@ export function pickVoice(voices: readonly Voice[], tag: string): Voice | null {
     if (t === want) return 0;
     return t.split("-")[0] === base ? 1 : 2;
   };
+  // Asked-for first, then anything that does not say, then the other one.
+  const asked = (v: Voice) => {
+    if (!prefer) return 1;
+    const gender = genderOf(v.name);
+    return gender === null ? 1 : gender === prefer ? 0 : 2;
+  };
   const candidates = voices.filter((v) => rank(v) < 2);
   if (candidates.length === 0) return null;
   return [...candidates].sort(
     (a, b) =>
       rank(a) - rank(b) ||
+      asked(a) - asked(b) ||
       Number(b.localService ?? false) - Number(a.localService ?? false) ||
       Number(b.default ?? false) - Number(a.default ?? false),
   )[0];

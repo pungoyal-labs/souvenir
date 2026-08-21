@@ -88,7 +88,25 @@ const envSchema = z.object({
   SPEECH_BASE_URL: z.string().optional(),
   SPEECH_API_KEY: z.string().optional(),
   SPEECH_TTS_MODEL: z.string().default("tts-1"),
+  /** The `openai` flavor's one voice; it has no notion of who is speaking. */
   SPEECH_TTS_VOICE: z.string().default("alloy"),
+  /**
+   * The `minimax` flavor's voice per side, which it can have because its
+   * voices are cross-lingual: `language_boost` says which language the words
+   * are in and the voice reads them in its own accent. So the group's own side
+   * is read by an Indian woman rather than an American one, and the local side
+   * by a Thai man — deliberately not the same person twice, because the whole
+   * point of the page is that two people are talking.
+   */
+  SPEECH_VOICE_US: z.string().default("hindi_female_1_v2"),
+  SPEECH_VOICE_THEM: z.string().default("Thai_male_1_sample8"),
+  /**
+   * How the local side is delivered. Semitones down and a little under speed:
+   * lower and slower than the voice's own register, which is what carries
+   * across a market stall. MiniMax takes pitch in semitones, -12 to 12.
+   */
+  SPEECH_VOICE_THEM_PITCH: z.coerce.number().min(-12).max(12).default(-5),
+  SPEECH_VOICE_THEM_SPEED: z.coerce.number().min(0.5).max(2).default(0.9),
   /**
    * Which shape the voice endpoint speaks. "openai" is `/audio/speech`
    * returning audio bytes; "minimax" is `/v1/t2a_v2` returning hex audio in

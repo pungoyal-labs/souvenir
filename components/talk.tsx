@@ -93,7 +93,7 @@ export function Talk({
   useEffect(() => setCanListen(recognizer() !== null), []);
   useEffect(() => () => active.current?.abort(), []);
 
-  const deviceVoice = pickVoice(voices, pair.them.tag);
+  const deviceVoice = pickVoice(voices, pair.them.tag, pair.them.voice);
   const note = warning(
     { listen: canListen, speak: deviceVoice !== null || serverSpeaks },
     pair.them.language,
@@ -103,8 +103,8 @@ export function Talk({
 
   const speak = useCallback(
     async (text: string, side: Side) => {
-      const tag = speakerOf(pair, side).tag;
-      const chosen = pickVoice(voices, tag);
+      const speaker = speakerOf(pair, side);
+      const chosen = pickVoice(voices, speaker.tag, speaker.voice);
       if (chosen) {
         window.speechSynthesis.cancel();
         const utterance = new SpeechSynthesisUtterance(text);

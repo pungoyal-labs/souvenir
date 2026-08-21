@@ -27,7 +27,7 @@ export async function POST(request: Request) {
   const side: Side = asked?.side === "them" ? "them" : "us";
 
   try {
-    const spoken = await say(text.slice(0, MAX_UTTERANCE), speakerOf(pair, side).language);
+    const spoken = await say(text.slice(0, MAX_UTTERANCE), speakerOf(pair, side).language, side);
     return new Response(spoken.bytes, {
       headers: {
         "Content-Type": spoken.contentType,

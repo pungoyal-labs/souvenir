@@ -112,6 +112,13 @@ Pre-commit (husky): biome on staged files, tsc, full test suite.
   destination is a line in `DESTINATIONS`, plus a migration if its money is not
   already in the `currency` enum — which `resolvePair` refuses rather than
   discovers at the till.
+  Who speaks is two settings, not one. On the device, `pickVoice` reads the
+  voice's *name* for a gender — the API offers no other clue — and prefers the
+  one the `Speaker` asks for, below the language and never instead of it. On
+  the server, MiniMax voices are cross-lingual, so each side gets its own
+  (`SPEECH_VOICE_US` / `SPEECH_VOICE_THEM`, plus pitch and speed for the local
+  side); the openai flavor keeps one voice for both, having no way to tell them
+  apart. Check a voice id against `POST /v1/get_voice` before setting it.
   Listening is the browser's own recogniser and nothing else: it is the only
   one there is, solid on Android Chrome and missing on some iPhones, and where
   it is missing the page says so and offers typing. Never add a server

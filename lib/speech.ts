@@ -14,6 +14,7 @@
 
 import { env } from "./env.ts";
 import { logger } from "./logger.ts";
+import type { Side } from "./talk.ts";
 
 /** Configured or not. The page asks before it offers anything that needs this. */
 export const speakEnabled = Boolean(env.SPEECH_BASE_URL && env.SPEECH_API_KEY);
@@ -35,13 +36,19 @@ function base(): string {
  * voice needs telling which language the text is in, and told wrongly it reads
  * Thai with an English mouth. Naming it rather than coding it keeps this file
  * out of the business of knowing where the group is.
+ *
+ * `side` is which of the two is talking, and only that: which voice each side
+ * gets is configuration, so a deploy that moves somewhere else changes an
+ * env var rather than this file. The `openai` flavor has one voice for both,
+ * having no way to tell them apart.
  */
 export async function say(
   text: string,
   language: string,
+  side: Side,
 ): Promise<{ bytes: ArrayBuffer; contentType: string }> {
   if (!speakEnabled) throw new SpeechError("No voice service is configured.");
-  return env.SPEECH_FLAVOR === "minimax" ? sayMiniMax(text, language) : sayOpenAi(text);
+  return env.SPEECH_FLAVOR === "minimax" ? sayMiniMax(text, language, side) : sayOpenAi(text);
 }
 
 async function sayOpenAi(text: string): Promise<{ bytes: ArrayBuffer; contentType: string }> {
@@ -68,6 +75,18 @@ async function sayOpenAi(text: string): Promise<{ bytes: ArrayBuffer; contentTyp
   };
 }
 
+/** Voice and delivery for one side. Pitch is in semitones, speed a multiplier. */
+function voiceFor(side: Side): { voice_id: string; speed: number; vol: number; pitch: number } {
+  return side === "them"
+    ? {
+        voice_id: env.SPEECH_VOICE_THEM,
+        speed: env.SPEECH_VOICE_THEM_SPEED,
+        vol: 1,
+        pitch: env.SPEECH_VOICE_THEM_PITCH,
+      }
+    : { voice_id: env.SPEECH_VOICE_US, speed: 0.95, vol: 1, pitch: 0 };
+}
+
 /**
  * MiniMax T2A: the non-streaming HTTP one, not the websocket. The websocket
  * exists to start playing a long passage before it is finished, and nothing
@@ -78,6 +97,7 @@ async function sayOpenAi(text: string): Promise<{ bytes: ArrayBuffer; contentTyp
 async function sayMiniMax(
   text: string,
   language: string,
+  side: Side,
 ): Promise<{ bytes: ArrayBuffer; contentType: string }> {
   // Some accounts still key the request by group on the query string.
   const url = new URL(`${base()}/v1/t2a_v2`);
@@ -95,7 +115,7 @@ async function sayMiniMax(
       stream: false,
       // Cross-lingual voices need to be told; Thai read as English is noise.
       language_boost: language,
-      voice_setting: { voice_id: env.SPEECH_TTS_VOICE, speed: 0.95, vol: 1, pitch: 0 },
+      voice_setting: voiceFor(side),
       audio_setting: { format: "mp3", sample_rate: 32000, bitrate: 128000, channel: 1 },
     }),
   });
