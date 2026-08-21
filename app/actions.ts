@@ -48,13 +48,22 @@ import {
   switchSides,
 } from "@/lib/data";
 import type { Member } from "@/lib/db/schema";
+
 import type { Side } from "@/lib/engine";
+import { pair } from "@/lib/env";
 import { inviteState, inviteUrl } from "@/lib/invites";
 import { isLingoKey, lingoOf } from "@/lib/lingo";
-import { llmEnabled, type PolishedDraft, polishMarketDraft } from "@/lib/llm";
+import {
+  type Interpretation,
+  interpret,
+  llmEnabled,
+  type PolishedDraft,
+  polishMarketDraft,
+} from "@/lib/llm";
 import { logger } from "@/lib/logger";
 import { recoveryState, recoveryUrl } from "@/lib/recovery";
 import type { Currency } from "@/lib/split";
+import { clampUtterance, type Particle, type Side as TalkSide, worthSaying } from "@/lib/talk";
 import {
   type PasskeyRegistrationOptions,
   type PasskeySignInOptions,
@@ -173,6 +182,39 @@ export async function polishAction(
   } catch (err) {
     logger.error({ err }, "polish failed");
     return { ok: false, error: "The magic fizzled. Try again." };
+  }
+}
+
+export async function interpretAction(
+  text: string,
+  to: TalkSide,
+  particle: Particle,
+): Promise<ActionResult & { said?: Interpretation }> {
+  await requireMemberId();
+  if (!llmEnabled) {
+    return { ok: false, error: "Live interpreting isn't switched on for this deploy." };
+  }
+  const utterance = clampUtterance(text);
+  if (!worthSaying(utterance)) {
+    return { ok: false, error: "Nothing came through. Say that again?" };
+  }
+  // Which languages these are is deployment configuration, not something the
+  // browser gets to assert — the client says only which way round it goes.
+  const target = to === "them" ? pair.them : pair.us;
+  const source = to === "them" ? pair.us : pair.them;
+  try {
+    const said = await interpret({
+      text: utterance,
+      to: target.language,
+      from: source.language,
+      place: pair.place,
+      romanise: target.script !== "Latin",
+      particle: to === "them" && pair.particles ? particle : undefined,
+    });
+    return { ok: true, said };
+  } catch (err) {
+    logger.error({ err, to }, "interpreting failed");
+    return { ok: false, error: "That didn't come back. Try it again." };
   }
 }
 

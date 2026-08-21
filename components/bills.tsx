@@ -23,11 +23,13 @@ export function Bills({
   members,
   meId,
   lingo,
+  defaultCurrency,
   bills,
   balances,
   comments,
 }: {
   members: Member[];
+  defaultCurrency: Currency;
   meId: string;
   lingo: string;
   bills: BillView[];
@@ -167,7 +169,13 @@ export function Bills({
       </div>
 
       {adding && (
-        <BillForm members={members} meId={meId} lingo={lingo} onDone={() => setAdding(false)} />
+        <BillForm
+          members={members}
+          meId={meId}
+          lingo={lingo}
+          defaultCurrency={defaultCurrency}
+          onDone={() => setAdding(false)}
+        />
       )}
       {paying && (
         <PaymentForm
@@ -198,6 +206,7 @@ export function Bills({
                       members={members}
                       meId={meId}
                       lingo={lingo}
+                      defaultCurrency={defaultCurrency}
                       initial={bill}
                       onDone={() => setEditingId(null)}
                     />

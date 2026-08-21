@@ -48,12 +48,15 @@ export function BillForm({
   members,
   meId,
   lingo,
+  defaultCurrency,
   initial,
   onDone,
 }: {
   members: Member[];
   meId: string;
   lingo: string;
+  /** Where the group is, so a new bill starts in the money they are spending. */
+  defaultCurrency: Currency;
   /** Editing an existing bill; omitted when adding. */
   initial?: BillView;
   onDone: () => void;
@@ -65,7 +68,7 @@ export function BillForm({
 
   const [onDate, setOnDate] = useState(initial?.onDate ?? todayLocal());
   const [description, setDescription] = useState(initial?.description ?? "");
-  const [currency, setCurrency] = useState<Currency>(initial?.currency ?? "inr");
+  const [currency, setCurrency] = useState<Currency>(initial?.currency ?? defaultCurrency);
   const [payerIds, setPayerIds] = useState<string[]>(() =>
     initial ? initial.entries.filter((e) => e.paidC > 0).map((e) => e.member.id) : [meId],
   );

@@ -28,7 +28,15 @@ predict things.
 test file: `lib/engine.test.ts` (settlement, fuzz-tested zero-sum),
 `lib/stats.test.ts` (outcomes, win/loss/ROI), `lib/recommend.test.ts` (ranking
 and reason chips), `lib/pies.test.ts` (centi-pie math and formatting),
-`lib/email.test.ts` (Gmail-dot canonicalization).
+`lib/email.test.ts` (Gmail-dot canonicalization), `lib/talk.test.ts` (the
+language pair, whose turn it is, and which voice a device can speak it with).
+
+**Talking to locals.** `/talk` is a two-way interpreter on one phone: tap your
+side, speak, and it says it out loud in the local language; hand the phone over
+and it comes back in yours. Nothing is stored — the conversation lives in the
+tab. The pair is configuration (`GROUP_LANGUAGE` / `GROUP_DESTINATION`,
+defaulting to English in Thailand), and the destination also sets the currency
+a new bill starts in.
 
 **Vocabulary.** UI: *prediction, bet, resolve, pool, pie*. Code and schema:
 `market`, `stake`, `settle*`, `amountC`. Keep them apart.
@@ -41,8 +49,9 @@ dialect missing one of its fields fails the build.
 
 Next.js 16 (App Router, server actions) · React 19 · TypeScript 7 ·
 Tailwind CSS 4 · Google OAuth (no auth library) · Postgres 18 · Drizzle ORM ·
-Biome · Vitest · pnpm 11 · Docker. Optional LLM polish of prediction drafts via
-any Anthropic-compatible API.
+Biome · Vitest · pnpm 11 · Docker. Optional LLM (any Anthropic-compatible API)
+for prediction-draft polish and Thai interpreting; optional OpenAI-compatible
+`/audio` endpoint for speech.
 
 ## Local development
 
@@ -60,6 +69,13 @@ login (any email, bypasses the invite list). **Never in production.** Full
 stack in Docker instead: `docker compose up -d --build` (db → one-shot
 `migrate` → app).
 
+`/talk` is the one page that cannot be tested on a laptop: it wants a
+microphone, and a browser only hands one over in a secure context. `localhost`
+counts; a LAN address does not. So reach it from a phone with `pnpm dev:https`
+(self-signed, accept the warning) and set `AUTH_URL` to the same
+`https://<your-ip>:3000`. Passkeys stay off there — an IP address cannot be a
+WebAuthn relying party — so sign in with the dev login.
+
 ## Configuration
 
 Every variable is validated in `lib/env.ts`; `.env.example` is the annotated
@@ -74,7 +90,9 @@ list. Highlights:
 | `MAX_STAKE_PIES` | Per-member exposure cap per market (default 10) |
 | `RANKED_MIN_RESOLVED` | Verdicts needed to appear ranked (default 5) |
 | `DB_PORT` / `APP_PORT` / `APP_BIND` / `PORT` | Database and HTTP ports |
-| `LLM_BASE_URL` / `LLM_API_KEY` / `LLM_MODEL` | Optional draft-polish endpoint (hidden when unset) |
+| `LLM_BASE_URL` / `LLM_API_KEY` / `LLM_MODEL` | Optional draft-polish and Thai interpreting endpoint (hidden when unset) |
+| `GROUP_LANGUAGE` / `GROUP_DESTINATION` | What the group speaks and where they are (default `en` / `TH`) |
+| `SPEECH_BASE_URL` / `SPEECH_API_KEY` / `SPEECH_FLAVOR` | Optional voice for phones with none: OpenAI-compatible `/audio/speech`, or `minimax` |
 
 Membership is invite-only. Founders mint a single-use invite link on the
 members page; whoever opens it picks a name, creates a passkey, and is in —

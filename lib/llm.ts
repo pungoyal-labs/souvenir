@@ -1,11 +1,16 @@
-// Optional LLM polish for prediction drafts, via any Anthropic-compatible API
-// (configured for MiniMax M3 through LLM_BASE_URL / LLM_API_KEY / LLM_MODEL).
-// Purely advisory: the creator iterates on the draft before publishing, and
-// nothing in the core game depends on this being configured.
+// The model, for the two things in this app that need one: polishing a
+// prediction draft before it is published, and interpreting between the group
+// and whoever they are standing in front of.
+//
+// Any Anthropic-compatible API (configured for MiniMax M3 through
+// LLM_BASE_URL / LLM_API_KEY / LLM_MODEL). Both features are optional and
+// hidden when it is unset — the game does not depend on this, and the Thai
+// page still has its phrasebook.
 
 import Anthropic from "@anthropic-ai/sdk";
 import { env } from "./env.ts";
 import { logger } from "./logger.ts";
+import type { Particle } from "./talk.ts";
 
 export const llmEnabled = Boolean(env.LLM_BASE_URL && env.LLM_API_KEY);
 
@@ -94,5 +99,140 @@ function parsePolished(text: string, fallback: MarketDraft): PolishedDraft {
       typeof obj.rationale === "string" && obj.rationale.trim()
         ? obj.rationale.trim()
         : `Tightened from: “${fallback.question}”`,
+  };
+}
+
+// --- Interpreting --------------------------------------------------------
+
+/**
+ * One utterance, said again in the other language.
+ *
+ * Deliberately not the polish prompt with a different instruction glued on.
+ * That one is talking to the group and matches whoever's lingo they picked;
+ * this one is talking to a stranger, and a sentence with South Bangalore
+ * banter pushed through it is not a favour to anybody. Plain, spoken, polite.
+ */
+export interface Interpretation {
+  /** The sentence to say, in the target language. */
+  text: string;
+  /** Romanisation with tone or stress marks — empty when the target is Latin. */
+  roman: string;
+  /**
+   * What the translation literally says, back in the speaker's own language.
+   * The one guard against a confident mistranslation: they read it before the
+   * phone says anything on their behalf.
+   */
+  literal: string;
+  /** Anything the speaker should know — an idiom, a register, a missing word. */
+  note?: string;
+}
+
+export interface InterpretRequest {
+  /** What was heard, in whatever language it was said in. */
+  text: string;
+  /** The language it is going into, named as a person would name it. */
+  to: string;
+  /** The language it came from. */
+  from: string;
+  /** Where this conversation is happening, which is what makes it idiomatic. */
+  place: string;
+  /** True when the target is not written in the Latin alphabet. */
+  romanise: boolean;
+  /**
+   * The speaker's polite ending, where the target language has one. Thai does;
+   * most do not, and asking a model to invent one for a language without them
+   * produces confident nonsense.
+   */
+  particle?: Particle;
+}
+
+/**
+ * The system half, which is stable for a whole conversation — the pair and the
+ * place do not change between turns, so the prompt prefix stays identical and
+ * only the utterance moves.
+ */
+function interpretSystem(req: InterpretRequest): string {
+  const rules = [
+    "- Translate the meaning as it would be said out loud, not word by word. Everyday spoken language as actually used there, not textbook phrasing and not written formal register.",
+    "- Keep it short. This is speech: one or two sentences, no preamble, no explanation, no greeting the speaker did not say.",
+    "- Numbers, prices and place names matter more than fluency. Keep them exact. Leave a proper name in its own script if you are not sure of it.",
+    "- If the input is garbled or empty of meaning, translate what is there and say so in the note rather than inventing a sentence.",
+    "- The note is almost always empty. Write one only when the speaker would say something different if they knew it — an idiom that will not land, a word you had to guess at, a register that is riskier than they intended. Never write a note that says the translation is normal, natural, common, or polite.",
+    "- The speaker may be rude, drunk or joking. Interpret it; do not clean it up, refuse it, or comment on it.",
+  ];
+  if (req.particle) {
+    rules.splice(
+      2,
+      0,
+      `- The speaker is using the polite particle ${
+        req.particle === "khrap" ? "ครับ (male speaker)" : "ค่ะ / คะ (female speaker)"
+      }. End polite sentences accordingly, and use ${
+        req.particle === "khrap" ? "ผม" : "ฉัน"
+      } for "I". Questions take ${req.particle === "khrap" ? "ครับ" : "คะ"}.`,
+    );
+  }
+
+  return `You are interpreting live between a visitor and a local in ${req.place}, between ${req.from} and ${req.to}. One utterance at a time, spoken out loud by a phone held between two people.
+
+Rules:
+${rules.join("\n")}
+
+Respond with ONLY a JSON object, no markdown fences:
+{"text": "the sentence to say", "roman": ${
+    req.romanise
+      ? '"the translation romanised, with tone or stress marks"'
+      : '"an empty string — the target is written in the Latin alphabet"'
+  }, "literal": "what your translation literally says, in ${req.from}", "note": "usually omitted; one short sentence only when the speaker needs to know something"}`;
+}
+
+/** Interpret one utterance, in whichever direction the pair is pointed. */
+export async function interpret(req: InterpretRequest): Promise<Interpretation> {
+  if (!llmEnabled) throw new Error("Interpreting is not configured");
+
+  const client = new Anthropic({
+    apiKey: env.LLM_API_KEY,
+    baseURL: env.LLM_BASE_URL,
+  });
+
+  const startedAt = Date.now();
+  const response = await client.messages.create({
+    model: env.LLM_MODEL,
+    // A spoken sentence and its gloss. Anything longer is the model rambling.
+    max_tokens: 700,
+    system: interpretSystem(req),
+    messages: [{ role: "user", content: `Target language: ${req.to}\n\nUtterance: ${req.text}` }],
+  });
+  logger.info(
+    { model: env.LLM_MODEL, to: req.to, ms: Date.now() - startedAt, usage: response.usage },
+    "utterance interpreted",
+  );
+
+  const body = response.content
+    .filter((block): block is Anthropic.TextBlock => block.type === "text")
+    .map((block) => block.text)
+    .join("");
+
+  return parseInterpretation(body, req.romanise);
+}
+
+function parseInterpretation(body: string, romanise: boolean): Interpretation {
+  const start = body.indexOf("{");
+  const end = body.lastIndexOf("}");
+  if (start === -1 || end <= start) {
+    throw new Error("The interpreter didn't answer in a way this app could read.");
+  }
+  const parsed = JSON.parse(body.slice(start, end + 1)) as Record<string, unknown>;
+  const str = (key: string) =>
+    typeof parsed[key] === "string" ? (parsed[key] as string).trim() : "";
+  const text = str("text");
+  if (!text) throw new Error("The interpreter came back with nothing to say.");
+  const note = str("note");
+  return {
+    text: text.slice(0, 600),
+    // A romanisation of Latin text is the text again; drop it rather than
+    // print every line twice.
+    roman: romanise ? str("roman").slice(0, 600) : "",
+    literal: str("literal").slice(0, 600),
+    note: note || undefined,
   };
 }

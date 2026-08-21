@@ -5,6 +5,7 @@
 
 import { z } from "zod";
 import { normalizeEmail } from "./email.ts";
+import { resolvePair } from "./talk.ts";
 
 const envSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
@@ -64,14 +65,47 @@ const envSchema = z.object({
   /** Resolved markets required before a member appears in the ranked leaderboard. */
   RANKED_MIN_RESOLVED: z.coerce.number().int().positive().default(5),
 
+  /**
+   * The pair the group is living in: the language they speak among themselves,
+   * and the country they are in. The second half decides what the interpreter
+   * translates into, which voice speaks it, and which currency a bill defaults
+   * to. Validated against lib/destination at boot — a typo stops the server
+   * rather than being discovered in front of a driver.
+   */
+  GROUP_LANGUAGE: z.string().default("en"),
+  GROUP_DESTINATION: z.string().default("TH"),
+
   // Optional LLM used to polish market drafts before publishing.
   // Any Anthropic-compatible endpoint works (e.g. MiniMax M3 via its
   // Anthropic-style API). The feature is hidden unless URL + key are set.
   LLM_BASE_URL: z.string().optional(),
   LLM_API_KEY: z.string().optional(),
   LLM_MODEL: z.string().default("MiniMax-M3"),
+
+  // Optional voice for the talk page, for phones with no voice of their own.
+  // Unset, the page still works: it types, it reads, and the device speaks if
+  // it can.
+  SPEECH_BASE_URL: z.string().optional(),
+  SPEECH_API_KEY: z.string().optional(),
+  SPEECH_TTS_MODEL: z.string().default("tts-1"),
+  SPEECH_TTS_VOICE: z.string().default("alloy"),
+  /**
+   * Which shape the voice endpoint speaks. "openai" is `/audio/speech`
+   * returning audio bytes; "minimax" is `/v1/t2a_v2` returning hex audio in
+   * JSON — worth its own branch because the same key already drives
+   * LLM_BASE_URL, so the group pays one vendor rather than two.
+   */
+  SPEECH_FLAVOR: z.enum(["openai", "minimax"]).default("openai"),
+  /** MiniMax only, and only where the account still requires it on the query. */
+  SPEECH_GROUP_ID: z.string().optional(),
 });
 
 export const env = envSchema.parse(process.env);
+
+/**
+ * Where the group is and what they speak, resolved once. Throws on a bad pair,
+ * which is the point: this is boot, not a request.
+ */
+export const pair = resolvePair(env.GROUP_LANGUAGE, env.GROUP_DESTINATION);
 
 export type Env = typeof env;

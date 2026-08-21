@@ -1,7 +1,9 @@
 import { Bills } from "@/components/bills";
 import { billComments, billsOverview, listMembers } from "@/lib/data";
+import { pair } from "@/lib/env";
 import { lingoOf } from "@/lib/lingo";
 import { requireMember } from "@/lib/session";
+import type { Currency } from "@/lib/split";
 
 export default async function BillsPage() {
   const me = await requireMember();
@@ -18,6 +20,7 @@ export default async function BillsPage() {
       <h1 className="display text-4xl font-extrabold uppercase tracking-wide">{t.billsTitle}</h1>
       <p className="mt-1 text-sm text-soft">{t.billsSub}</p>
       <Bills
+        defaultCurrency={pair.currency as Currency}
         members={members}
         meId={me.id}
         lingo={me.lingo}

@@ -9,12 +9,15 @@ beside it: `lib/engine` (settlement), `lib/stats` (outcomes/roll-ups),
 `lib/recommend` (For-you ranking), `lib/pies` (money math), `lib/email`
 (canonicalization), `lib/webauthn` + `lib/cbor` (passkey verification),
 `lib/avatar` (monograms), `lib/invites` (invite codes), `lib/recovery`
-(recovery links). Read the test before changing a module; change them
-together.
+(recovery links), `lib/talk` (the language pair, turn-taking, voice choice).
+Read the test before changing a module; change them together.
 
 ## Commands (pnpm 11)
 
 - `pnpm dev` — dev server (needs `docker compose up -d db` and a `.env`)
+- `pnpm dev:https` — same on `0.0.0.0` over self-signed TLS, which is the only
+  way to reach `/talk` from a phone: the microphone needs a secure context and
+  a LAN address is not one
 - `pnpm test` — vitest, pure logic only; never add UI/component/page tests
 - `pnpm lint` / `pnpm format` — Biome (2-space, 100 cols, double quotes)
 - `pnpm tsc --noEmit` — typecheck
@@ -98,6 +101,30 @@ Pre-commit (husky): biome on staged files, tsc, full test suite.
   `members.image` any more.
 - Vocabulary: UI says *prediction/bet/resolve/pool/pie*; code says
   `market/stake/settle*/amountC`. Don't half-rename either side.
+- `/talk` is the one page pointed *outward*, at somebody who is not in the
+  group: tap a side, speak, and the phone says it in the other language.
+  Nothing about it is stored — no turn, no clip, no transcript. The
+  conversation is component state and dies with the tab, which is why there is
+  no table and no session behind it.
+  Which two languages is configuration, not code: `GROUP_LANGUAGE` and
+  `GROUP_DESTINATION` resolve through `lib/talk` at boot, and the destination
+  decides the voice, the prompt, and the currency a bill defaults to. A new
+  destination is a line in `DESTINATIONS`, plus a migration if its money is not
+  already in the `currency` enum — which `resolvePair` refuses rather than
+  discovers at the till.
+  Listening is the browser's own recogniser and nothing else: it is the only
+  one there is, solid on Android Chrome and missing on some iPhones, and where
+  it is missing the page says so and offers typing. Never add a server
+  transcription path without a vendor that actually has one — the last one was
+  configured against MiniMax, which has no ASR, and it would have failed in
+  front of somebody. Speaking prefers the device's own voice and falls back to
+  `SPEECH_BASE_URL`.
+  Thai politeness needs the speaker's gender and this schema refuses to hold
+  it, so ครับ/ค่ะ is a toggle on the page, shown only where the destination
+  language has particles at all.
+  A lingo is how the app talks *to a member*; the destination language is how a
+  member talks to a stranger. Do not add one to `lingo.yaml` — it would owe all
+  47 fields and would be roasting the wrong person.
 - pnpm hoisted linker (pnpm-workspace.yaml) keeps standalone output identical
   locally and in Docker; one arm64 image serves the app and runs migrations
   (`next.config.ts` `outputFileTracingIncludes`).

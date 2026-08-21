@@ -9,6 +9,7 @@ import { Pies } from "@/components/pies";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { destroySession, getSession, passkeysConfigured } from "@/lib/auth";
 import { getMember, hasPasskey, inbox, netOf } from "@/lib/data";
+import { pair } from "@/lib/env";
 import { lingoOf } from "@/lib/lingo";
 import "./globals.css";
 
@@ -80,6 +81,9 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                 </Link>
                 <Link href="/bills" className="rounded px-2 py-1 hover:bg-white/10">
                   Bills
+                </Link>
+                <Link href="/talk" className="rounded px-2 py-1 hover:bg-white/10">
+                  {pair.them.language}
                 </Link>
                 <Link href="/inbox" className="relative rounded px-2 py-1 hover:bg-white/10">
                   Inbox

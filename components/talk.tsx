@@ -1,0 +1,429 @@
+"use client";
+
+// The phone in the middle of the table.
+//
+// Tap your side, say it, tap again. It comes back spoken in the other language
+// and stays on screen big enough to hold out — the speaking is the part that
+// fails first, and the screen is the part that never does. Then they tap their
+// side and it goes the other way.
+//
+// Listening is the browser's own recogniser, which is the only one there is:
+// it is solid on Android Chrome and absent on some iPhones, and where it is
+// absent the page says so and you type instead. Speaking prefers the device's
+// own voice and falls back to the server's. Everything is component state —
+// close the tab and the conversation is gone.
+
+import { useCallback, useEffect, useRef, useState } from "react";
+import { interpretAction } from "@/app/actions";
+import {
+  appendTurn,
+  clampUtterance,
+  otherSide,
+  PARTICLES,
+  type Pair,
+  type Particle,
+  pickVoice,
+  type Side,
+  sideOf,
+  speakerOf,
+  type Turn,
+  warning,
+  worthSaying,
+} from "@/lib/talk";
+
+/** SpeechRecognition, which is not in every DOM lib and not on every phone. */
+interface RecognitionLike {
+  lang: string;
+  continuous: boolean;
+  interimResults: boolean;
+  start(): void;
+  stop(): void;
+  abort(): void;
+  onresult: ((event: RecognitionEvent) => void) | null;
+  onerror: ((event: { error?: string }) => void) | null;
+  onend: (() => void) | null;
+}
+
+interface RecognitionEvent {
+  resultIndex: number;
+  results: ArrayLike<ArrayLike<{ transcript: string }> & { isFinal: boolean }>;
+}
+
+function recognizer(): (new () => RecognitionLike) | null {
+  if (typeof window === "undefined") return null;
+  const w = window as unknown as {
+    SpeechRecognition?: new () => RecognitionLike;
+    webkitSpeechRecognition?: new () => RecognitionLike;
+  };
+  return w.SpeechRecognition ?? w.webkitSpeechRecognition ?? null;
+}
+
+export function Talk({
+  pair,
+  canInterpret,
+  serverSpeaks,
+}: {
+  pair: Pair;
+  canInterpret: boolean;
+  /** A voice service is configured, for phones with no voice of their own. */
+  serverSpeaks: boolean;
+}) {
+  const [particle, setParticle] = useState<Particle>("khrap");
+  const [turns, setTurns] = useState<Turn[]>([]);
+  const [listening, setListening] = useState<Side | null>(null);
+  const [partial, setPartial] = useState("");
+  const [thinking, setThinking] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [typed, setTyped] = useState("");
+  const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
+  const [canListen, setCanListen] = useState(false);
+
+  const active = useRef<RecognitionLike | null>(null);
+  const primed = useRef(false);
+  const nextId = useRef(1);
+
+  // Voices arrive late, and on some devices twice.
+  useEffect(() => {
+    if (!window.speechSynthesis) return;
+    const read = () => setVoices(window.speechSynthesis.getVoices());
+    read();
+    window.speechSynthesis.addEventListener("voiceschanged", read);
+    return () => window.speechSynthesis.removeEventListener("voiceschanged", read);
+  }, []);
+  useEffect(() => setCanListen(recognizer() !== null), []);
+  useEffect(() => () => active.current?.abort(), []);
+
+  const deviceVoice = pickVoice(voices, pair.them.tag);
+  const note = warning(
+    { listen: canListen, speak: deviceVoice !== null || serverSpeaks },
+    pair.them.language,
+  );
+  const busy = listening !== null || thinking;
+  const latest = turns[turns.length - 1];
+
+  const speak = useCallback(
+    async (text: string, side: Side) => {
+      const tag = speakerOf(pair, side).tag;
+      const chosen = pickVoice(voices, tag);
+      if (chosen) {
+        window.speechSynthesis.cancel();
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = chosen.lang;
+        utterance.voice = voices.find((v) => v.name === chosen.name) ?? null;
+        // Full speed is a wall to a listener who expected a tourist.
+        utterance.rate = 0.95;
+        window.speechSynthesis.speak(utterance);
+        return;
+      }
+      if (!serverSpeaks) return;
+      const response = await fetch("/api/speak", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text, side }),
+      });
+      if (!response.ok) return;
+      const url = URL.createObjectURL(await response.blob());
+      const audio = new Audio(url);
+      audio.onended = () => URL.revokeObjectURL(url);
+      await audio.play().catch(() => URL.revokeObjectURL(url));
+    },
+    [pair, voices, serverSpeaks],
+  );
+
+  /** One utterance all the way through: heard, interpreted, said back. */
+  const put = useCallback(
+    async (heard: string, pressed: Side) => {
+      const utterance = clampUtterance(heard);
+      if (!worthSaying(utterance)) {
+        setError("Nothing came through. Try that again.");
+        return;
+      }
+      const from = sideOf(utterance, pressed, pair);
+      const to = otherSide(from);
+      setThinking(true);
+      try {
+        const result = await interpretAction(utterance, to, particle);
+        if (!result.ok || !result.said) {
+          setError(result.error ?? "That didn't come back.");
+          return;
+        }
+        const turn: Turn = {
+          id: nextId.current++,
+          side: from,
+          heard: utterance,
+          said: result.said.text,
+          roman: result.said.roman || undefined,
+          literal: result.said.literal || undefined,
+        };
+        setTurns((current) => appendTurn(current, turn));
+        await speak(turn.said, to);
+      } finally {
+        setThinking(false);
+      }
+    },
+    [pair, particle, speak],
+  );
+
+  const press = (side: Side) => {
+    setError(null);
+    if (listening) {
+      active.current?.stop();
+      return;
+    }
+    const Recognition = recognizer();
+    if (!Recognition) {
+      setError("This phone can't listen. Type it instead.");
+      return;
+    }
+    // iOS will not speak later unless it has spoken once inside a tap.
+    if (!primed.current && window.speechSynthesis) {
+      primed.current = true;
+      const silence = new SpeechSynthesisUtterance("");
+      silence.volume = 0;
+      window.speechSynthesis.speak(silence);
+    }
+
+    const rec = new Recognition();
+    active.current = rec;
+    rec.lang = speakerOf(pair, side).tag;
+    rec.continuous = true;
+    rec.interimResults = true;
+    let heard = "";
+    let failure: string | null = null;
+
+    rec.onresult = (event) => {
+      let interim = "";
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const result = event.results[i];
+        const text = result[0]?.transcript ?? "";
+        if (result.isFinal) heard += text;
+        else interim += text;
+      }
+      setPartial((heard + interim).trim());
+    };
+    rec.onerror = (event) => {
+      // "no-speech" and "aborted" are somebody changing their mind, not faults.
+      if (event.error && event.error !== "no-speech" && event.error !== "aborted") {
+        failure = event.error === "not-allowed" ? "Microphone blocked." : "Didn't catch that.";
+      }
+    };
+    rec.onend = () => {
+      active.current = null;
+      setListening(null);
+      setPartial("");
+      if (failure) setError(failure);
+      else if (heard.trim()) void put(heard, side);
+      else setError("Didn't hear anything.");
+    };
+
+    setPartial("");
+    setListening(side);
+    rec.start();
+  };
+
+  const send = () => {
+    const text = typed;
+    setTyped("");
+    setError(null);
+    void put(text, "us");
+  };
+
+  if (!canInterpret) {
+    return (
+      <div className="rounded-lg border border-dashed border-line bg-surface p-6 text-sm text-soft">
+        Interpreting isn't switched on for this deploy — it needs an LLM endpoint in the
+        environment.
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      {pair.particles && (
+        <div className="flex items-center justify-center gap-2">
+          <span className="text-[11px] font-semibold uppercase tracking-wider text-soft">
+            You end sentences with
+          </span>
+          <div className="flex overflow-hidden rounded-md border border-line">
+            {(Object.keys(PARTICLES) as Particle[]).map((key) => (
+              <button
+                key={key}
+                type="button"
+                onClick={() => setParticle(key)}
+                className={`px-3 py-1.5 text-sm ${
+                  particle === key ? "bg-felt text-[#f1eee4]" : "bg-surface hover:bg-paper"
+                }`}
+              >
+                <span lang={pair.them.code} className="font-semibold">
+                  {PARTICLES[key].native}
+                </span>
+                <span className="mono ml-1.5 text-xs opacity-70">{PARTICLES[key].roman}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div className="grid grid-cols-2 gap-3">
+        <Mic
+          label={`Say it in ${pair.us.language}`}
+          sub={listening === "us" ? "Tap to finish" : "Tap, speak, tap"}
+          tone="ours"
+          active={listening === "us"}
+          disabled={busy && listening !== "us"}
+          onPress={() => press("us")}
+        />
+        <Mic
+          label="Their turn"
+          sub={listening === "them" ? "Tap to finish" : "Hand the phone over"}
+          tone="theirs"
+          active={listening === "them"}
+          disabled={busy && listening !== "them"}
+          onPress={() => press("them")}
+        />
+      </div>
+
+      <p className="min-h-5 text-center text-sm text-soft" aria-live="polite">
+        {partial ? (
+          <span className="italic">{partial}</span>
+        ) : listening ? (
+          "Listening…"
+        ) : thinking ? (
+          "Interpreting…"
+        ) : (
+          ""
+        )}
+      </p>
+
+      {error && (
+        <p className="rounded-md bg-no-tint px-3 py-2 text-center text-sm font-semibold text-no-deep">
+          {error}
+        </p>
+      )}
+
+      {latest && (
+        <Card
+          pair={pair}
+          turn={latest}
+          onReplay={() => speak(latest.said, otherSide(latest.side))}
+        />
+      )}
+
+      <div className="flex gap-2">
+        <input
+          value={typed}
+          onChange={(e) => setTyped(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && typed.trim()) send();
+          }}
+          placeholder={`…or type it, in ${pair.us.language} or ${pair.them.language}`}
+          className="w-full rounded-md border border-line bg-surface px-3 py-2.5 text-sm"
+        />
+        <button
+          type="button"
+          onClick={send}
+          disabled={busy || !typed.trim()}
+          className="shrink-0 rounded-md bg-felt px-4 py-2.5 text-sm font-semibold text-[#f1eee4] disabled:opacity-40"
+        >
+          Say it
+        </button>
+      </div>
+
+      {note && <p className="text-center text-xs text-soft">{note}</p>}
+
+      {turns.length > 1 && (
+        <div className="card list">
+          {[...turns]
+            .slice(0, -1)
+            .reverse()
+            .map((turn) => (
+              <button
+                key={turn.id}
+                type="button"
+                onClick={() => speak(turn.said, otherSide(turn.side))}
+                className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-paper"
+              >
+                <span
+                  className={`h-2 w-2 shrink-0 rounded-full ${
+                    turn.side === "us" ? "bg-felt" : "bg-gold"
+                  }`}
+                />
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-sm font-semibold">{turn.said}</span>
+                  <span className="block truncate text-xs text-soft">{turn.heard}</span>
+                </span>
+                <span aria-hidden>🔊</span>
+              </button>
+            ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Mic({
+  label,
+  sub,
+  tone,
+  active,
+  disabled,
+  onPress,
+}: {
+  label: string;
+  sub: string;
+  tone: "ours" | "theirs";
+  active: boolean;
+  disabled: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onPress}
+      disabled={disabled}
+      className={`rounded-lg px-4 py-5 text-center transition-colors disabled:opacity-40 ${
+        active
+          ? "bg-no text-[#f1eee4]"
+          : tone === "ours"
+            ? "bg-felt text-[#f1eee4] hover:bg-felt-deep"
+            : "bg-gold text-[#21261f] hover:brightness-95"
+      }`}
+    >
+      <span className="block text-xl leading-none">{active ? "◼" : "🎙"}</span>
+      <span className="display mt-2 block text-lg font-bold uppercase tracking-wide">{label}</span>
+      <span className="mt-0.5 block text-[11px] opacity-80">{sub}</span>
+    </button>
+  );
+}
+
+/** The turn being held out to somebody, at the size that survives a night market. */
+function Card({ pair, turn, onReplay }: { pair: Pair; turn: Turn; onReplay: () => void }) {
+  const outbound = turn.side === "us";
+  const target = speakerOf(pair, otherSide(turn.side));
+  return (
+    <div className="card overflow-hidden">
+      <div aria-hidden className="zari" />
+      <div className="p-5 text-center">
+        <p className="eyebrow">{outbound ? "Show them this" : "They said"}</p>
+        <p
+          lang={target.code}
+          className={`mt-2 font-semibold leading-snug ${outbound ? "text-4xl" : "text-3xl"}`}
+        >
+          {turn.said}
+        </p>
+        {turn.roman && <p className="mono mt-2 text-sm text-soft">{turn.roman}</p>}
+        <p className="mt-3 text-xs text-soft">
+          {outbound ? `You said “${turn.heard}”` : `They said “${turn.heard}”`}
+          {turn.literal && outbound && ` · literally: ${turn.literal}`}
+        </p>
+        <button
+          type="button"
+          onClick={onReplay}
+          className="mt-4 rounded-md border border-line px-3 py-1.5 text-sm font-semibold hover:bg-paper"
+        >
+          🔊 Again
+        </button>
+      </div>
+    </div>
+  );
+}

@@ -64,6 +64,8 @@ export interface Lingo {
   billsEmptyTitle: string;
   billsEmptySub: string;
   allSquare: string;
+  talkTitle: (language: string) => string;
+  talkSub: (language: string) => string;
 }
 
 /**
@@ -85,6 +87,8 @@ function hydrate(raw: RawLingo): Lingo {
     ...raw,
     leaderboardSub: (min) => fill(raw.leaderboardSub, { min }),
     youWon: (amount) => fill(raw.youWon, { amount }),
+    talkTitle: (language) => fill(raw.talkTitle, { language }),
+    talkSub: (language) => fill(raw.talkSub, { language }),
     youLost: (amount) => fill(raw.youLost, { amount }),
   };
 }
