@@ -92,6 +92,14 @@ export const trips = pgTable("trips", {
   endsOn: date("ends_on", { mode: "string" }),
   /** Exposure cap per prediction, in whole pies. */
   maxStakePies: integer("max_stake_pies").notNull().default(10),
+  /**
+   * Private trips (docs/private-trips.md): which trip-key epoch new events
+   * must be sealed under. Null until the trip is sealed — the flag Phase 1
+   * reads to tell a sealed trip from one still on the plaintext tables.
+   */
+  keyEpoch: integer("key_epoch"),
+  /** The name under the trip key, once sealed; `name` empties then (Phase 2). */
+  nameEnc: text("name_enc"),
   createdBy: text("created_by")
     .notNull()
     .references(() => members.id),
@@ -155,6 +163,16 @@ export const invites = pgTable("invites", {
   isOpen: boolean("is_open").notNull().default(false),
   /** What spends a personal invite, and what counts arrivals through an open one. */
   useCount: integer("use_count").notNull().default(0),
+  /**
+   * Private trips: the trip key wrapped under the link's secret, which lives
+   * in the URL fragment and never reaches this server; the epoch it is; and
+   * the join page's peek at the table, wrapped under the same secret.
+   * Null on links minted before the trip was sealed — they seat a member
+   * keyless, and the key comes by rekey.
+   */
+  wrappedKey: text("wrapped_key"),
+  epoch: integer("epoch"),
+  preview: text("preview"),
   invitedBy: text("invited_by")
     .notNull()
     .references(() => members.id),
@@ -184,6 +202,12 @@ export const recoveries = pgTable(
     expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
     /** Set the moment a passkey is added through it; the row is spent from then on. */
     usedAt: timestamp("used_at", { withTimezone: true }),
+    /**
+     * Private trips: the trip key under the link's secret, put there by the
+     * organiser's browser. Null when minted from the console, which can give
+     * a seat back and nothing more.
+     */
+    wrappedKey: text("wrapped_key"),
   },
   (t) => [index("recoveries_member_idx").on(t.memberId)],
 );
@@ -466,6 +490,109 @@ export const phrases = pgTable(
   ],
 );
 
+// ---------- private trips (docs/private-trips.md) ----------
+//
+// A sealed trip is one append-only table of envelopes the server orders and
+// cannot open, a keyring blob per member it cannot open either, and links
+// that carry keys under secrets it never sees. Nothing here is read by a page
+// yet — Phase 0 lands the shape and the pure modules; Phase 1 writes to it.
+
+/**
+ * Every event on a sealed trip, in the order the server received them, under
+ * the trip key for `epoch`. The server checks the author holds a seat, that
+ * `epoch` is the trip's current one, the body's size, and a rate — and can
+ * check nothing else, because the type and everything after it is inside the
+ * envelope. Positions, balances, bills, the phrasebook: all replayed from
+ * here on the phone (lib/replay.ts).
+ */
+export const events = pgTable(
+  "events",
+  {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    at: timestamp("at", { withTimezone: true }).notNull().defaultNow(),
+    tripId: text("trip_id")
+      .notNull()
+      .references(() => trips.id),
+    authorId: text("author_id")
+      .notNull()
+      .references(() => members.id),
+    epoch: integer("epoch").notNull(),
+    /** `v1.<epoch>.<iv>.<ct>` — lib/crypto.ts. */
+    body: text("body").notNull(),
+  },
+  (t) => [
+    index("events_trip_id_idx").on(t.tripId, t.id),
+    check("events_body_size", sql`length(${t.body}) <= 16384`),
+  ],
+);
+
+/**
+ * A member's keyring — every trip key they hold, by epoch — under their
+ * keyring key, which lives in their browser (and, from Phase 4, under each
+ * passkey's PRF secret). Opaque here: the server learns its size and when it
+ * changed. `version` is bumped on every write so two devices cannot silently
+ * overwrite each other.
+ */
+export const keyrings = pgTable("keyrings", {
+  memberId: text("member_id")
+    .primaryKey()
+    .references(() => members.id, { onDelete: "cascade" }),
+  blob: text("blob").notNull(),
+  version: integer("version").notNull().default(1),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+/**
+ * A key for a member who already has a seat: how a phone that lost its
+ * keyring gets one back from anyone on the trip. Same primitive as an invite
+ * — a code in a URL, the key under the fragment's secret — pointed at a
+ * member instead of a stranger, so it is short-lived, single-use, and
+ * redeemable only by a session that *is* `for_member_id`. A stray one adds a
+ * key to a phone that already holds that member's seat, and nothing else.
+ */
+export const rekeys = pgTable(
+  "rekeys",
+  {
+    code: text("code").primaryKey(),
+    tripId: text("trip_id")
+      .notNull()
+      .references(() => trips.id),
+    forMemberId: text("for_member_id")
+      .notNull()
+      .references(() => members.id),
+    mintedBy: text("minted_by")
+      .notNull()
+      .references(() => members.id),
+    wrappedKey: text("wrapped_key").notNull(),
+    epoch: integer("epoch").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    usedAt: timestamp("used_at", { withTimezone: true }),
+  },
+  (t) => [index("rekeys_trip_member_idx").on(t.tripId, t.forMemberId)],
+);
+
+/**
+ * The one deliberate plaintext on a sealed trip: a prediction's verdict, put
+ * on the public card page by a member who tapped *share*. First names and
+ * pies, as the card shows today — chosen, not leaked. Unpublished by the
+ * publisher or an organiser.
+ */
+export const cards = pgTable("cards", {
+  marketId: text("market_id").primaryKey(),
+  tripId: text("trip_id")
+    .notNull()
+    .references(() => trips.id),
+  publishedBy: text("published_by")
+    .notNull()
+    .references(() => members.id),
+  at: timestamp("at", { withTimezone: true }).notNull().defaultNow(),
+  question: text("question").notNull(),
+  verdict: text("verdict").notNull(),
+  /** `[{ name, pies }]` — what the card prints, nothing the card does not. */
+  lines: text("lines").notNull(),
+});
+
 export type Member = typeof members.$inferSelect;
 export type Trip = typeof trips.$inferSelect;
 export type MembershipRow = typeof memberships.$inferSelect;
@@ -482,3 +609,7 @@ export type BillRevisionRow = typeof billRevisions.$inferSelect;
 export type BillEntryRow = typeof billEntries.$inferSelect;
 export type CommentRow = typeof comments.$inferSelect;
 export type PhraseRow = typeof phrases.$inferSelect;
+export type EventRow = typeof events.$inferSelect;
+export type KeyringRow = typeof keyrings.$inferSelect;
+export type RekeyRow = typeof rekeys.$inferSelect;
+export type CardRow = typeof cards.$inferSelect;

@@ -14,7 +14,10 @@ beside it: `lib/engine` (settlement), `lib/stats` (outcomes/roll-ups),
 (recovery links), `lib/talk` (the language pair, turn-taking, voice choice),
 `lib/phrases` (kept phrases: slugs and which voice says one again),
 `lib/trips` (what a trip is: its two currencies, its phase, its rules),
-`lib/starters` (the first predictions a trip offers).
+`lib/starters` (the first predictions a trip offers),
+`lib/crypto` (sealing: envelopes, blobs, link wraps), `lib/keys` (a member's
+keyring and the links that carry keys), `lib/events` (what a member can do on
+a sealed trip), `lib/replay` (the rules of a sealed trip, run on every phone).
 Read the test before changing a module; change them together.
 
 ## Commands (pnpm 11)
@@ -99,6 +102,14 @@ Pre-commit (husky): biome on staged files, tsc, full test suite.
   before scale. Account deletion (`deleteAccount`) scrubs everything
   identifying in one transaction and leaves the ledger rows under "Departed
   member", because append-only means a payout cannot vanish.
+- **Private trips** (end-to-end encryption) are being built to
+  `docs/private-trips.md` — read it before touching invites, recovery, the
+  ledger, or `lib/data.ts`. Phase 0 landed the pure modules, the schema
+  (`events`, `keyrings`, `rekeys`, `cards`, the wrapped-key columns) and
+  `components/keyring.tsx`; nothing writes to `events` yet and every page still
+  reads the plaintext tables. Do not add a plaintext content column or a
+  server-side check that needs plaintext: both are about to have nothing to
+  read.
 - `lib/env.ts` is the only file reading `process.env` (zod-validated).
 - Relative imports in `lib/` and `scripts/` carry explicit `.ts` extensions so
   plain `node scripts/*.ts` runs (Node type stripping).

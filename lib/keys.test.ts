@@ -1,0 +1,164 @@
+import { describe, expect, it } from "vitest";
+import { CryptoError, exportKey, newKey, toBase64Url } from "./crypto.ts";
+import {
+  decodeKeyring,
+  emptyKeyring,
+  encodeKeyring,
+  holdsKey,
+  KeyringError,
+  latestEpoch,
+  linkSecretOf,
+  linkWithSecret,
+  newLinkSecret,
+  openKeyring,
+  parseKeyring,
+  sealKeyring,
+  secretFromFragment,
+  tripCryptoKey,
+  tripKeyOf,
+  unwrapKeyringFromDevice,
+  unwrapPreview,
+  unwrapTripKey,
+  withLinkSecret,
+  withoutLink,
+  withoutTrip,
+  withTripKey,
+  wrapKeyringForDevice,
+  wrapPreview,
+  wrapTripKey,
+} from "./keys.ts";
+
+const rawKey = () => newKey().then(exportKey);
+
+describe("keyring", () => {
+  it("starts empty and holds nothing", () => {
+    const kr = emptyKeyring();
+    expect(holdsKey(kr, "t1", 0)).toBe(false);
+    expect(latestEpoch(kr, "t1")).toBeNull();
+    expect(tripKeyOf(kr, "t1", 0)).toBeNull();
+  });
+
+  it("adds trip keys by epoch without mutating", async () => {
+    const k0 = await rawKey();
+    const k1 = await rawKey();
+    const kr0 = emptyKeyring();
+    const kr1 = withTripKey(kr0, "t1", 0, k0);
+    const kr2 = withTripKey(kr1, "t1", 1, k1);
+    expect(kr0.trips).toEqual({});
+    expect(tripKeyOf(kr2, "t1", 0)).toEqual(k0);
+    expect(tripKeyOf(kr2, "t1", 1)).toEqual(k1);
+    expect(latestEpoch(kr2, "t1")).toBe(1);
+    expect(holdsKey(kr2, "t1", 2)).toBe(false);
+  });
+
+  it("drops a trip whole", async () => {
+    const kr = withTripKey(
+      withTripKey(emptyKeyring(), "t1", 0, await rawKey()),
+      "t2",
+      0,
+      await rawKey(),
+    );
+    const less = withoutTrip(kr, "t1");
+    expect(latestEpoch(less, "t1")).toBeNull();
+    expect(latestEpoch(less, "t2")).toBe(0);
+  });
+
+  it("refuses bad epochs and short keys", async () => {
+    expect(() => withTripKey(emptyKeyring(), "t1", -1, new Uint8Array(32))).toThrow(KeyringError);
+    expect(() => withTripKey(emptyKeyring(), "t1", 0, new Uint8Array(16))).toThrow(KeyringError);
+  });
+
+  it("gives back a usable CryptoKey", async () => {
+    const kr = withTripKey(emptyKeyring(), "t1", 3, await rawKey());
+    expect(await tripCryptoKey(kr, "t1", 3)).not.toBeNull();
+    expect(await tripCryptoKey(kr, "t1", 2)).toBeNull();
+  });
+
+  it("keeps link secrets by code", () => {
+    const s = newLinkSecret();
+    const kr = withLinkSecret(emptyKeyring(), "code-a", s);
+    expect(linkSecretOf(kr, "code-a")).toEqual(s);
+    expect(linkSecretOf(kr, "code-b")).toBeNull();
+    expect(linkSecretOf(withoutLink(kr, "code-a"), "code-a")).toBeNull();
+  });
+
+  it("encodes and decodes losslessly", async () => {
+    const kr = withLinkSecret(
+      withTripKey(emptyKeyring(), "t1", 0, await rawKey()),
+      "c",
+      newLinkSecret(),
+    );
+    expect(decodeKeyring(encodeKeyring(kr))).toEqual(kr);
+  });
+
+  it("refuses shapes that are not keyrings", () => {
+    expect(() => parseKeyring(null)).toThrow(KeyringError);
+    expect(() => parseKeyring({ v: 2, trips: {}, links: {} })).toThrow(KeyringError);
+    expect(() => parseKeyring({ v: 1, trips: [], links: {} })).toThrow(KeyringError);
+    expect(() => parseKeyring({ v: 1, trips: { t: { "0": 1 } }, links: {} })).toThrow(KeyringError);
+    expect(() => parseKeyring({ v: 1, trips: {}, links: { c: 1 } })).toThrow(KeyringError);
+    expect(() => parseKeyring({ v: 1, trips: {}, links: {}, mk: "x" })).toThrow(KeyringError);
+    expect(() => decodeKeyring(new Uint8Array([1, 2, 3]))).toThrow(KeyringError);
+  });
+
+  it("keeps an mk when there is one", () => {
+    const mk = { kty: "EC", crv: "P-256", x: "a", y: "b", d: "c" };
+    expect(parseKeyring({ v: 1, trips: {}, links: {}, mk }).mk).toEqual(mk);
+  });
+
+  it("seals under the keyring key and opens with it, not another", async () => {
+    const kk = await newKey();
+    const kr = withTripKey(emptyKeyring(), "t1", 0, await rawKey());
+    const blob = await sealKeyring(kk, kr);
+    expect(await openKeyring(kk, blob)).toEqual(kr);
+    await expect(openKeyring(await newKey(), blob)).rejects.toThrow(CryptoError);
+  });
+});
+
+describe("links", () => {
+  it("puts the secret in the fragment and reads it back", () => {
+    const s = newLinkSecret();
+    const url = linkWithSecret("https://x.test/join/abc", s);
+    expect(url).toBe(`https://x.test/join/abc#${toBase64Url(s)}`);
+    expect(secretFromFragment(new URL(url).hash)).toEqual(s);
+    expect(secretFromFragment(toBase64Url(s))).toEqual(s);
+  });
+
+  it("treats a bare or malformed fragment as no secret", () => {
+    expect(secretFromFragment("")).toBeNull();
+    expect(secretFromFragment("#")).toBeNull();
+    expect(secretFromFragment("#not base64!")).toBeNull();
+    expect(secretFromFragment(`#${toBase64Url(new Uint8Array(16))}`)).toBeNull();
+  });
+
+  it("wraps a trip key for one kind of link", async () => {
+    const s = newLinkSecret();
+    const raw = await rawKey();
+    const blob = await wrapTripKey(s, "invite", raw);
+    expect(await unwrapTripKey(s, "invite", blob)).toEqual(raw);
+    await expect(unwrapTripKey(s, "recover", blob)).rejects.toThrow(CryptoError);
+    await expect(unwrapTripKey(newLinkSecret(), "invite", blob)).rejects.toThrow(CryptoError);
+  });
+
+  it("refuses to wrap something that is not a trip key", async () => {
+    await expect(wrapTripKey(newLinkSecret(), "invite", new Uint8Array(8))).rejects.toThrow(
+      KeyringError,
+    );
+  });
+
+  it("carries a whole keyring to another device", async () => {
+    const s = newLinkSecret();
+    const kr = withTripKey(emptyKeyring(), "t1", 2, await rawKey());
+    const blob = await wrapKeyringForDevice(s, kr);
+    expect(await unwrapKeyringFromDevice(s, blob)).toEqual(kr);
+    await expect(unwrapTripKey(s, "device", blob)).rejects.toThrow(KeyringError);
+  });
+
+  it("carries the join preview under the same secret, apart from the key", async () => {
+    const s = newLinkSecret();
+    const preview = { name: "Chiang Pai", names: ["A", "B"], questions: ["Will it rain?"] };
+    const blob = await wrapPreview(s, preview);
+    expect(await unwrapPreview(s, blob)).toEqual(preview);
+    await expect(unwrapTripKey(s, "invite", blob)).rejects.toThrow(CryptoError);
+  });
+});
