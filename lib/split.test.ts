@@ -4,8 +4,10 @@ import {
   type BillForNets,
   billTotalC,
   buildEntries,
+  CURRENCIES,
   equalShares,
   fmtMoney,
+  isCurrency,
   memberBillLine,
   memberNets,
   nets,
@@ -339,6 +341,11 @@ describe("parseAmount", () => {
     expect(parseAmount("0.05")).toBe(5);
   });
 
+  it("holds a zero-decimal-currency bill — dong and rupiah run to the tens of millions", () => {
+    expect(parseAmount("30,000,000")).toBe(3_000_000_000);
+    expect(parseAmount("60000000")).toBe(6_000_000_000);
+  });
+
   it("rejects anything that isn't money", () => {
     expect(parseAmount("")).toBeNull();
     expect(parseAmount("-5")).toBeNull();
@@ -346,5 +353,20 @@ describe("parseAmount", () => {
     expect(parseAmount("12.")).toBeNull();
     expect(parseAmount("abc")).toBeNull();
     expect(parseAmount("1e3")).toBeNull();
+  });
+});
+
+describe("money without minor units", () => {
+  it("formats đồng and rupiah whole, with symbols and grouping", () => {
+    expect(fmtMoney("vnd", 25_000_000)).toBe("₫250,000");
+    expect(fmtMoney("idr", 1_500_050)).toBe("Rp15,001");
+    expect(fmtMoney("jpy", -120_000, { sign: true })).toBe("−¥1,200");
+    expect(fmtMoney("aed", 12_345)).toBe("AED 123.45");
+    expect(fmtMoney("inr", 123_456_700)).toBe("₹12,34,567");
+  });
+  it("knows every currency a destination can spend", () => {
+    expect(isCurrency("thb")).toBe(true);
+    expect(isCurrency("btc")).toBe(false);
+    expect(CURRENCIES.length).toBeGreaterThan(10);
   });
 });
