@@ -68,10 +68,10 @@ export function MemberPage({
 
   return (
     <div className="mx-auto max-w-3xl">
-      <div className="flex items-center gap-4">
+      <div className="flex flex-wrap items-center gap-4">
         <Avatar member={member} size={56} />
-        <div>
-          <h1 className="display text-4xl font-extrabold">{member.name}</h1>
+        <div className="min-w-48 flex-1">
+          <h1 className="display break-words text-3xl font-extrabold sm:text-4xl">{member.name}</h1>
           <p className="text-sm text-soft">
             At the table since {fmtDate(member.joinedAt)}
             {member.role === "organiser" && " · organiser"}
@@ -96,7 +96,7 @@ export function MemberPage({
         {isMe && (
           <Link
             href={routes.account}
-            className="ml-auto rounded-md border border-line px-3 py-1.5 text-sm font-semibold hover:bg-surface"
+            className="shrink-0 rounded-md border border-line px-3 py-1.5 text-sm font-semibold hover:bg-surface"
           >
             Your account →
           </Link>
@@ -114,6 +114,7 @@ export function MemberPage({
         <Stat label="Record" value={`${stats.wins}–${stats.losses}`} />
         <Stat
           label="Best / worst"
+          wide
           value={
             stats.resolvedCount > 0
               ? `${fmtPies(stats.biggestWinC, { sign: true })} / ${fmtPies(stats.biggestLossC, { sign: true })}`
@@ -267,23 +268,27 @@ export function MemberPage({
           Every pie movement, newest first. The balance column is derived by replaying the whole
           history — nothing is ever overwritten.
         </p>
-        <div className="mt-3 overflow-x-auto card">
-          <table className="w-full min-w-[520px] text-sm">
+        {/* On a phone the "when" goes under the "what" rather than in a column of its own. */}
+        <div className="mt-3 card">
+          <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-line text-left text-[11px] uppercase tracking-wider text-soft">
-                <th className="px-4 py-2">When</th>
-                <th className="px-2 py-2">What</th>
+                <th className="hidden px-4 py-2 sm:table-cell">When</th>
+                <th className="px-3 py-2 sm:px-2">What</th>
                 <th className="px-2 py-2 text-right">Δ pies</th>
-                <th className="px-4 py-2 text-right">Balance</th>
+                <th className="px-3 py-2 text-right sm:px-4">Balance</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-line">
               {withBalance.map(({ item, afterC }) => (
                 <tr key={item.row.id}>
-                  <td className="whitespace-nowrap px-4 py-2 text-xs text-soft">
+                  <td className="hidden whitespace-nowrap px-4 py-2 text-xs text-soft sm:table-cell">
                     {timeAgo(item.row.at)}
                   </td>
-                  <td className="px-2 py-2">
+                  <td className="px-3 py-2 sm:px-2">
+                    <span className="block text-xs text-soft sm:hidden">
+                      {timeAgo(item.row.at)}
+                    </span>
                     {describe(item.row.kind, item.row.side, t)}
                     {item.market && (
                       <>
@@ -297,12 +302,16 @@ export function MemberPage({
                       </>
                     )}
                   </td>
-                  <td className={`mono px-2 py-2 text-right ${tone(item.row.balanceDeltaC)}`}>
+                  <td
+                    className={`mono whitespace-nowrap px-2 py-2 text-right ${tone(item.row.balanceDeltaC)}`}
+                  >
                     {item.row.balanceDeltaC === 0
                       ? "·"
                       : fmtPies(item.row.balanceDeltaC, { sign: true })}
                   </td>
-                  <td className="mono px-4 py-2 text-right font-semibold">{fmtPies(afterC)}</td>
+                  <td className="mono whitespace-nowrap px-3 py-2 text-right font-semibold sm:px-4">
+                    {fmtPies(afterC)}
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -336,13 +345,16 @@ function Stat({
   label,
   value,
   tone,
+  wide,
 }: {
   label: string;
   value: React.ReactNode;
   tone?: "up" | "down";
+  /** Takes the whole row on a phone, where two columns would leave it alone. */
+  wide?: boolean;
 }) {
   return (
-    <div className="card px-3 py-2">
+    <div className={`card px-3 py-2 ${wide ? "col-span-2 sm:col-span-1" : ""}`}>
       <p className="text-[10px] font-semibold uppercase tracking-wider text-soft">{label}</p>
       <p
         className={`mono mt-0.5 text-lg font-bold ${

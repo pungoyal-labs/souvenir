@@ -17,17 +17,17 @@ export default async function AccountPage() {
 
   return (
     <div className="mx-auto max-w-2xl">
-      <div className="flex items-center gap-4">
+      <div className="flex flex-wrap items-center gap-4">
         <Avatar member={me} size={56} />
-        <div>
+        <div className="min-w-0">
           <p className="eyebrow">Your account</p>
-          <h1 className="display text-4xl font-extrabold">{me.name}</h1>
-          <p className="text-sm text-soft">
+          <h1 className="display break-words text-3xl font-extrabold sm:text-4xl">{me.name}</h1>
+          <p className="break-words text-sm text-soft">
             Since {fmtDate(me.joinedAt)} · {trips.length} trip{trips.length === 1 ? "" : "s"}
             {me.email && ` · ${me.email}`}
           </p>
         </div>
-        <div className="ml-auto flex flex-col items-end gap-2">
+        <div className="flex w-full flex-col gap-2 sm:ml-auto sm:w-auto sm:items-end">
           <LingoPicker current={me.lingo} />
           <AvatarPicker hasCustom={me.avatarUpdatedAt != null} />
         </div>

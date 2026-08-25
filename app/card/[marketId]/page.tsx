@@ -110,7 +110,7 @@ export default async function CardPage({ params }: { params: Promise<{ marketId:
         </div>
         <Link
           href={me ? routes.trips : routes.home}
-          className="rounded-md bg-felt px-3 py-2 text-sm font-semibold text-white hover:bg-felt-deep"
+          className="shrink-0 rounded-md bg-felt px-3 py-2 text-sm font-semibold text-white hover:bg-felt-deep"
         >
           {me ? "Your trips" : "Start yours"}
         </Link>

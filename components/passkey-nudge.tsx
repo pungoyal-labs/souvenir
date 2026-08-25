@@ -12,7 +12,7 @@ export function PasskeyNudge({ needsPicture }: { memberId?: string; needsPicture
   return (
     <div className="mx-auto mt-4 max-w-5xl px-4">
       <div className="card flex flex-wrap items-center gap-x-4 gap-y-3 border-gold/40 bg-gold/10 px-4 py-3">
-        <div className="min-w-0 flex-1">
+        <div className="min-w-64 flex-1">
           <p className="font-semibold">Add a passkey so this phone can sign you in.</p>
           <p className="text-sm text-soft">
             One tap with Face ID, a fingerprint, or your phone. No password, no email, nothing about

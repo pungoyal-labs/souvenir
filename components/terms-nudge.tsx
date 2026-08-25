@@ -16,7 +16,7 @@ export function TermsNudge() {
   return (
     <div className="mx-auto mt-4 max-w-5xl px-4">
       <div className="card flex flex-wrap items-center gap-x-4 gap-y-3 border-gold/40 bg-gold/10 px-4 py-3">
-        <div className="min-w-0 flex-1">
+        <div className="min-w-64 flex-1">
           <p className="font-semibold">One tick before you carry on.</p>
           <p className="text-sm text-soft">
             Chiang Pai is for adults, pies are never money, and we keep only what the game needs.

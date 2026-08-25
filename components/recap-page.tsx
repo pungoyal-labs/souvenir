@@ -90,16 +90,20 @@ export function RecapPage({ eyebrow, minResolved }: { eyebrow: string; minResolv
               <ul className="mt-3 card list">
                 {recap.rivalries.slice(0, 6).map((r) => (
                   <li key={`${r.a}-${r.b}`} className="flex items-center gap-3 px-4 py-2.5 text-sm">
-                    <span className={`font-semibold ${r.aWins > r.bWins ? "text-felt" : ""}`}>
+                    <span
+                      className={`min-w-0 truncate font-semibold ${r.aWins > r.bWins ? "text-felt" : ""}`}
+                    >
                       {name(r.a)}
                     </span>
-                    <span className="mono rounded bg-surface px-2 py-0.5 text-xs">
+                    <span className="mono shrink-0 rounded bg-surface px-2 py-0.5 text-xs">
                       {r.aWins}–{r.bWins}
                     </span>
-                    <span className={`font-semibold ${r.bWins > r.aWins ? "text-felt" : ""}`}>
+                    <span
+                      className={`min-w-0 truncate font-semibold ${r.bWins > r.aWins ? "text-felt" : ""}`}
+                    >
                       {name(r.b)}
                     </span>
-                    <span className="ml-auto text-xs text-soft">
+                    <span className="ml-auto shrink-0 text-xs text-soft">
                       {r.clashes} clash{r.clashes === 1 ? "" : "es"}
                     </span>
                   </li>

@@ -197,9 +197,12 @@ function Row({
 }) {
   return (
     <li className={`flex items-center gap-3 px-4 py-2.5 text-sm ${className}`}>
-      <span className="min-w-0 flex-1 truncate">
+      <span className="min-w-0 flex-1">
         <span className="font-semibold">{who}</span>
-        <span className="text-soft"> · {detail}</span>
+        <span className="block text-xs text-soft sm:inline sm:text-sm">
+          <span className="hidden sm:inline"> · </span>
+          {detail}
+        </span>
       </span>
       {children}
     </li>

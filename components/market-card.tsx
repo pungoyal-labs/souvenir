@@ -55,7 +55,9 @@ export function MarketCard({
         </span>
       </div>
 
-      <h3 className="display mt-2 text-2xl font-bold leading-tight">{market.question}</h3>
+      <h3 className="display mt-2 break-words text-2xl font-bold leading-tight">
+        {market.question}
+      </h3>
 
       {social.length > 0 && <p className="mono mt-2 text-xs text-soft">{social.join(" · ")}</p>}
 

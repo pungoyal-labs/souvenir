@@ -62,7 +62,7 @@ function Keyless() {
             <p className="font-semibold">Your other phone</p>
             <p className="mt-0.5 text-xs text-soft">
               On the phone that has the key, open this trip's table page and tap{" "}
-              <em>Send the key</em> next to your own name. Open that link here.
+              <em>Key for my other phone</em> next to your own name. Open that link here.
             </p>
           </div>
           <div className="rounded-md border border-line bg-surface p-3">

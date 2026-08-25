@@ -41,7 +41,7 @@ export function TripNav({
           <Link
             key={tab.href}
             href={tab.href}
-            className={`relative whitespace-nowrap px-3 py-2 font-semibold ${
+            className={`relative flex-1 whitespace-nowrap px-1 py-2 text-center font-semibold sm:flex-none sm:px-3 ${
               active ? "border-b-[3px] border-felt text-ink" : "text-soft hover:text-ink"
             }`}
           >

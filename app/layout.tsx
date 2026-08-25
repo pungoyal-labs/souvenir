@@ -80,7 +80,8 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       <body
         className={`${display.variable} ${body.variable} ${mono.variable} min-h-screen antialiased`}
       >
-        <header className="bg-felt-deep text-[#f1eee4]">
+        {/* Installed to a home screen, the page runs under the status bar: pad the header down by the notch. */}
+        <header className="bg-felt-deep pt-[env(safe-area-inset-top)] text-[#f1eee4]">
           <div className="mx-auto flex max-w-5xl flex-wrap items-center gap-x-4 gap-y-1 px-4 py-3">
             <Link href={member ? routes.trips : routes.home} className="flex items-center gap-2.5">
               <Logo size={30} className="rounded-[22%] ring-1 ring-white/20" />
@@ -91,15 +92,19 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             <div className="ml-auto flex items-center gap-3">
               {member ? (
                 <>
-                  <Link href={routes.trips} className="rounded px-2 py-1 text-sm hover:bg-white/10">
+                  {/* The logo already leads to the trips on a phone, where the row has no room for the word. */}
+                  <Link
+                    href={routes.trips}
+                    className="hidden rounded px-2 py-1 text-sm hover:bg-white/10 sm:inline"
+                  >
                     Trips
                   </Link>
                   <Link
                     href={routes.account}
-                    className="flex items-center gap-2 rounded-full bg-white/10 py-1 pl-3 pr-1 hover:bg-white/20"
+                    className="flex items-center gap-2 rounded-full bg-white/10 p-1 hover:bg-white/20 sm:pl-3"
                     title="Your account"
                   >
-                    <span className="text-sm">{member.name}</span>
+                    <span className="hidden text-sm sm:inline">{member.name}</span>
                     <Avatar member={member} size={26} />
                   </Link>
                   <form action={signOutAction}>
@@ -135,7 +140,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <KeyringProvider signedIn={member != null}>
           <main className="mx-auto max-w-5xl px-4 py-6">{children}</main>
         </KeyringProvider>
-        <footer className="mx-auto flex max-w-5xl flex-wrap items-center gap-x-4 gap-y-1 px-4 pb-8 pt-4 text-xs text-soft">
+        <footer className="mx-auto flex max-w-5xl flex-wrap items-center gap-x-4 gap-y-1 px-4 pb-[calc(2rem+env(safe-area-inset-bottom))] pt-4 text-xs text-soft">
           <span>{t.footer}</span>
           <span className="ml-auto flex gap-3">
             <Link href={routes.terms} className="hover:underline">

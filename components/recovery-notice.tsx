@@ -32,7 +32,7 @@ export function RecoveryNotice({
   return (
     <div className="mx-auto mt-4 max-w-5xl px-4">
       <div className="card flex flex-wrap items-center gap-x-4 gap-y-3 border-no/40 bg-no-tint px-4 py-3">
-        <div className="min-w-0 flex-1">
+        <div className="min-w-64 flex-1">
           {live ? (
             <>
               <p className="font-semibold">A recovery link to your seat is live.</p>

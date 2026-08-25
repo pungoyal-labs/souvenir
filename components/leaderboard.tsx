@@ -68,17 +68,21 @@ export function Leaderboard({
         </p>
       )}
 
-      <div className="mt-3 overflow-x-auto card">
-        <table className="w-full min-w-[640px] text-sm">
+      {/* A phone gets rank, predictor, return and net; profit, record and
+          what was put up fold into a line under the name. Fixed layout, with
+          every phone column given its share: hidden cells still count as
+          columns when leftover width is split, and would starve the name. */}
+      <div className="mt-3 card">
+        <table className="w-full table-fixed text-sm">
           <thead>
             <tr className="border-b border-line text-left text-[11px] uppercase tracking-wider text-soft">
-              <th className="px-4 py-2.5">#</th>
-              <th className="px-2 py-2.5">Predictor</th>
-              <th className="px-2 py-2.5 text-right">Return</th>
-              <th className="px-2 py-2.5 text-right">Profit</th>
-              <th className="px-2 py-2.5 text-right">Record</th>
-              <th className="px-2 py-2.5 text-right">Put up</th>
-              <th className="px-4 py-2.5 text-right">Net</th>
+              <th className="w-[12%] px-3 py-2.5 sm:w-16 sm:px-4">#</th>
+              <th className="w-[42%] px-2 py-2.5 sm:w-auto">Predictor</th>
+              <th className="w-[20%] px-2 py-2.5 text-right sm:w-20">Return</th>
+              <th className="hidden w-20 px-2 py-2.5 text-right sm:table-cell">Profit</th>
+              <th className="hidden w-20 px-2 py-2.5 text-right sm:table-cell">Record</th>
+              <th className="hidden w-20 px-2 py-2.5 text-right sm:table-cell">Put up</th>
+              <th className="w-[26%] px-3 py-2.5 text-right sm:w-28 sm:px-4">Net</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-line">
@@ -87,7 +91,7 @@ export function Leaderboard({
               <tr className="bg-felt-tint/40">
                 <td
                   colSpan={7}
-                  className="px-4 py-1.5 text-[11px] uppercase tracking-wider text-soft"
+                  className="px-3 py-1.5 text-[11px] uppercase tracking-wider text-soft sm:px-4"
                 >
                   Calibrating — {t.calibratingSub}
                 </td>
@@ -127,7 +131,7 @@ function Row({
 }) {
   return (
     <tr className={isMe ? "bg-felt-tint/50" : undefined}>
-      <td className="px-4 py-2.5">
+      <td className="px-3 py-2.5 sm:px-4">
         {rank === null ? (
           <span className="mono text-[11px] text-soft">
             {s.resolvedCount}/{minResolved}
@@ -136,17 +140,20 @@ function Row({
           <span className="display text-lg font-bold">{medal(rank)}</span>
         )}
       </td>
-      <td className="px-2 py-2.5">
+      <td className="min-w-0 px-2 py-2.5">
         <div className="flex items-center gap-2">
           <Avatar member={s.member} size={30} />
           <div className="min-w-0">
             <Link
               href={routes.member(tripId, s.member.id)}
-              className="font-semibold hover:underline"
+              className="block truncate font-semibold hover:underline"
             >
               {s.member.name}
               {isMe && <span className="font-normal text-soft"> (you)</span>}
             </Link>
+            <p className="mono truncate text-[11px] text-soft sm:hidden">
+              {s.wins}–{s.losses} · <Pies c={s.profitC} sign /> on <Pies c={s.wageredC} />
+            </p>
             <p className="truncate text-[11px] text-soft">
               joined {fmtDate(s.member.joinedAt)} ·{" "}
               {hasPasskey ? (
@@ -167,16 +174,16 @@ function Row({
       >
         {s.roi === null ? "—" : fmtPct(s.roi)}
       </td>
-      <td className="mono px-2 py-2.5 text-right">
+      <td className="mono hidden px-2 py-2.5 text-right sm:table-cell">
         <Pies c={s.profitC} sign />
       </td>
-      <td className="mono px-2 py-2.5 text-right">
+      <td className="mono hidden px-2 py-2.5 text-right sm:table-cell">
         {s.wins}–{s.losses}
       </td>
-      <td className="mono px-2 py-2.5 text-right">
+      <td className="mono hidden px-2 py-2.5 text-right sm:table-cell">
         <Pies c={s.wageredC} />
       </td>
-      <td className="px-4 py-2.5 text-right">
+      <td className="px-3 py-2.5 text-right sm:px-4">
         <span className="mono font-semibold">
           <Pies c={s.netC} sign />
         </span>

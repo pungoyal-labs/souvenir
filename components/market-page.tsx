@@ -91,7 +91,9 @@ export function MarketPage({
         </span>
       </div>
 
-      <h1 className="display mt-2 text-4xl font-extrabold leading-tight">{market.question}</h1>
+      <h1 className="display mt-2 break-words text-4xl font-extrabold leading-tight">
+        {market.question}
+      </h1>
 
       <ReactionBar
         marketId={market.id}
@@ -177,12 +179,12 @@ export function MarketPage({
                 <Avatar member={p.member} size={28} />
                 <Link
                   href={routes.member(tripId, p.member.id)}
-                  className="font-semibold hover:underline"
+                  className="min-w-0 truncate font-semibold hover:underline"
                 >
                   {p.member.name}
                   {p.member.id === me.id && <span className="text-soft"> (you)</span>}
                 </Link>
-                <span className="ml-auto flex items-center gap-2">
+                <span className="ml-auto flex shrink-0 items-center gap-2">
                   <span className="mono font-bold">
                     <Pies c={p.stakeC} />
                   </span>

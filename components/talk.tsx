@@ -348,7 +348,7 @@ export function Talk({
   return (
     <div className="space-y-4">
       {pair.particles && (
-        <div className="flex items-center justify-center gap-2">
+        <div className="flex flex-wrap items-center justify-center gap-2">
           <span className="text-[11px] font-semibold uppercase tracking-wider text-soft">
             You end sentences with
           </span>
@@ -590,7 +590,7 @@ function Card({
         <p className="eyebrow">{outbound ? "Show them this" : "They said"}</p>
         <p
           lang={target.code}
-          className={`mt-2 font-semibold leading-snug ${outbound ? "text-4xl" : "text-3xl"}`}
+          className={`mt-2 break-words font-semibold leading-snug ${outbound ? "text-4xl" : "text-3xl"}`}
         >
           {turn.said}
         </p>

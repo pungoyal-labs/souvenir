@@ -133,6 +133,17 @@ body {
   outline-offset: 2px;
 }
 
+/* iOS Safari zooms the page into any field set under 16px. On a touch screen
+   no field goes under it (this rule is unlayered, so it wins over a text-sm
+   utility); the few fields set larger say so with text-lg!. */
+@media (pointer: coarse) {
+  input,
+  select,
+  textarea {
+    font-size: 1rem;
+  }
+}
+
 /* Signature trim: a Mysore-silk zari border — a solid gold band with the
    classic temple-border triangles hanging off it. Sits under the header and
    on the sign-in slip. Fixed gold: it always trims the dark felt band, and

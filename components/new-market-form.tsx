@@ -73,7 +73,7 @@ export function NewMarketForm({
           onChange={(e) => setQuestion(e.target.value)}
           maxLength={200}
           placeholder={t.questionPlaceholder}
-          className="mt-1 w-full rounded-md border border-line bg-surface px-3 py-2.5 text-lg"
+          className="mt-1 w-full rounded-md border border-line bg-surface px-3 py-2.5 text-lg!"
         />
       </label>
 

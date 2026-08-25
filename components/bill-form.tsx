@@ -217,7 +217,7 @@ export function BillForm({
               inputMode="decimal"
               placeholder="0"
               aria-label="Amount"
-              className="mono w-32 rounded-md border border-line bg-surface px-3 py-2 text-lg font-bold focus:outline-none focus:ring-2 focus:ring-felt"
+              className="mono w-32 rounded-md border border-line bg-surface px-3 py-2 text-lg! font-bold focus:outline-none focus:ring-2 focus:ring-felt"
             />
           ) : (
             <span className="mono text-lg font-bold">{fmtMoney(currency, totalC)}</span>
