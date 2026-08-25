@@ -51,21 +51,28 @@ Pre-commit (husky): biome on staged files, tsc, full test suite.
   creator resolves, organiser reopens, zero-sum — are `lib/replay.ts`, run on
   every phone over the whole log (`components/trip-store.tsx`), and the pages
   are derived from that state by `lib/views.ts`. Never add a server-side
-  check that needs plaintext: there is none. The plaintext `markets`,
-  `ledger`, `market_views`, `market_reactions` tables and prediction
-  `comments` are the pre-sealing record, read only by `scripts/seal-trip.ts`
-  (`pnpm private:migrate`) and dropped in Phase 4 of `docs/private-trips.md`.
-  Bills are sealed the same way (`bill.rev` events, replayed by `lib/views`
-  `billsOverview`); the phrasebook and the trip's name are still plaintext
-  until Phase 2.
+  check that needs plaintext: there is none. Bills (`bill.rev`) and the
+  phrasebook (`phrase.keep`/`phrase.drop`) are events too; the trip's name
+  is sealed on its own into `trips.name_enc` (`lib/keys` `sealName`) so the
+  trips list can show it without the log. The schema has no plaintext
+  content column left — `lib/rows.ts` is the shape `Market`/`LedgerRow`
+  kept when the tables went. `trips.name` and `phrases` are legacy columns
+  from before sealing: the first organiser phone that opens such a trip with
+  its key puts them on the record (`lib/views` `resealPlan`,
+  `clearLeftovers`) and the plaintext is dropped; `pnpm stats` counts what is
+  left. Never write to them.
 - **Keys move only through people.** A key reaches a phone through a link
   fragment — invite, rekey (`lib/rekeys`, `/k/[code]`), recovery — opened by
   that phone and put in its keyring (`components/keyring.tsx`, IndexedDB).
-  The server stores keys only wrapped under secrets it has never seen. Never
-  encrypt to a public key the server supplied; never add a path that returns
-  a key to the server. The console (`pnpm recovery:link`) restores seats,
-  never keys; `pnpm private:migrate` and `pnpm seed` mint console rekey links
-  because they hold the key for the one moment it exists in the clear.
+  The keyring is also backed up under each passkey's PRF secret
+  (`keyring_wraps`, `lib/keys` `prfKeyringKey`): the authenticator derives
+  the same secret on every device the passkey syncs to, so a sign-in with
+  that passkey restores the keys by itself, and dropping the passkey drops
+  the backup. The server stores keys only wrapped under secrets it has never
+  seen. Never encrypt to a public key the server supplied; never add a path
+  that returns a key to the server. The console (`pnpm recovery:link`)
+  restores seats, never keys; `pnpm seed` mints console rekey links because
+  it holds the key for the one moment it exists in the clear.
 - The `ledger` is append-only and still the shape every derivation uses —
   `lib/replay` emits `LedgerRow`s so `lib/stats` is unchanged. Never store a
   balance, score, or profile.
@@ -133,9 +140,9 @@ Pre-commit (husky): biome on staged files, tsc, full test suite.
   member", because append-only means a payout cannot vanish.
 - **Private trips** (end-to-end encryption) are being built to
   `docs/private-trips.md` — read it before touching invites, recovery, the
-  log, or `lib/data.ts`. Phase 1 sealed predictions and bills end to end;
-  the phrasebook and the trip's name (Phase 2), key rotation on leaving
-  (Phase 3) and passkey-PRF key backup (Phase 4) are still to come. Do not add a
+  log, or `lib/data.ts`. Phases 1, 2 and 4 sealed everything a trip holds
+  and gave the keyring a passkey backup; key rotation on leaving (Phase 3)
+  and the verifiable client (Phase 5) are still to come. Do not add a
   plaintext content column.
 - `lib/env.ts` is the only file reading `process.env` (zod-validated).
 - Relative imports in `lib/` and `scripts/` carry explicit `.ts` extensions so

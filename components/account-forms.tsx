@@ -51,7 +51,7 @@ export function AccountForms({ name: initialName }: { name: string }) {
           Delete your account
         </h2>
         <p className="mt-1 text-xs text-soft">
-          Your name, email, picture, passkeys, kept phrases, and seats go at once, and nothing can
+          Your name, email, picture, passkeys, key backups, and seats go at once, and nothing can
           sign in as you again. What stays is the record every trip keeps of its own game — the pies
           you won and lost, the bills you were on, the comments you wrote — under "Departed member",
           because an append-only ledger can't forget a payout without breaking everybody else's

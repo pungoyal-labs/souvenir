@@ -58,17 +58,19 @@ The full design is [`docs/private-trips.md`](docs/private-trips.md). In short:
   for any seat) puts it on a second phone or a replacement one; a recovery link
   carries it from the organiser who minted it. The server stores keys only
   wrapped under secrets it has never seen, and no path returns one to it.
-- **What stays readable**, on purpose: the trip's shape (name, destination,
-  dates, currencies, cap), the roster and roles, and who appended what when
-  and how big it was. The phrasebook and the trip's name are sealed next.
-  A verdict card (`/card/[id]`) is plaintext because a member's phone
+- **The backup.** A passkey with the PRF extension derives the same secret on
+  every device it syncs to; the keyring is sealed under it in `keyring_wraps`
+  and restored, silently, after a sign-in with that passkey. No PRF, no
+  backup — the way back is a key link.
+- **What stays readable**, on purpose: the trip's shape (destination, dates,
+  currencies, cap), the roster and roles, and who appended what when and how
+  big it was. The name, the phrasebook and every bill are sealed like the
+  rest. A verdict card (`/card/[id]`) is plaintext because a member's phone
   published it on share; anyone on the trip can take it down.
-- **A trip that predates sealing** is moved by
-  `pnpm private:migrate "<trip name or id>"` (`scripts/seal-trip.ts`): it
-  rebuilds the plaintext record as events, refuses to commit unless replayed
-  nets and bill balances match the old tables exactly, and prints one key link
-  per member to be handed out by hand. The plaintext tables are dropped once
-  every trip is sealed.
+- **Nothing is left in the clear.** The plaintext prediction and bill tables
+  are gone. A trip named, or phrases kept, before sealing wait in two legacy
+  columns until the first organiser phone that opens the trip with its key
+  puts them on the record and drops them; `pnpm stats` counts what is left.
 
 **The tests are the spec.** Each pure module carries its documentation as a
 test file: `lib/engine.test.ts` (settlement, fuzz-tested zero-sum),
@@ -185,6 +187,5 @@ Console scripts run from the image, which has no pnpm:
 
 ```sh
 docker compose run --rm migrate node scripts/stats.ts
-docker compose run --rm migrate node scripts/seal-trip.ts "<trip name or id>"
 docker compose run --rm migrate node scripts/recovery-link.ts "<member>"
 ```

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type { LedgerRow, Market } from "./db/schema.ts";
 import type { Side } from "./engine.ts";
+import type { LedgerRow, Market } from "./rows.ts";
 import {
   marketOutcomes,
   nemesisOf,

@@ -18,9 +18,11 @@
 // to be said again on a night nobody feels like explaining themselves twice.
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { dropPhraseAction, interpretAction, keepPhraseAction } from "@/app/actions";
+import { interpretAction } from "@/app/actions";
 import {
+  keepPayload,
   MAX_PHRASE_NAME,
+  PhraseError,
   type PhraseVoice,
   type SavedPhrase,
   slugify,
@@ -41,6 +43,8 @@ import {
   warning,
   worthSaying,
 } from "@/lib/talk";
+import { phrasebook as phrasesOf } from "@/lib/views";
+import { useOpenTrip } from "./trip-store";
 
 /** SpeechRecognition, which is not in every DOM lib and not on every phone. */
 interface RecognitionLike {
@@ -70,27 +74,21 @@ function recognizer(): (new () => RecognitionLike) | null {
 }
 
 export function Talk({
-  tripId,
-  meId,
-  organiser,
   pair,
   canInterpret,
   serverSpeaks,
-  phrases,
-  phrasebookHeading,
 }: {
-  tripId: string;
-  meId: string;
-  /** Organisers can drop anybody's phrase; everyone else only their own. */
-  organiser: boolean;
   pair: Pair;
   canInterpret: boolean;
   /** A voice service is configured, for phones with no voice of their own. */
   serverSpeaks: boolean;
-  /** The trip's phrasebook, as it stood when the page was rendered. */
-  phrases: SavedPhrase[];
-  phrasebookHeading: string;
 }) {
+  const { tripId, me, t, state, append } = useOpenTrip();
+  const meId = me.id;
+  // Organisers can drop anybody's phrase; everyone else only their own.
+  const organiser = me.role === "organiser";
+  const kept = phrasesOf(state);
+  const phrasebookHeading = t.phrasebookHeading;
   const [particle, setParticle] = useState<Particle>("khrap");
   const [turns, setTurns] = useState<Turn[]>([]);
   const [listening, setListening] = useState<Side | null>(null);
@@ -100,8 +98,6 @@ export function Talk({
   const [typed, setTyped] = useState("");
   const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
   const [canListen, setCanListen] = useState(false);
-  // The phrasebook, kept in state so a save shows up without a round trip.
-  const [kept, setKept] = useState<SavedPhrase[]>(phrases);
   // Which turn is being named, if any. One at a time, wherever it was tapped.
   const [naming, setNaming] = useState<Turn | null>(null);
   const [keeping, setKeeping] = useState(false);
@@ -203,39 +199,37 @@ export function Talk({
     [pair, particle, speak, sideVoice, tripId],
   );
 
-  /** Keep a turn under a name. The server decides the slug and the language. */
+  /** Keep a turn under a name: sealed on this phone, the slug decided against the book it sees. */
   const keep = useCallback(
     async (turn: Turn, name: string) => {
       setError(null);
       setKeeping(true);
-      const result = await keepPhraseAction(tripId, name, {
-        side: turn.side,
-        heard: turn.heard,
-        said: turn.said,
-        roman: turn.roman,
-        literal: turn.literal,
-      });
-      setKeeping(false);
-      const phrase = result.phrase;
-      if (!result.ok || !phrase) {
-        setError(result.error ?? "That didn't save.");
-        return;
+      try {
+        const payload = keepPayload(
+          { name, ...turn },
+          pair,
+          kept.map((p) => p.slug),
+        );
+        const result = await append(payload);
+        if (!result.ok) setError(result.error ?? "That didn't save.");
+        else setNaming(null);
+      } catch (err) {
+        setError(err instanceof PhraseError ? err.message : "That didn't save.");
+      } finally {
+        setKeeping(false);
       }
-      setKept((current) => [phrase, ...current]);
-      setNaming(null);
     },
-    [tripId],
+    [append, kept, pair],
   );
 
-  const forget = useCallback(async (phrase: SavedPhrase) => {
-    if (!confirm(`Forget “${phrase.slug}”?`)) return;
-    const result = await dropPhraseAction(phrase.id);
-    if (!result.ok) {
-      setError(result.error ?? "Couldn't forget that one.");
-      return;
-    }
-    setKept((current) => current.filter((row) => row.id !== phrase.id));
-  }, []);
+  const forget = useCallback(
+    async (phrase: SavedPhrase) => {
+      if (!confirm(`Forget “${phrase.slug}”?`)) return;
+      const result = await append({ t: "phrase.drop", id: phrase.id });
+      if (!result.ok) setError(result.error ?? "Couldn't forget that one.");
+    },
+    [append],
+  );
 
   const press = (side: Side) => {
     setError(null);

@@ -14,7 +14,9 @@ import {
   removePasskeyAction,
 } from "@/app/actions";
 import { fmtDate, timeAgo } from "@/lib/format";
+import { PRF_SALT } from "@/lib/keys";
 import type { PasskeyRegistrationOptions } from "@/lib/webauthn";
+import { rememberPrf } from "./keyring";
 
 export function toBase64url(bytes: ArrayBuffer): string {
   let binary = "";
@@ -68,6 +70,22 @@ export function ceremonyError(err: unknown, verb: string): string {
   return name ? `That didn't work (${name}). Try again.` : "That didn't work. Try again.";
 }
 
+// The PRF extension: the authenticator hands back a secret derived from this
+// salt and its own, the same on every device the passkey syncs to. That secret
+// backs the keyring up (components/keyring.tsx). Authenticators without it
+// simply return nothing, and the member's way back stays a key link.
+export function prfExtension(): AuthenticationExtensionsClientInputs {
+  return { prf: { eval: { first: PRF_SALT } } } as AuthenticationExtensionsClientInputs;
+}
+
+export async function rememberPrfOf(credential: PublicKeyCredential): Promise<void> {
+  const results = credential.getClientExtensionResults() as {
+    prf?: { results?: { first?: ArrayBuffer } };
+  };
+  const first = results.prf?.results?.first;
+  if (first) await rememberPrf(credential.id, first);
+}
+
 /** The wire shape a finish action expects; see lib/webauthn.ts. */
 export interface RegistrationWire {
   id: string;
@@ -114,6 +132,7 @@ export async function createCredential(
         authenticatorSelection: options.authenticatorSelection,
         attestation: options.attestation,
         timeout: options.timeout,
+        extensions: prfExtension(),
       },
     })) as PublicKeyCredential | null;
   } catch (err) {
@@ -121,6 +140,7 @@ export async function createCredential(
   }
   if (!credential) return { error: `No passkey was ${verb}.` };
 
+  await rememberPrfOf(credential);
   const response = credential.response as AuthenticatorAttestationResponse;
   return {
     wire: {

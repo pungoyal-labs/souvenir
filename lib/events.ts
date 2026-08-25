@@ -99,6 +99,8 @@ export interface PhraseKeep {
   literal?: string;
   language: string;
   tag: string;
+  /** Who kept it, when an organiser re-seals a phrase kept before the trip was; otherwise the author. */
+  keeper?: string;
 }
 
 export interface PhraseDrop {
@@ -124,11 +126,6 @@ export interface MemberRole {
   role: "organiser" | "member";
 }
 
-export interface TripRename {
-  t: "trip.rename";
-  name: string;
-}
-
 export type EventPayload =
   | MarketCreate
   | Call
@@ -142,8 +139,7 @@ export type EventPayload =
   | PhraseKeep
   | PhraseDrop
   | MemberHello
-  | MemberRole
-  | TripRename;
+  | MemberRole;
 
 export type EventType = EventPayload["t"];
 
@@ -251,11 +247,11 @@ const checks: Record<EventType, Check> = {
     optStr(p.roman) &&
     optStr(p.literal) &&
     nonEmpty(p.language) &&
-    nonEmpty(p.tag),
+    nonEmpty(p.tag) &&
+    optStr(p.keeper),
   "phrase.drop": (p) => nonEmpty(p.id),
   "member.hello": (p) => p.mkPub === undefined || (typeof p.mkPub === "object" && p.mkPub !== null),
   "member.role": (p) => nonEmpty(p.memberId) && (p.role === "organiser" || p.role === "member"),
-  "trip.rename": (p) => nonEmpty(p.name),
 };
 
 /** Every type this build knows, for the members page and for tests. */

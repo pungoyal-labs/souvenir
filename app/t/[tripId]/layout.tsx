@@ -1,7 +1,7 @@
-import { appendEventAction, eventsSinceAction } from "@/app/actions";
+import { appendEventAction, eventsSinceAction, sealLeftoversAction } from "@/app/actions";
 import { TripHeader } from "@/components/trip-header";
 import { TripStoreProvider } from "@/components/trip-store";
-import { eventsSince, membersOf } from "@/lib/data";
+import { eventsSince, leftoversOf, membersOf } from "@/lib/data";
 import { requireTrip } from "@/lib/session";
 import { DESTINATIONS, pairFor } from "@/lib/talk";
 import { daysBetween, placeOf, tripCurrencies, tripPhase, tripToday } from "@/lib/trips";
@@ -53,6 +53,8 @@ export default async function TripLayout({
     <TripStoreProvider
       tripId={tripId}
       epoch={trip.keyEpoch}
+      nameEnc={trip.nameEnc}
+      leftovers={membership.role === "organiser" ? await leftoversOf(tripId) : null}
       config={{
         creatorId: trip.createdBy,
         maxStakePies: trip.maxStakePies,
@@ -63,11 +65,14 @@ export default async function TripLayout({
       roster={roster.map(seat)}
       initial={initial}
       seenAt={membership.inboxSeenAt}
-      actions={{ append: appendEventAction, since: eventsSinceAction }}
+      actions={{
+        append: appendEventAction,
+        since: eventsSinceAction,
+        sealLeftovers: sealLeftoversAction,
+      }}
     >
       <TripHeader
         tripId={tripId}
-        name={trip.name}
         place={`${DESTINATIONS[trip.destination]?.flag ?? ""} ${placeOf(trip)}`.trim()}
         when={when}
         talkLabel={pair ? pair.them.language : null}

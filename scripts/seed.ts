@@ -7,6 +7,7 @@ import { createTrip, ensureMember } from "../lib/data.ts";
 import { db } from "../lib/db/index.ts";
 import { events, memberships } from "../lib/db/schema.ts";
 import type { EventPayload } from "../lib/events.ts";
+import { sealName } from "../lib/keys.ts";
 import { printKeyLinks, sealedRow, tripKey } from "./sealed-log.ts";
 
 async function main() {
@@ -19,8 +20,11 @@ async function main() {
   const kiran = await mk("kiran@example.com", "Kiran");
   const everyone = [priya, arjun, divya, kiran];
 
+  const { key, raw } = await tripKey();
+  const tripId = randomUUID();
   const trip = await createTrip(priya.id, {
-    name: "Chiang Mai, Diwali",
+    id: tripId,
+    nameEnc: await sealName(key, tripId, "Chiang Mai, Diwali"),
     destination: "TH",
     startsOn: "2026-11-06",
     endsOn: "2026-11-10",
@@ -33,7 +37,6 @@ async function main() {
     });
   }
 
-  const { key, raw } = await tripKey();
   let clock = Date.now() - 6 * 60 * 60 * 1000;
   const post = async (authorId: string, payload: EventPayload) => {
     clock += 60_000;

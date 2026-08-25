@@ -1,5 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { MAX_SLUG, type SavedPhrase, slugify, uniqueSlug, voiceFor } from "./phrases.ts";
+import {
+  keepPayload,
+  MAX_PHRASES,
+  MAX_SLUG,
+  PhraseError,
+  type SavedPhrase,
+  slugify,
+  uniqueSlug,
+  voiceFor,
+} from "./phrases.ts";
 import { resolvePair } from "./talk.ts";
 
 const THAI = resolvePair("en", "TH");
@@ -85,5 +94,35 @@ describe("saying a saved phrase again", () => {
     // this deploy now calls "them".
     const india = resolvePair("en", "IN");
     expect(voiceFor(phrase(), india)).toEqual({ tag: "th-TH", side: null });
+  });
+});
+
+describe("keepPayload", () => {
+  const turn = { name: "No peanuts", side: "us" as const, heard: "No peanuts", said: " ไม่ใส่ถั่ว " };
+
+  it("builds the event: slug against the phrasebook, language off the pair", () => {
+    const p = keepPayload(turn, THAI, ["no-peanuts"], "p9");
+    expect(p).toEqual({
+      t: "phrase.keep",
+      id: "p9",
+      slug: "no-peanuts-2",
+      name: "No peanuts",
+      side: "us",
+      heard: "No peanuts",
+      said: "ไม่ใส่ถั่ว",
+      language: "Thai",
+      tag: "th-TH",
+    });
+    expect(keepPayload({ ...turn, side: "them", roman: " mai " }, THAI, []).language).toBe(
+      "English",
+    );
+    expect(keepPayload({ ...turn, roman: " mai " }, THAI, []).roman).toBe("mai");
+  });
+
+  it("refuses nothing, a nameless phrase, and a full book", () => {
+    expect(() => keepPayload({ ...turn, said: "…" }, THAI, [])).toThrow(PhraseError);
+    expect(() => keepPayload({ ...turn, name: "!!!" }, THAI, [])).toThrow(/name/);
+    const full = Array.from({ length: MAX_PHRASES }, (_, i) => `p${i}`);
+    expect(() => keepPayload(turn, THAI, full)).toThrow(/Drop one/);
   });
 });

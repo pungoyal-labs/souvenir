@@ -2,8 +2,9 @@
 // Pure: state and people in, view out. The shapes are the ones the components rendered before
 // sealing — `Market` and `LedgerRow` are the schema's own — so lib/stats carries over unchanged.
 
-import type { LedgerRow, Market } from "./db/schema.ts";
 import { exposure, type Position, type Side } from "./engine.ts";
+import type { PhraseKeep } from "./events.ts";
+import type { SavedPhrase } from "./phrases.ts";
 import { type CandidateMarket, type MarketHistory, recommend } from "./recommend.ts";
 import {
   type BillState,
@@ -12,6 +13,7 @@ import {
   marketRows,
   type TripState,
 } from "./replay.ts";
+import type { LedgerRow, Market } from "./rows.ts";
 import {
   type BillKind,
   type Currency,
@@ -796,4 +798,60 @@ export function commentError(body: string): string | null {
   if (trimmed.length === 0) return "Write the comment first.";
   if (trimmed.length > 1000) return "Keep the comment under 1000 characters.";
   return null;
+}
+
+// --- the phrasebook -------------------------------------------------------------
+
+/** The trip's kept phrases, newest first. */
+export function phrasebook(state: TripState): SavedPhrase[] {
+  return [...state.phrases.values()]
+    .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+    .map((p) => ({
+      id: p.id,
+      slug: p.slug,
+      side: p.side,
+      heard: p.heard,
+      said: p.said,
+      ...(p.roman ? { roman: p.roman } : {}),
+      ...(p.literal ? { literal: p.literal } : {}),
+      language: p.language,
+      tag: p.tag,
+      keptBy: p.memberId,
+    }));
+}
+
+/** What a trip still held in the clear from before sealing. */
+export interface Leftovers {
+  name: string | null;
+  phrases: SavedPhrase[];
+}
+
+/**
+ * The events an organiser's phone appends to put pre-sealing phrases on the
+ * record, each under its original keeper, and every leftover id the server can
+ * then drop — those already on the record included.
+ */
+export function resealPlan(
+  leftovers: Leftovers,
+  state: TripState,
+): { keeps: PhraseKeep[]; phraseIds: string[] } {
+  const keeps: PhraseKeep[] = [];
+  for (const p of leftovers.phrases) {
+    if (state.phrases.has(p.id)) continue;
+    keeps.push({
+      t: "phrase.keep",
+      id: p.id,
+      slug: p.slug,
+      name: p.slug,
+      side: p.side,
+      heard: p.heard,
+      said: p.said,
+      ...(p.roman ? { roman: p.roman } : {}),
+      ...(p.literal ? { literal: p.literal } : {}),
+      language: p.language,
+      tag: p.tag,
+      keeper: p.keptBy,
+    });
+  }
+  return { keeps, phraseIds: leftovers.phrases.map((p) => p.id) };
 }

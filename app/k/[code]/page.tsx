@@ -4,6 +4,7 @@ import { findRekey, getMember, getTrip } from "@/lib/data";
 import { type RekeyState, rekeyState } from "@/lib/rekeys";
 import { routes, signInThen } from "@/lib/routes";
 import { currentMember } from "@/lib/session";
+import { placeOf } from "@/lib/trips";
 
 const EYEBROW = "Your key";
 
@@ -24,9 +25,10 @@ export default async function RekeyPage({ params }: { params: Promise<{ code: st
     return (
       <SignedOutCard eyebrow={EYEBROW}>
         <p className="mt-3 text-sm text-soft">
-          This link carries the key to <span className="font-semibold text-ink">{trip.name}</span>{" "}
-          for <span className="font-semibold text-ink">{forMember.name}</span>. Sign in as them and
-          it opens.
+          This link carries the key to{" "}
+          <span className="font-semibold text-ink">{placeOf(trip)}</span> for{" "}
+          <span className="font-semibold text-ink">{forMember.name}</span>. Sign in as them and it
+          opens.
         </p>
         <SignInForKey code={code} href={signInThen(routes.rekey(code))} />
       </SignedOutCard>
@@ -42,7 +44,7 @@ export default async function RekeyPage({ params }: { params: Promise<{ code: st
   return (
     <SignedOutCard eyebrow={EYEBROW}>
       <p className="mt-3 text-sm text-soft">
-        The key to <span className="font-semibold text-ink">{trip.name}</span>, for this phone.
+        The key to <span className="font-semibold text-ink">{placeOf(trip)}</span>, for this phone.
       </p>
       <RedeemRekey code={code} />
     </SignedOutCard>

@@ -9,10 +9,14 @@ import {
   latestEpoch,
   linkSecretOf,
   linkWithSecret,
+  mergeKeyrings,
   newLinkSecret,
   openKeyring,
+  openName,
   parseKeyring,
+  prfKeyringKey,
   sealKeyring,
+  sealName,
   secretFromFragment,
   tripCryptoKey,
   tripKeyOf,
@@ -160,5 +164,47 @@ describe("links", () => {
     const blob = await wrapPreview(s, preview);
     expect(await unwrapPreview(s, blob)).toEqual(preview);
     await expect(unwrapTripKey(s, "invite", blob)).rejects.toThrow(CryptoError);
+  });
+});
+
+describe("merging", () => {
+  it("keeps every trip, epoch and link from both, the second winning a clash", () => {
+    const k = new Uint8Array(32).fill(1);
+    const k2 = new Uint8Array(32).fill(2);
+    const a = withLinkSecret(withTripKey(emptyKeyring(), "t1", 0, k), "L1", k);
+    const b = withTripKey(withTripKey(emptyKeyring(), "t1", 1, k2), "t2", 0, k2);
+    b.mk = { kty: "EC" };
+    const m = mergeKeyrings(a, b);
+    expect(tripKeyOf(m, "t1", 0)).toEqual(k);
+    expect(tripKeyOf(m, "t1", 1)).toEqual(k2);
+    expect(tripKeyOf(m, "t2", 0)).toEqual(k2);
+    expect(linkSecretOf(m, "L1")).toEqual(k);
+    expect(m.mk).toEqual({ kty: "EC" });
+    expect(mergeKeyrings(withTripKey(emptyKeyring(), "t1", 0, k2), a).trips.t1["0"]).toBe(
+      a.trips.t1["0"],
+    );
+  });
+});
+
+describe("the trip's name", () => {
+  it("seals under the trip key, bound to the trip", async () => {
+    const tk = await newKey();
+    const blob = await sealName(tk, "t1", "Chiang Mai");
+    expect(await openName(tk, "t1", blob)).toBe("Chiang Mai");
+    await expect(openName(tk, "t2", blob)).rejects.toThrow(CryptoError);
+    await expect(openName(await newKey(), "t1", blob)).rejects.toThrow(CryptoError);
+  });
+});
+
+describe("passkey backup", () => {
+  it("derives the same keyring key from the same PRF output, and another from another", async () => {
+    const prf = new Uint8Array(32).fill(7);
+    const kr = withTripKey(emptyKeyring(), "t1", 0, new Uint8Array(32).fill(1));
+    const blob = await sealKeyring(await prfKeyringKey(prf), kr);
+    expect(await openKeyring(await prfKeyringKey(prf), blob)).toEqual(kr);
+    await expect(
+      openKeyring(await prfKeyringKey(new Uint8Array(32).fill(8)), blob),
+    ).rejects.toThrow(CryptoError);
+    await expect(prfKeyringKey(new Uint8Array(16))).rejects.toThrow(CryptoError);
   });
 });

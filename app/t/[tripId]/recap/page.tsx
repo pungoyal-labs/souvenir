@@ -12,7 +12,7 @@ export default async function RecapRoute({ params }: { params: Promise<{ tripId:
   const eyebrow = `${over ? "The season is over" : "The season so far"} · ${DESTINATIONS[trip.destination]?.flag ?? ""} ${placeOf(trip)}`;
   return (
     <Sealed>
-      <RecapPage tripName={trip.name} eyebrow={eyebrow} minResolved={env.RANKED_MIN_RESOLVED} />
+      <RecapPage eyebrow={eyebrow} minResolved={env.RANKED_MIN_RESOLVED} />
     </Sealed>
   );
 }

@@ -28,7 +28,9 @@ export default function PrivacyPage() {
         never sends to any server — and is kept on that phone. A member who changes phones or loses
         one gets the key again from somebody on the trip, over a short-lived link; an organiser can
         confirm who is asking, but cannot hand out a key they do not hold, and we cannot either.
-        There is no reset on our side, on purpose.
+        There is no reset on our side, on purpose. A passkey that supports it also keeps a backup of
+        your keys, sealed under a secret only that passkey can produce: sign in with it on a new
+        phone and the keys come back by themselves — we store the sealed copy and cannot open it.
       </Section>
 
       <Section title="What we can see">
@@ -50,14 +52,10 @@ export default function PrivacyPage() {
             initials.
           </li>
           <li>
-            <b>The shape of a trip</b>: that it exists, its name, destination, dates, currencies and
-            cap; who is on it and with what role; and, for each sealed entry, who wrote it, when,
-            and how large it is — not what it says.
-          </li>
-          <li>
-            <b>Kept phrases</b>: a line from the interpreter that a member deliberately named and
-            saved, with the language it is in. The phrasebook is the one piece of trip content still
-            stored readable; sealing it, and the trip's name, is the next release.
+            <b>The shape of a trip</b>: that it exists, its destination, dates, currencies and cap;
+            who is on it and with what role; and, for each sealed entry, who wrote it, when, and how
+            large it is — not what it says. The name, the phrasebook and every bill are sealed with
+            the rest.
           </li>
           <li>
             <b>A verdict card</b>, only when a member taps share on a resolved prediction: their
@@ -101,7 +99,7 @@ export default function PrivacyPage() {
 
       <Section title="How long">
         As long as you have an account. When you delete it, your name, email, picture, passkeys,
-        kept phrases and shared cards are removed immediately. Your sealed entries stay in each
+        shared cards and key backups are removed immediately. Your sealed entries stay in each
         trip's record, attributed to "Departed member", because the record is append-only and
         removing a call would change other members' numbers. That residue carries no identifier —
         and, being sealed, nothing we could read anyway.

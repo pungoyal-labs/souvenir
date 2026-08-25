@@ -16,7 +16,6 @@
     "seed": "node --env-file-if-exists=.env scripts/seed.ts",
     "stats": "node --env-file-if-exists=.env scripts/stats.ts",
     "recovery:link": "node --env-file-if-exists=.env scripts/recovery-link.ts",
-    "private:migrate": "node --env-file-if-exists=.env scripts/seal-trip.ts",
     "prepare": "husky",
     "format": "biome check --write ."
   },

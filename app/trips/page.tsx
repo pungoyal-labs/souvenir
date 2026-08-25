@@ -1,13 +1,11 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { TripsList } from "@/components/trips-list";
 import { EmptyState } from "@/components/ui";
 import { listTrips } from "@/lib/data";
-import { fmtDate } from "@/lib/format";
 import { lingoOf } from "@/lib/lingo";
 import { routes } from "@/lib/routes";
 import { requireMember } from "@/lib/session";
-import { DESTINATIONS } from "@/lib/talk";
-import { tripPhase, tripToday } from "@/lib/trips";
 
 export default async function TripsPage({
   searchParams,
@@ -44,41 +42,7 @@ export default async function TripsPage({
           <EmptyState title={t.tripsEmptyTitle} sub={t.tripsEmptySub} />
         </div>
       ) : (
-        <ul className="mt-6 grid gap-3">
-          {trips.map(({ trip, role, memberCount }) => {
-            const there = DESTINATIONS[trip.destination];
-            const phase = tripPhase(trip, tripToday(trip));
-            return (
-              <li key={trip.id}>
-                <Link
-                  href={routes.trip(trip.id)}
-                  className="card flex items-center gap-4 px-4 py-3 hover:border-felt"
-                >
-                  <span className="text-3xl" aria-hidden>
-                    {there?.flag ?? "✈️"}
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="display block truncate text-2xl font-extrabold uppercase tracking-wide">
-                      {trip.name}
-                    </span>
-                    <span className="block text-xs text-soft">
-                      {there?.place ?? trip.destination}
-                      {trip.startsOn && ` · ${fmtDate(trip.startsOn)}`}
-                      {trip.endsOn && ` – ${fmtDate(trip.endsOn)}`}
-                      {phase === "after" && " · home"}
-                    </span>
-                  </span>
-                  <span className="text-right text-xs text-soft">
-                    <span className="block">
-                      {memberCount} {memberCount === 1 ? "person" : "people"}
-                    </span>
-                    {role === "organiser" && <span className="block text-gold">organiser</span>}
-                  </span>
-                </Link>
-              </li>
-            );
-          })}
-        </ul>
+        <TripsList trips={trips} sealedName={t.sealedTripName} />
       )}
     </div>
   );

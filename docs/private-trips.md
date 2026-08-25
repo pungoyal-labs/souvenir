@@ -1,6 +1,6 @@
 # Private trips — end-to-end encryption, planned properly
 
-Status: decisions settled 2026-08-24; Phase 0 merged (#4); Phase 1 — predictions and bills sealed — in PR #5 (`private-trips-phase-1`). Written against the codebase at `a654787`; §7 records what shipped.
+Status: decisions settled 2026-08-24; Phase 0 merged (#4); Phase 1 merged (#5); Phases 2 and 4 in review (`private-trips-phase-2-4`). Written against the codebase at `a654787`; §7 records what shipped.
 
 ## 0. The promise, stated precisely
 
@@ -422,13 +422,41 @@ What differs from the plan, and why:
 5. `docker compose run --rm migrate node scripts/stats.ts` — `sealed events`
    should match what the script reported.
 
-### Phase 2 — Phrases and the name (≈1 week)
+(Done 2026-08-25. The script is gone with Phase 4; the steps stay as the
+record of how the one trip crossed over.)
 
-- `phrase.keep`/`phrase.drop`; slug uniqueness by replay; `/talk` phrasebook
-  reads the store.
-- `trip.rename` event; `name_enc`; layout header from the store.
-- Exit: nothing content-bearing is written to a plaintext column for a new
-  trip.
+#### Cutover for Phases 2 and 4
+
+1. `pg_dump` — migration `0022` drops the plaintext tables.
+2. Deploy `main`.
+3. Open the trip on an organiser's phone that holds the key: it re-seals the
+   name and the phrasebook and drops the plaintext. `stats.ts` should then
+   show `plaintext left 0`.
+4. Sign in once with a passkey on each phone that has the key: that is what
+   writes the backup. Google-only members have none.
+
+### Phase 2 — Phrases and the name (with Phase 4, one PR)
+
+Shipped: `phrase.keep`/`phrase.drop` events, the slug decided on the phone
+against the book it sees (`lib/phrases` `keepPayload`) and refused by replay
+if taken; `/talk` reads the store. The name is sealed on its own under the
+trip key into `trips.name_enc` (`lib/keys` `sealName`) so the trips list can
+show it without opening a log; the header, settings, recap and the share
+texts read it from the store, and a phone without the key sees *A sealed
+trip*. The verdict card carries the name its publishing phone printed.
+
+What differs from the plan:
+
+- **No `trip.rename` event.** One source: `name_enc`, re-sealed by the
+  organiser's phone on rename. The event and its replay rule were removed.
+- **The trip id is minted on the phone**, so the name can be bound to it
+  before the row exists.
+- **What predates sealing cannot be sealed from the console** — it has no
+  key. `trips.name` and `phrases` stay as legacy columns; the first organiser
+  phone that opens such a trip with its key appends the phrases under their
+  original keepers (`phrase.keep` gained an organiser-only `keeper`), seals
+  the name, and calls `clearLeftovers`. `pnpm stats` shows `plaintext left`;
+  a follow-up migration drops the two columns once it reads zero.
 
 ### Phase 3 — Member keys and rotation (≈1.5 weeks)
 
@@ -441,16 +469,28 @@ What differs from the plan, and why:
 - Exit: a removed member holding a DB copy cannot open anything after their
   removal.
 
-### Phase 4 — Keys that survive, migration, retirement (≈1.5 weeks)
+### Phase 4 — Keys that survive, retirement (with Phase 2, one PR)
 
-- Passkey PRF: request the extension in `beginPasskey*`, parse the output
-  (`lib/webauthn.ts` + test — today it deliberately rejects extensions),
-  `keyring_wraps`. Silent for passkey members; nothing to explain.
-- Drop the retired plaintext tables and `scripts/seal-trip.ts` with them
-  (the one existing trip was sealed in Phase 1; the operator saw its
-  plaintext once, which is what they could see before, and never again).
-- `/privacy` loses its "still stored readable" line once Phase 2 is in.
-- Exit: no plaintext content column exists in the schema.
+Shipped: the PRF extension is requested on every passkey ceremony
+(`components/passkeys.tsx` `prfExtension`); its output never leaves the
+phone — it derives a key (`lib/keys` `prfKeyringKey`) kept non-extractable
+in IndexedDB beside the keyring key, and the keyring is sealed under it into
+`keyring_wraps`, one row per credential, on every change. After a passkey
+sign-in the provider merges whatever backups this phone's passkeys open into
+what it holds (`mergeKeyrings`) and backs the result up again. Dropping a
+passkey cascades its backup away. Google-only members have no backup; their
+way back stays a key link. The server never parses the extension: the
+authenticator data's ED flag was already tolerated.
+
+Migration `0022` drops `markets`, `ledger`, `market_views`,
+`market_reactions`, `comments`, `comment_mentions`, `bills`,
+`bill_revisions`, `bill_entries`, the enums they used, and the unused
+`keyrings`; `scripts/seal-trip.ts` and `pnpm private:migrate` went with
+them; `lib/rows.ts` keeps the `Market`/`LedgerRow` shapes. **The migration is
+destructive: `pg_dump` before deploying it.** `0023` adds `keyring_wraps`.
+
+Exit reached: no plaintext content column exists except the two legacy
+columns above, which carry only what predates sealing and empty themselves.
 
 ### Phase 5 — Verifiable client (≈1 week, optional but the centrepiece needs it)
 

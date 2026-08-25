@@ -5,7 +5,7 @@ import { useState } from "react";
 import { appendEventAction, createTripAction, updateTripAction } from "@/app/actions";
 import { exportKey, newKey, seal } from "@/lib/crypto";
 import { encodeEvent } from "@/lib/events";
-import { withTripKey } from "@/lib/keys";
+import { sealName, withTripKey } from "@/lib/keys";
 import { routes } from "@/lib/routes";
 import { CURRENCIES, CURRENCY_INFO, type Currency } from "@/lib/split";
 import { DESTINATION_LIST, HOME } from "@/lib/talk";
@@ -14,8 +14,10 @@ import {
   DEFAULT_HOME_LANGUAGE,
   DEFAULT_MAX_STAKE_PIES,
   MAX_STAKE_CEILING,
+  TripError,
+  tripName,
 } from "@/lib/trips";
-import { useKeyring } from "./keyring";
+import { useKeyring, useTripKey } from "./keyring";
 import { useAct } from "./use-act";
 
 const field =
@@ -35,6 +37,7 @@ export function TripForm({
   initial?: {
     id: string;
     name: string;
+    epoch: number | null;
     destination: string;
     homeLanguage: string;
     homeCurrency: string;
@@ -45,6 +48,7 @@ export function TripForm({
 }) {
   const router = useRouter();
   const keyring = useKeyring();
+  const held = useTripKey(initial?.id ?? "", initial?.epoch ?? null);
   const { pending, error, act } = useAct();
   const [name, setName] = useState(initial?.name ?? "");
   const [destination, setDestination] = useState(initial?.destination ?? "TH");
@@ -63,14 +67,27 @@ export function TripForm({
 
   const submit = () =>
     act(async () => {
-      const input = {
-        name,
-        startsOn: startsOn || null,
-        endsOn: endsOn || null,
-        maxStakePies,
-      };
+      let cleanName: string;
+      try {
+        cleanName = tripName(name);
+      } catch (err) {
+        return {
+          ok: false,
+          error: err instanceof TripError ? err.message : "Give the trip a name.",
+        };
+      }
+      const input = { startsOn: startsOn || null, endsOn: endsOn || null, maxStakePies };
+      // The name never reaches the server in the clear: it is sealed under the trip's key here.
       if (initial) {
-        const res = await updateTripAction(initial.id, input);
+        if (cleanName !== initial.name && !held) {
+          return { ok: false, error: "This phone has no key for the trip, so it can't rename it." };
+        }
+        const res = await updateTripAction(initial.id, {
+          ...input,
+          ...(cleanName !== initial.name && held
+            ? { nameEnc: await sealName(held, initial.id, cleanName) }
+            : {}),
+        });
         if (res.ok) router.refresh();
         return res;
       }
@@ -85,9 +102,16 @@ export function TripForm({
       if (!creatorId) return;
       const key = await newKey();
       const raw = await exportKey(key);
-      const res = await createTripAction({ ...input, destination, homeLanguage, homeCurrency });
-      const tripId = res.tripId;
-      if (!res.ok || !tripId) return { ok: false, error: res.error };
+      const tripId = crypto.randomUUID();
+      const res = await createTripAction({
+        ...input,
+        id: tripId,
+        nameEnc: await sealName(key, tripId, cleanName),
+        destination,
+        homeLanguage,
+        homeCurrency,
+      });
+      if (!res.ok || !res.tripId) return { ok: false, error: res.error };
       await keyring.update((kr) => withTripKey(kr, tripId, 0, raw));
       const hello = await seal(
         key,

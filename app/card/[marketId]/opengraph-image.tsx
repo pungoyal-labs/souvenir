@@ -34,7 +34,7 @@ export default async function Image({ params }: { params: Promise<{ marketId: st
       }}
     >
       <div style={{ display: "flex", fontSize: 28, color: "#e8c46a", letterSpacing: 2 }}>
-        {card ? card.trip.name.toUpperCase() : "CHIANG PAI"}
+        {card ? card.tripName.toUpperCase() : "CHIANG PAI"}
       </div>
       <div
         style={{

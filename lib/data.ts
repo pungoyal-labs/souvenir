@@ -9,7 +9,6 @@ import { type EnvelopeHeader, parseEnvelope } from "./crypto.ts";
 import { db } from "./db/index.ts";
 import {
   avatars,
-  bills,
   type CredentialRow,
   cards,
   credentials,
@@ -17,14 +16,12 @@ import {
   events,
   type InviteRow,
   invites,
+  keyringWraps,
   type Member,
   type MembershipRole,
   type MembershipRow,
-  marketReactions,
-  marketViews,
   members,
   memberships,
-  type PhraseRow,
   phrases,
   type RecoveryRow,
   type RekeyRow,
@@ -36,7 +33,7 @@ import {
 import { normalizeEmail } from "./email.ts";
 import { expiresAtFrom, inviteState, newInviteCode } from "./invites.ts";
 import { logger } from "./logger.ts";
-import { MAX_PHRASE_NAME, MAX_PHRASES, type SavedPhrase, uniqueSlug } from "./phrases.ts";
+import type { SavedPhrase } from "./phrases.ts";
 import {
   newRecoveryCode,
   recoveryExpiresAt,
@@ -50,8 +47,8 @@ import {
   rekeyExpiresAt,
   rekeyState,
 } from "./rekeys.ts";
-import { clampUtterance, type Side as TalkSide, worthSaying } from "./talk.ts";
 import { TripError, type TripInput, tripConfig } from "./trips.ts";
+import type { Leftovers } from "./views.ts";
 import type { VerifiedRegistration } from "./webauthn.ts";
 
 export type { SavedPhrase };
@@ -64,6 +61,8 @@ type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 const STALE_KEY = "This phone's key is out of date. Reload and try again.";
 
 /** A wrap is opaque here, but it has a shape, and a size that is not a payload. */
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+
 function checkWrapped(blob: string): void {
   if (!/^v1\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(blob) || blob.length > 8192) {
     throw new DataError("That key didn't come through right. Reload and try again.");
@@ -154,14 +153,19 @@ function configOf(input: TripInput): ReturnType<typeof tripConfig> {
   }
 }
 
-/** Whoever creates a trip is its first organiser. */
-export async function createTrip(creatorId: string, input: TripInput): Promise<Trip> {
+/** Whoever creates a trip is its first organiser. The name arrives sealed under the trip's key. */
+export async function createTrip(
+  creatorId: string,
+  input: TripInput & { id: string; nameEnc: string },
+): Promise<Trip> {
   const config = configOf(input);
-  const id = randomUUID();
+  if (!UUID.test(input.id)) throw new DataError("That didn't come through right. Try again.");
+  checkWrapped(input.nameEnc);
+  const id = input.id;
   const trip = await db.transaction(async (tx) => {
     const [created] = await tx
       .insert(trips)
-      .values({ id, createdBy: creatorId, keyEpoch: 0, ...config })
+      .values({ id, createdBy: creatorId, keyEpoch: 0, nameEnc: input.nameEnc, ...config })
       .returning();
     await tx.insert(memberships).values({ tripId: id, memberId: creatorId, role: "organiser" });
     return created;
@@ -170,22 +174,33 @@ export async function createTrip(creatorId: string, input: TripInput): Promise<T
   return trip;
 }
 
+export type TripUpdate = Omit<TripInput, "destination" | "homeLanguage" | "homeCurrency"> & {
+  /** A new name, sealed; absent leaves the name alone. */
+  nameEnc?: string;
+};
+
 /** Name, dates, or cap. Organisers only; the language pair is fixed. */
 export async function updateTrip(
   actorId: string,
   tripId: string,
-  input: Omit<TripInput, "destination" | "homeLanguage" | "homeCurrency">,
+  input: TripUpdate,
 ): Promise<Trip> {
   const { trip } = await requireOrganiser(tripId, actorId);
-  const { name, startsOn, endsOn, maxStakePies } = configOf({
+  const { startsOn, endsOn, maxStakePies } = configOf({
     ...input,
     destination: trip.destination,
     homeLanguage: trip.homeLanguage,
     homeCurrency: trip.homeCurrency,
   });
+  if (input.nameEnc) checkWrapped(input.nameEnc);
   const [updated] = await db
     .update(trips)
-    .set({ name, startsOn, endsOn, maxStakePies })
+    .set({
+      startsOn,
+      endsOn,
+      maxStakePies,
+      ...(input.nameEnc ? { nameEnc: input.nameEnc, name: null } : {}),
+    })
     .where(eq(trips.id, tripId))
     .returning();
   logger.info({ tripId, actorId }, "trip updated");
@@ -393,8 +408,7 @@ export async function deleteAccount(memberId: string): Promise<void> {
     await tx.delete(credentials).where(eq(credentials.memberId, memberId));
     await tx.delete(avatars).where(eq(avatars.memberId, memberId));
     await tx.delete(phrases).where(eq(phrases.memberId, memberId));
-    await tx.delete(marketReactions).where(eq(marketReactions.memberId, memberId));
-    await tx.delete(marketViews).where(eq(marketViews.memberId, memberId));
+    await tx.delete(keyringWraps).where(eq(keyringWraps.memberId, memberId));
     await tx.delete(recoveries).where(eq(recoveries.memberId, memberId));
     await tx.delete(rekeys).where(eq(rekeys.forMemberId, memberId));
     await tx.delete(memberships).where(eq(memberships.memberId, memberId));
@@ -1102,7 +1116,8 @@ export interface CardLine {
 
 export interface PublishedCard {
   marketId: string;
-  trip: { id: string; name: string; destination: string };
+  trip: { id: string; destination: string };
+  tripName: string;
   publishedBy: string;
   at: Date;
   question: string;
@@ -1118,6 +1133,7 @@ export async function publishCard(
   tripId: string,
   input: {
     marketId: string;
+    tripName: string;
     question: string;
     verdict: PublishedCard["verdict"];
     winners: CardLine[];
@@ -1127,6 +1143,7 @@ export async function publishCard(
   await requireMembership(tripId, memberId);
   const question = input.question.trim();
   if (question.length < 5 || question.length > 200) throw new DataError("That's not a card.");
+  if (input.tripName.length > 60) throw new DataError("That's not a card.");
   const lines = [...input.winners, ...input.losers];
   if (lines.length > MAX_CARD_LINES) throw new DataError("Too many names for a card.");
   for (const line of lines) {
@@ -1136,6 +1153,7 @@ export async function publishCard(
   }
   const card = {
     publishedBy: memberId,
+    tripName: input.tripName.trim(),
     question,
     verdict: input.verdict,
     lines: JSON.stringify({ winners: input.winners, losers: input.losers }),
@@ -1169,7 +1187,8 @@ export async function cardOf(marketId: string): Promise<PublishedCard | null> {
   }
   return {
     marketId: card.marketId,
-    trip: { id: trip.id, name: trip.name, destination: trip.destination },
+    trip: { id: trip.id, destination: trip.destination },
+    tripName: card.tripName,
     publishedBy: card.publishedBy,
     at: card.at,
     question: card.question,
@@ -1187,102 +1206,99 @@ export async function publishedCards(tripId: string): Promise<Set<string>> {
   return new Set(rows.map((r) => r.marketId));
 }
 
-// ---------- kept phrases ----------
-// Still plaintext until Phase 2. A phrase one member kept is the whole table's to play; only
-// whoever kept it, or an organiser, can drop it.
+// ---------- what sealing left behind ----------
+// A trip named, and phrases kept, before either was sealed. The console holds no key, so the first
+// organiser's phone that opens the trip with one re-seals them as events and then clears them here.
 
-function toPhrase(row: PhraseRow): SavedPhrase {
-  return {
-    id: row.id,
-    slug: row.slug,
-    side: row.side,
-    heard: row.heard,
-    said: row.said,
-    roman: row.roman ?? undefined,
-    literal: row.literal ?? undefined,
-    language: row.language,
-    tag: row.tag,
-    keptBy: row.memberId,
-  };
-}
+export type { Leftovers };
 
-/** Newest first — the order they were kept in. */
-export async function listPhrases(tripId: string): Promise<SavedPhrase[]> {
+export async function leftoversOf(tripId: string): Promise<Leftovers | null> {
+  const trip = await getTrip(tripId);
+  if (!trip) return null;
   const rows = await db
     .select()
     .from(phrases)
     .where(eq(phrases.tripId, tripId))
-    .orderBy(desc(phrases.createdAt), desc(phrases.id));
-  return rows.map(toPhrase);
+    .orderBy(asc(phrases.createdAt), asc(phrases.id));
+  if (trip.name === null && rows.length === 0) return null;
+  return {
+    name: trip.name,
+    phrases: rows.map((row) => ({
+      id: row.id,
+      slug: row.slug,
+      side: row.side,
+      heard: row.heard,
+      said: row.said,
+      roman: row.roman ?? undefined,
+      literal: row.literal ?? undefined,
+      language: row.language,
+      tag: row.tag,
+      keptBy: row.memberId,
+    })),
+  };
 }
 
-export interface PhraseInput {
-  /** What the member typed; the slug is made from it here. */
-  name: string;
-  side: TalkSide;
-  heard: string;
-  said: string;
-  roman?: string;
-  literal?: string;
-  /** Named by the pair, on the server — the browser asserts no language. */
-  language: string;
-  tag: string;
-}
-
-/** The slug is decided against the trip's slugs inside the inserting transaction: two taps, two phrases. */
-export async function savePhrase(
+/** Organisers only: the phone has put these on the sealed record, so the plaintext can go. */
+export async function clearLeftovers(
+  actorId: string,
   tripId: string,
-  memberId: string,
-  input: PhraseInput,
-): Promise<SavedPhrase> {
-  await requireMembership(tripId, memberId);
-  const name = input.name.trim().slice(0, MAX_PHRASE_NAME);
-  const said = input.said.trim().slice(0, 600);
-  if (!worthSaying(said)) throw new DataError("There's nothing here to keep.");
-  return await db.transaction(async (tx) => {
-    const held = await tx
-      .select({ slug: phrases.slug })
-      .from(phrases)
-      .where(eq(phrases.tripId, tripId));
-    if (held.length >= MAX_PHRASES) {
-      throw new DataError(`This trip has kept ${MAX_PHRASES} phrases. Drop one to keep another.`);
+  input: { nameEnc: string | null; phraseIds: string[] },
+): Promise<void> {
+  await requireOrganiser(tripId, actorId);
+  if (input.nameEnc) checkWrapped(input.nameEnc);
+  await db.transaction(async (tx) => {
+    if (input.nameEnc) {
+      await tx
+        .update(trips)
+        .set({ nameEnc: input.nameEnc, name: null })
+        .where(eq(trips.id, tripId));
     }
-    const slug = uniqueSlug(
-      name,
-      held.map((row) => row.slug),
-    );
-    if (!slug) throw new DataError("Give it a name you'll recognise later.");
-    const [row] = await tx
-      .insert(phrases)
-      .values({
-        id: randomUUID(),
-        tripId,
-        memberId,
-        slug,
-        side: input.side,
-        heard: clampUtterance(input.heard),
-        said,
-        roman: input.roman?.trim().slice(0, 600) || null,
-        literal: input.literal?.trim().slice(0, 600) || null,
-        language: input.language,
-        tag: input.tag,
-      })
-      .returning();
-    logger.info({ tripId, memberId, slug, language: input.language }, "phrase kept");
-    return toPhrase(row);
+    if (input.phraseIds.length > 0) {
+      await tx
+        .delete(phrases)
+        .where(and(eq(phrases.tripId, tripId), inArray(phrases.id, input.phraseIds)));
+    }
   });
+  logger.warn(
+    { tripId, actorId, name: input.nameEnc !== null, phrases: input.phraseIds.length },
+    "leftovers sealed",
+  );
 }
 
-export async function deletePhrase(memberId: string, id: string): Promise<{ tripId: string }> {
-  const [row] = await db.select().from(phrases).where(eq(phrases.id, id));
-  if (!row) throw new DataError("That phrase is already gone.");
-  if (row.memberId !== memberId) {
-    const ctx = await tripFor(memberId, row.tripId);
-    if (!ctx || !isOrganiser(ctx)) throw new DataError("Only whoever kept it can drop it.");
+// ---------- keyring backups ----------
+// The keyring under a key only that passkey's PRF can derive; one per credential.
+
+const MAX_KEYRING_BYTES = 64 * 1024;
+
+export async function saveKeyringWrap(
+  memberId: string,
+  credentialId: string,
+  blob: string,
+): Promise<void> {
+  const [cred] = await db
+    .select({ memberId: credentials.memberId })
+    .from(credentials)
+    .where(eq(credentials.id, credentialId));
+  if (!cred || cred.memberId !== memberId) throw new DataError("That passkey isn't yours.");
+  if (!/^v1\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(blob) || blob.length > MAX_KEYRING_BYTES) {
+    throw new DataError("That backup didn't come through right.");
   }
-  await db.delete(phrases).where(eq(phrases.id, id));
-  logger.info({ memberId, slug: row.slug }, "phrase dropped");
-  return { tripId: row.tripId };
+  await db
+    .insert(keyringWraps)
+    .values({ credentialId, memberId, blob })
+    .onConflictDoUpdate({
+      target: keyringWraps.credentialId,
+      set: { blob, updatedAt: new Date() },
+    });
+}
+
+export async function keyringWrapsOf(
+  memberId: string,
+): Promise<{ credentialId: string; blob: string }[]> {
+  return db
+    .select({ credentialId: keyringWraps.credentialId, blob: keyringWraps.blob })
+    .from(keyringWraps)
+    .where(eq(keyringWraps.memberId, memberId));
 }
 
 // ---------- the numbers that decide what happens next ----------
@@ -1299,8 +1315,8 @@ export interface PlatformStats {
   invited: number;
   /** Sealed: the server can count what happened, not what it was. */
   eventsSealed: number;
-  billsLogged: number;
-  phrasesKept: number;
+  /** Names and phrases still readable from before sealing, waiting for an organiser's phone. */
+  plaintextLeft: number;
 }
 
 export async function platformStats(): Promise<PlatformStats> {
@@ -1321,7 +1337,7 @@ export async function platformStats(): Promise<PlatformStats> {
   const founders = await db.selectDistinct({ memberId: trips.createdBy }).from(trips);
   const founderSet = new Set(founders.map((f) => f.memberId));
   const [ev] = await db.select({ n: count }).from(events);
-  const [b] = await db.select({ n: count }).from(bills);
+  const [named] = await db.select({ n: count }).from(trips).where(isNotNull(trips.name));
   const [p] = await db.select({ n: count }).from(phrases);
   return {
     members: m.n,
@@ -1333,7 +1349,6 @@ export async function platformStats(): Promise<PlatformStats> {
     invitedThenFounded: invitedRows.filter((r) => founderSet.has(r.memberId)).length,
     invited: invitedRows.length,
     eventsSealed: ev.n,
-    billsLogged: b.n,
-    phrasesKept: p.n,
+    plaintextLeft: named.n + p.n,
   };
 }

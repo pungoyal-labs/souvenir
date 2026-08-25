@@ -22,11 +22,11 @@ import {
   addCredential,
   appendEvent,
   clearAvatar,
+  clearLeftovers,
   createAccount,
   createTrip,
   DataError,
   deleteAccount,
-  deletePhrase,
   eventsSince,
   findCredential,
   findInvite,
@@ -35,6 +35,7 @@ import {
   joinTripWithInvite,
   joinWithInvite,
   type KeyHandover,
+  keyringWrapsOf,
   listCredentials,
   markInboxSeen,
   mintInvite,
@@ -48,13 +49,13 @@ import {
   revokeInvite,
   revokeRecovery,
   revokeRekey,
-  type SavedPhrase,
-  savePhrase,
+  saveKeyringWrap,
   setAvatar,
   setLingo,
   setName,
   setRole,
   spendRekey,
+  type TripUpdate,
   tripFor,
   unpublishCard,
   updateTrip,
@@ -76,10 +77,8 @@ import { routes } from "@/lib/routes";
 import { currentMember } from "@/lib/session";
 import {
   clampUtterance,
-  otherSide as otherTalkSide,
   type Particle,
   pairFor,
-  speakerOf,
   type Side as TalkSide,
   worthSaying,
 } from "@/lib/talk";
@@ -150,7 +149,7 @@ async function mutate<T extends object>(
 
 /** Returns rather than redirects: the phone still has to seal the first event with its new key. */
 export async function createTripAction(
-  input: TripInput,
+  input: TripInput & { id: string; nameEnc: string },
 ): Promise<ActionResult & { tripId?: string }> {
   return mutate(
     async (memberId) => ({ tripId: (await createTrip(memberId, input)).id }),
@@ -158,10 +157,7 @@ export async function createTripAction(
   );
 }
 
-export async function updateTripAction(
-  tripId: string,
-  input: Omit<TripInput, "destination" | "homeLanguage" | "homeCurrency">,
-): Promise<ActionResult> {
+export async function updateTripAction(tripId: string, input: TripUpdate): Promise<ActionResult> {
   return mutate(
     async (memberId) => {
       await updateTrip(memberId, tripId, input);
@@ -270,6 +266,7 @@ const cardLines = z
   .max(12);
 const cardSchema = z.object({
   marketId: z.string().min(1).max(64),
+  tripName: z.string().max(60),
   question: z.string().min(1).max(200),
   verdict: z.enum(["yes", "no", "refunded"]),
   winners: cardLines,
@@ -332,39 +329,30 @@ export async function interpretAction(
   }
 }
 
-/** Which language the phrase is in is read off the trip's pair here, never asserted by the browser. */
-export async function keepPhraseAction(
+// ---------- keys ----------
+
+/** An organiser's phone has re-sealed what predates sealing; drop the plaintext. */
+export async function sealLeftoversAction(
   tripId: string,
-  name: string,
-  turn: { side: TalkSide; heard: string; said: string; roman?: string; literal?: string },
-): Promise<ActionResult & { phrase?: SavedPhrase }> {
+  input: { nameEnc: string | null; phraseIds: string[] },
+): Promise<ActionResult> {
   return mutate(
-    async (memberId) => {
-      const pair = await pairOf(memberId, tripId);
-      if (!pair) throw new DataError("Nothing to keep on this trip.");
-      const said: TalkSide = turn.side === "them" ? "them" : "us";
-      const spoken = speakerOf(pair, otherTalkSide(said));
-      const phrase = await savePhrase(tripId, memberId, {
-        name,
-        side: said,
-        heard: turn.heard,
-        said: turn.said,
-        roman: turn.roman,
-        literal: turn.literal,
-        language: spoken.language,
-        tag: spoken.tag,
-      });
-      return { phrase };
-    },
-    [routes.talk(tripId)],
+    (memberId) => clearLeftovers(memberId, tripId, input),
+    [routes.trip(tripId), routes.talk(tripId), routes.trips],
   );
 }
 
-export async function dropPhraseAction(id: string): Promise<ActionResult> {
-  return mutate(
-    (memberId) => deletePhrase(memberId, id),
-    ({ tripId }) => [routes.talk(tripId)],
-  );
+export async function saveKeyringWrapAction(
+  credentialId: string,
+  blob: string,
+): Promise<ActionResult> {
+  return mutate((memberId) => saveKeyringWrap(memberId, credentialId, blob));
+}
+
+export async function keyringWrapsAction(): Promise<
+  ActionResult & { wraps?: { credentialId: string; blob: string }[] }
+> {
+  return mutate(async (memberId) => ({ wraps: await keyringWrapsOf(memberId) }));
 }
 
 // ---------- account ----------

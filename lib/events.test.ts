@@ -46,7 +46,6 @@ const samples: EventPayload[] = [
   { t: "member.hello", mkPub: { kty: "EC", crv: "P-256", x: "a", y: "b" } },
   { t: "member.hello" },
   { t: "member.role", memberId: "b", role: "organiser" },
-  { t: "trip.rename", name: "Chiang Pai 2" },
 ];
 
 describe("codec", () => {
@@ -129,7 +128,6 @@ describe("shape checks", () => {
     ],
     ["hello with a string key", { t: "member.hello", mkPub: "not a jwk" }],
     ["role that is not one", { t: "member.role", memberId: "b", role: "founder" }],
-    ["rename to nothing", { t: "trip.rename", name: "" }],
   ];
 
   for (const [label, value] of bad) {

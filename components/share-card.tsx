@@ -14,17 +14,16 @@ import { useAct } from "./use-act";
  * deliberate plaintext (docs/private-trips.md §4.11) — then shares the link.
  */
 export function ShareCard({
-  tripName,
   marketId,
   card,
   published,
 }: {
-  tripName: string;
   marketId: string;
   card: MarketCard | null;
   published: boolean;
 }) {
-  const { tripId, t } = useTrip();
+  const { tripId, t, name } = useTrip();
+  const tripName = name ?? t.sealedTripName;
   const [isUp, setUp] = useState(published);
   const [done, setDone] = useState<string | null>(null);
   const { pending, error, act } = useAct("Couldn't put the card up.");
@@ -35,6 +34,7 @@ export function ShareCard({
     if (isUp) return { ok: true };
     const res = await publishCardAction(tripId, {
       marketId,
+      tripName,
       question,
       verdict: card.status,
       winners: card.winners,

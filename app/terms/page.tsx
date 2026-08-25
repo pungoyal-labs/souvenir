@@ -71,7 +71,7 @@ export default function TermsPage() {
 
       <Section title="8. Leaving">
         You can delete your account at any time from your account page. Your name, email, picture,
-        passkeys, kept phrases, and seats are removed immediately. Entries in a trip's append-only
+        passkeys, key backups, and seats are removed immediately. Entries in a trip's append-only
         ledger, bills, and comments remain under a "Departed member" label, because removing them
         would change every other member's numbers. See the{" "}
         <Link href={routes.privacy} className="text-felt hover:underline">

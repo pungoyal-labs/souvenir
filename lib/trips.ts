@@ -27,7 +27,6 @@ export const DEFAULT_HOME_CURRENCY: Currency = "inr";
 export const DEFAULT_HOME_LANGUAGE = "en";
 
 export interface TripInput {
-  name: string;
   destination: string;
   homeLanguage?: string;
   homeCurrency?: string;
@@ -38,7 +37,6 @@ export interface TripInput {
 
 /** The row a trip becomes — every field checked, the foreign currency decided. */
 export interface TripConfig {
-  name: string;
   destination: string;
   homeLanguage: string;
   homeCurrency: Currency;
@@ -65,13 +63,17 @@ function checkDate(value: string | null | undefined, what: string): string | nul
  * dropped entirely when that is already what the group settles in, so a
  * domestic trip has exactly one currency and no bill ever asks.
  */
-export function tripConfig(input: TripInput): TripConfig {
-  const name = input.name.trim().replace(/\s+/g, " ");
+/** The name is sealed on the phone and never reaches the server, so the phone checks it. */
+export function tripName(raw: string): string {
+  const name = raw.trim().replace(/\s+/g, " ");
   if (name.length < MIN_TRIP_NAME) throw new TripError("Give the trip a name.");
   if (name.length > MAX_TRIP_NAME) {
     throw new TripError(`Keep the trip name under ${MAX_TRIP_NAME} characters.`);
   }
+  return name;
+}
 
+export function tripConfig(input: TripInput): TripConfig {
   const destination = input.destination.trim().toUpperCase();
   const there = DESTINATIONS[destination];
   if (!there) throw new TripError("Pick a destination from the list.");
@@ -98,7 +100,6 @@ export function tripConfig(input: TripInput): TripConfig {
   }
 
   return {
-    name,
     destination,
     homeLanguage,
     homeCurrency,

@@ -22,17 +22,6 @@ const bytea = customType<{ data: Buffer; driverData: Buffer }>({
   },
 });
 
-export const sideEnum = pgEnum("side", ["yes", "no"]);
-export const marketStatusEnum = pgEnum("market_status", ["open", "yes", "no", "refunded"]);
-export const ledgerKindEnum = pgEnum("ledger_kind", [
-  "grant",
-  "bet",
-  "switch",
-  "payout",
-  "refund",
-  "reversal",
-]);
-
 export const members = pgTable("members", {
   id: text("id").primaryKey(),
   // Nullable since invite links arrived: a member who joined by link has no
@@ -79,7 +68,8 @@ export const membershipRoleEnum = pgEnum("membership_role", ["organiser", "membe
 
 export const trips = pgTable("trips", {
   id: text("id").primaryKey(),
-  name: text("name").notNull(),
+  /** Plaintext only on a trip named before names were sealed; a phone with the key moves it to `nameEnc`. */
+  name: text("name"),
   /** A key of lib/talk DESTINATIONS — where the group is going. */
   destination: text("destination").notNull(),
   /** A key of lib/talk HOME — what the group speaks among themselves. */
@@ -98,7 +88,7 @@ export const trips = pgTable("trips", {
    * reads to tell a sealed trip from one still on the plaintext tables.
    */
   keyEpoch: integer("key_epoch"),
-  /** The name under the trip key, once sealed; `name` empties then (Phase 2). */
+  /** The name, sealed under the trip key (lib/keys `sealName`). */
   nameEnc: text("name_enc"),
   createdBy: text("created_by")
     .notNull()
@@ -240,214 +230,6 @@ export const credentials = pgTable(
   (t) => [index("credentials_member_idx").on(t.memberId)],
 );
 
-export const markets = pgTable(
-  "markets",
-  {
-    id: text("id").primaryKey(),
-    tripId: text("trip_id")
-      .notNull()
-      .references(() => trips.id),
-    creatorId: text("creator_id")
-      .notNull()
-      .references(() => members.id),
-    question: text("question").notNull(),
-    criteria: text("criteria").notNull(),
-    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-    status: marketStatusEnum("status").notNull().default("open"),
-    resolvedAt: timestamp("resolved_at", { withTimezone: true }),
-    resolutionNote: text("resolution_note"),
-  },
-  (t) => [index("markets_trip_idx").on(t.tripId)],
-);
-
-// Append-only. Every pie movement in the system is a row here; balances and
-// positions are always derived by replaying it, never stored elsewhere.
-//   grant   +amount   pies issued to a member on joining
-//   bet     -amount   stake committed to a market side
-//   switch   0        stake moved to the other side (side = destination)
-//   payout  +amount   winning share of a resolved market's pool
-//   refund  +amount   stake returned (voided market or empty winning side)
-//   reversal -amount  a resolution taken back: the payout or refund handed in
-//                     again so the market can be resolved afresh. The stakes
-//                     are untouched, so replaying bet/switch still gives the
-//                     same positions and re-resolving pays the same pool out.
-export const ledger = pgTable(
-  "ledger",
-  {
-    id: bigserial("id", { mode: "number" }).primaryKey(),
-    at: timestamp("at", { withTimezone: true }).notNull().defaultNow(),
-    /** Denormalised from the market so a balance is one indexed sum. */
-    tripId: text("trip_id")
-      .notNull()
-      .references(() => trips.id),
-    memberId: text("member_id")
-      .notNull()
-      .references(() => members.id),
-    marketId: text("market_id").references(() => markets.id),
-    kind: ledgerKindEnum("kind").notNull(),
-    side: sideEnum("side"),
-    amountC: integer("amount_c").notNull(),
-    balanceDeltaC: integer("balance_delta_c").notNull(),
-    note: text("note"),
-  },
-  (t) => [index("ledger_trip_member_idx").on(t.tripId, t.memberId)],
-);
-
-// Append-only, like the ledger: one row each time a member opens a prediction
-// page. Pure telemetry — never touches settlement. The "For you" ranking and
-// the watcher count are derived from it at read time.
-export const marketViews = pgTable(
-  "market_views",
-  {
-    id: bigserial("id", { mode: "number" }).primaryKey(),
-    at: timestamp("at", { withTimezone: true }).notNull().defaultNow(),
-    memberId: text("member_id")
-      .notNull()
-      .references(() => members.id),
-    marketId: text("market_id")
-      .notNull()
-      .references(() => markets.id),
-  },
-  (t) => [index("market_views_member_market_idx").on(t.memberId, t.marketId)],
-);
-
-export const marketReactionEnum = pgEnum("market_reaction", ["upvote", "watch"]);
-
-// Raw member intent on a prediction, one row per live reaction: an `upvote`
-// says "good question", a `watch` says "keep me posted". Toggling off deletes
-// the row — this is presence state like `memberships.inbox_seen_at`, not history.
-// Counts, ranking boosts, and watch-driven inbox items are derived at read
-// time; nothing aggregated is ever stored.
-export const marketReactions = pgTable(
-  "market_reactions",
-  {
-    marketId: text("market_id")
-      .notNull()
-      .references(() => markets.id),
-    memberId: text("member_id")
-      .notNull()
-      .references(() => members.id),
-    kind: marketReactionEnum("kind").notNull(),
-    at: timestamp("at", { withTimezone: true }).notNull().defaultNow(),
-  },
-  (t) => [
-    primaryKey({ columns: [t.marketId, t.memberId, t.kind] }),
-    index("market_reactions_member_idx").on(t.memberId),
-  ],
-);
-
-// ---------- split bills (real money, separate from the pie ledger) ----------
-
-export const billKindEnum = pgEnum("bill_kind", ["expense", "settlement"]);
-export const billSplitEnum = pgEnum("bill_split", ["equal", "custom"]);
-
-/** Identity only — everything about a bill lives in its revisions. */
-export const bills = pgTable(
-  "bills",
-  {
-    id: text("id").primaryKey(),
-    tripId: text("trip_id")
-      .notNull()
-      .references(() => trips.id),
-    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-  },
-  (t) => [index("bills_trip_idx").on(t.tripId)],
-);
-
-// Append-only, in the ledger's spirit: every add, edit, or delete of a bill is
-// a new full snapshot here, so any member can change any bill and the whole
-// trail stays on the record. A bill's current state is its latest revision;
-// `deleted: true` retires it. A `settlement` is a bill where the payer paid
-// and the receiver owes — the same replay that nets expenses cancels it.
-export const billRevisions = pgTable(
-  "bill_revisions",
-  {
-    id: bigserial("id", { mode: "number" }).primaryKey(),
-    billId: text("bill_id")
-      .notNull()
-      .references(() => bills.id),
-    editorId: text("editor_id")
-      .notNull()
-      .references(() => members.id),
-    at: timestamp("at", { withTimezone: true }).notNull().defaultNow(),
-    deleted: boolean("deleted").notNull().default(false),
-    kind: billKindEnum("kind").notNull().default("expense"),
-    // The day the money moved, as the member stated it — no timezone games.
-    onDate: date("on_date", { mode: "string" }).notNull(),
-    description: text("description").notNull(),
-    /** ISO 4217 lowercased; one of the trip's two (lib/split.ts knows the set). */
-    currency: text("currency").notNull(),
-    split: billSplitEnum("split").notNull().default("equal"),
-  },
-  (t) => [index("bill_revisions_bill_idx").on(t.billId)],
-);
-
-// One member's line on one revision. Owed shares are computed at write time by
-// lib/split.ts (largest-remainder, like engine's settle) so paid and owed each
-// sum to the bill total and historical bills never re-split.
-export const billEntries = pgTable(
-  "bill_entries",
-  {
-    id: bigserial("id", { mode: "number" }).primaryKey(),
-    revisionId: bigint("revision_id", { mode: "number" })
-      .notNull()
-      .references(() => billRevisions.id),
-    memberId: text("member_id")
-      .notNull()
-      .references(() => members.id),
-    // Centi-units of currencies with wildly different magnitudes: a Vietnam
-    // hotel runs tens of millions of dong, past what int4 can hold.
-    paidC: bigint("paid_c", { mode: "number" }).notNull().default(0),
-    owedC: bigint("owed_c", { mode: "number" }).notNull().default(0),
-    participant: boolean("participant").notNull().default(true),
-  },
-  (t) => [index("bill_entries_revision_idx").on(t.revisionId)],
-);
-
-// ---------- comments (on predictions and on bills) ----------
-
-// Append-only, in the ledger's spirit: table talk stays on the record, no
-// edits or deletes. Exactly one of market_id / bill_id is set (the check
-// below). Mentions in the body are resolved against member names at write
-// time by lib/mentions.ts and snapshotted as comment_mentions rows, so a
-// later rename never rewrites who was tagged. "You were tagged" inbox items
-// are derived from those rows at read time — no notification rows; the only
-// read state is still memberships.inbox_seen_at.
-export const comments = pgTable(
-  "comments",
-  {
-    id: bigserial("id", { mode: "number" }).primaryKey(),
-    at: timestamp("at", { withTimezone: true }).notNull().defaultNow(),
-    authorId: text("author_id")
-      .notNull()
-      .references(() => members.id),
-    marketId: text("market_id").references(() => markets.id),
-    billId: text("bill_id").references(() => bills.id),
-    body: text("body").notNull(),
-  },
-  (t) => [
-    index("comments_market_idx").on(t.marketId),
-    index("comments_bill_idx").on(t.billId),
-    check("comments_one_subject", sql`("market_id" IS NULL) <> ("bill_id" IS NULL)`),
-  ],
-);
-
-export const commentMentions = pgTable(
-  "comment_mentions",
-  {
-    commentId: bigint("comment_id", { mode: "number" })
-      .notNull()
-      .references(() => comments.id),
-    memberId: text("member_id")
-      .notNull()
-      .references(() => members.id),
-  },
-  (t) => [
-    primaryKey({ columns: [t.commentId, t.memberId] }),
-    index("comment_mentions_member_idx").on(t.memberId),
-  ],
-);
-
 // ---------- kept phrases (the one thing /talk writes down) ----------
 
 export const talkSideEnum = pgEnum("talk_side", ["us", "them"]);
@@ -529,20 +311,26 @@ export const events = pgTable(
 );
 
 /**
- * A member's keyring — every trip key they hold, by epoch — under their
- * keyring key, which lives in their browser (and, from Phase 4, under each
- * passkey's PRF secret). Opaque here: the server learns its size and when it
- * changed. `version` is bumped on every write so two devices cannot silently
- * overwrite each other.
+ * A member's keyring under a key only their passkey can derive: the PRF
+ * extension gives the same secret every time that credential signs in, so a
+ * new phone that signs in with a synced passkey opens its keys by itself.
+ * Opaque here — the server learns its size and when it changed. Dropping the
+ * credential drops the backup with it.
  */
-export const keyrings = pgTable("keyrings", {
-  memberId: text("member_id")
-    .primaryKey()
-    .references(() => members.id, { onDelete: "cascade" }),
-  blob: text("blob").notNull(),
-  version: integer("version").notNull().default(1),
-  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
-});
+export const keyringWraps = pgTable(
+  "keyring_wraps",
+  {
+    credentialId: text("credential_id")
+      .primaryKey()
+      .references(() => credentials.id, { onDelete: "cascade" }),
+    memberId: text("member_id")
+      .notNull()
+      .references(() => members.id, { onDelete: "cascade" }),
+    blob: text("blob").notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("keyring_wraps_member_idx").on(t.memberId)],
+);
 
 /**
  * A key for a member who already has a seat: how a phone that lost its
@@ -589,6 +377,8 @@ export const cards = pgTable("cards", {
     .notNull()
     .references(() => members.id),
   at: timestamp("at", { withTimezone: true }).notNull().defaultNow(),
+  /** The trip's name as the publishing phone printed it: the server cannot read the real one. */
+  tripName: text("trip_name").notNull().default(""),
   question: text("question").notNull(),
   verdict: text("verdict").notNull(),
   /** `[{ name, pies }]` — what the card prints, nothing the card does not. */
@@ -602,16 +392,7 @@ export type MembershipRole = MembershipRow["role"];
 export type CredentialRow = typeof credentials.$inferSelect;
 export type InviteRow = typeof invites.$inferSelect;
 export type RecoveryRow = typeof recoveries.$inferSelect;
-export type Market = typeof markets.$inferSelect;
-export type LedgerRow = typeof ledger.$inferSelect;
-export type MarketViewRow = typeof marketViews.$inferSelect;
-export type MarketReactionRow = typeof marketReactions.$inferSelect;
-export type ReactionKind = MarketReactionRow["kind"];
-export type BillRevisionRow = typeof billRevisions.$inferSelect;
-export type BillEntryRow = typeof billEntries.$inferSelect;
-export type CommentRow = typeof comments.$inferSelect;
 export type PhraseRow = typeof phrases.$inferSelect;
 export type EventRow = typeof events.$inferSelect;
-export type KeyringRow = typeof keyrings.$inferSelect;
 export type RekeyRow = typeof rekeys.$inferSelect;
 export type CardRow = typeof cards.$inferSelect;

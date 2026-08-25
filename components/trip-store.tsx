@@ -18,9 +18,10 @@ import type { ActionResult } from "@/app/actions";
 import { open, seal } from "@/lib/crypto";
 import type { EventRow } from "@/lib/db/schema";
 import { decodeEvent, type EventPayload, encodeEvent, type OpenEvent } from "@/lib/events";
+import { openName, sealName } from "@/lib/keys";
 import { type Lingo, lingoOf } from "@/lib/lingo";
 import { type ReplayConfig, replayTrip, type TripState } from "@/lib/replay";
-import { type Person, peopleOf, type RosterMember } from "@/lib/views";
+import { type Leftovers, type Person, peopleOf, type RosterMember, resealPlan } from "@/lib/views";
 import { useTripKey } from "./keyring";
 
 const POLL_MS = 15_000;
@@ -28,11 +29,17 @@ const POLL_MS = 15_000;
 export interface TripStoreActions {
   append(tripId: string, envelope: string): Promise<ActionResult & { id?: number; at?: Date }>;
   since(tripId: string, afterId: number): Promise<ActionResult & { rows?: EventRow[] }>;
+  sealLeftovers(
+    tripId: string,
+    input: { nameEnc: string | null; phraseIds: string[] },
+  ): Promise<ActionResult>;
 }
 
 export interface TripStoreValue {
   tripId: string;
   epoch: number | null;
+  /** The trip's name: `undefined` while the key is loading, `null` when this phone cannot read it. */
+  name: string | null | undefined;
   me: RosterMember;
   lingo: string;
   t: Lingo;
@@ -57,6 +64,8 @@ const TripStoreContext = createContext<TripStoreValue | null>(null);
 export function TripStoreProvider({
   tripId,
   epoch,
+  nameEnc,
+  leftovers,
   config,
   me,
   lingo,
@@ -68,6 +77,9 @@ export function TripStoreProvider({
 }: {
   tripId: string;
   epoch: number | null;
+  nameEnc: string | null;
+  /** A name and phrases from before sealing, for an organiser's phone to put on the record. */
+  leftovers: Leftovers | null;
   config: Omit<ReplayConfig, "tripId">;
   me: RosterMember;
   lingo: string;
@@ -84,6 +96,23 @@ export function TripStoreProvider({
   const [seenAt, setSeenAt] = useState<Date | null>(initialSeenAt);
   const rowsRef = useRef(rows);
   rowsRef.current = rows;
+  const [name, setName] = useState<string | null | undefined>(undefined);
+
+  useEffect(() => {
+    if (key === undefined) return;
+    if (!key || !nameEnc) {
+      setName(leftovers?.name ?? null);
+      return;
+    }
+    let cancelled = false;
+    openName(key, tripId, nameEnc).then(
+      (n) => !cancelled && setName(n),
+      () => !cancelled && setName(null),
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [key, nameEnc, leftovers?.name, tripId]);
 
   useEffect(() => {
     if (!key) return;
@@ -208,11 +237,47 @@ export function TripStoreProvider({
     void append({ t: "member.hello" });
   }, [state, ready, rows.length, unreadable, me.id, append]);
 
+  // What predates sealing — a name, kept phrases — goes on the record from the first organiser's
+  // phone that can read the trip; the console never could. Once, then the plaintext is dropped.
+  const resealed = useRef(false);
+  useEffect(() => {
+    if (!leftovers || !key || !state || !ready || resealed.current) return;
+    if (me.role !== "organiser" || (rows.length > 0 && unreadable === rows.length)) return;
+    resealed.current = true;
+    (async () => {
+      const plan = resealPlan(leftovers, state);
+      for (const keep of plan.keeps) {
+        const res = await append(keep);
+        if (!res.ok) return console.warn(`leftovers stayed: ${res.error}`);
+      }
+      const sealedName =
+        leftovers.name && !nameEnc ? await sealName(key, tripId, leftovers.name) : null;
+      const res = await actions.sealLeftovers(tripId, {
+        nameEnc: sealedName,
+        phraseIds: plan.phraseIds,
+      });
+      if (!res.ok) console.warn(`leftovers stayed: ${res.error}`);
+    })();
+  }, [
+    leftovers,
+    key,
+    state,
+    ready,
+    me.role,
+    rows.length,
+    unreadable,
+    append,
+    actions,
+    nameEnc,
+    tripId,
+  ]);
+
   const t = useMemo(() => lingoOf(lingo), [lingo]);
   const value = useMemo<TripStoreValue>(
     () => ({
       tripId,
       epoch,
+      name,
       me,
       lingo,
       t,
@@ -230,6 +295,7 @@ export function TripStoreProvider({
     [
       tripId,
       epoch,
+      name,
       me,
       lingo,
       t,

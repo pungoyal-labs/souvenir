@@ -18,9 +18,9 @@ export function TripHome({
   starterTrip,
 }: {
   showSettled: boolean;
-  starterTrip: Omit<StarterContext, "members" | "viewerId">;
+  starterTrip: Omit<StarterContext, "members" | "viewerId" | "name">;
 }) {
-  const { tripId, me, lingo, t, roster, people, state } = useOpenTrip();
+  const { tripId, me, lingo, t, roster, people, state, name } = useOpenTrip();
   const { open, resolved, forYou } = listMarkets(state, tripId, people, me.id, new Date());
   const netC = netOf(state, me.id);
   const results = memberResults(state, tripId, me.id);
@@ -36,6 +36,7 @@ export function TripHome({
     open.length + resolved.length < 3
       ? starters({
           ...starterTrip,
+          name: name ?? starterTrip.place,
           members: roster.map((m) => ({ id: m.id, name: m.name })),
           viewerId: me.id,
         })

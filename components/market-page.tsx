@@ -32,12 +32,10 @@ const heading = "display text-lg font-bold uppercase tracking-wide text-soft";
 export function MarketPage({
   marketId,
   maxStakePies,
-  tripName,
   published,
 }: {
   marketId: string;
   maxStakePies: number;
-  tripName: string;
   /** Whether a card is up for it — the one thing about a prediction the server knows. */
   published: boolean;
 }) {
@@ -148,7 +146,6 @@ export function MarketPage({
             </div>
           )}
           <ShareCard
-            tripName={tripName}
             card={marketCard(state, tripId, people, marketId)}
             marketId={marketId}
             published={published}

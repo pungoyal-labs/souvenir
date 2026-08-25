@@ -1,13 +1,12 @@
 "use client";
 
-// The keyring on this phone. See docs/private-trips.md §4.1.
+// The keyring on this phone. See docs/private-trips.md §4.1 and §4.8.3.
 //
-// Two things live in IndexedDB, and only here: the keyring key — generated
-// non-extractable, so not even this page can read its bytes — and the keyring
-// blob sealed under it. Everything a page needs (the key for a trip's current
-// epoch, whether this phone holds one at all) comes through the context below.
-// `onSave`, when a page passes one, is how the blob also reaches the server's
-// `keyrings` row in Phase 1; this component never talks to the network itself.
+// IndexedDB holds the keyring key — non-extractable, so not even this page can
+// read its bytes — and the keyring blob sealed under it. It also holds one
+// derived key per passkey this phone has used: the passkey's PRF output makes
+// the same key on every phone that passkey syncs to, so the keyring is backed
+// up under each in `keyring_wraps` and restored from there after a sign-in.
 //
 // Storage can be missing (a private window, Safari after a week away, a
 // browser told to block site data): every read is wrapped, and an empty or
@@ -22,12 +21,16 @@ import {
   useRef,
   useState,
 } from "react";
+import { keyringWrapsAction, saveKeyringWrapAction } from "@/app/actions";
 import { newKey } from "@/lib/crypto";
 import {
   emptyKeyring,
+  encodeKeyring,
   holdsKey,
   type Keyring,
+  mergeKeyrings,
   openKeyring,
+  prfKeyringKey,
   sealKeyring,
   tripCryptoKey,
 } from "@/lib/keys";
@@ -36,6 +39,8 @@ const DB_NAME = "chiang-pai-keys";
 const STORE = "keys";
 const KK_ID = "kk";
 const BLOB_ID = "keyring";
+const PRF_IDS = "prf";
+const prfId = (credentialId: string) => `prf:${credentialId}`;
 
 // --- IndexedDB, the small part of it we need ----------------------------------
 
@@ -72,6 +77,73 @@ function idbPut(db: IDBDatabase, id: string, value: unknown): Promise<void> {
   });
 }
 
+// --- passkeys -------------------------------------------------------------------
+
+/** After a ceremony that returned a PRF result: keep the key it derives, for this credential. */
+export async function rememberPrf(credentialId: string, prf: ArrayBuffer): Promise<void> {
+  try {
+    const db = await openDb();
+    const key = await prfKeyringKey(new Uint8Array(prf));
+    await idbPut(db, prfId(credentialId), key);
+    const ids = (await idbGet<string[]>(db, PRF_IDS)) ?? [];
+    if (!ids.includes(credentialId)) await idbPut(db, PRF_IDS, [...ids, credentialId]);
+  } catch {
+    // No storage: nothing to back up into, and nothing to restore from.
+  }
+}
+
+async function prfKeys(db: IDBDatabase): Promise<Map<string, CryptoKey>> {
+  const out = new Map<string, CryptoKey>();
+  for (const id of (await idbGet<string[]>(db, PRF_IDS)) ?? []) {
+    const key = await idbGet<CryptoKey>(db, prfId(id));
+    if (key) out.set(id, key);
+  }
+  return out;
+}
+
+const same = (a: Keyring, b: Keyring) => encodeKeyring(a).join() === encodeKeyring(b).join();
+
+/** The keyring under every passkey key this phone holds, to the server. Best effort. */
+async function backUp(db: IDBDatabase, kr: Keyring, skip?: Set<string>): Promise<void> {
+  for (const [id, key] of await prfKeys(db)) {
+    if (skip?.has(id)) continue;
+    try {
+      await saveKeyringWrapAction(id, await sealKeyring(key, kr));
+    } catch {
+      // Offline, or a credential since dropped: the next change tries again.
+    }
+  }
+}
+
+/**
+ * Whatever this member's passkeys backed up that this phone can open, merged
+ * into what it holds. Returns the merged keyring and which backups already match it.
+ */
+async function restore(db: IDBDatabase, local: Keyring) {
+  const keys = await prfKeys(db);
+  if (keys.size === 0) return { keyring: local, current: new Set<string>() };
+  let merged = local;
+  const opened = new Map<string, Keyring>();
+  try {
+    const res = await keyringWrapsAction();
+    for (const wrap of res.wraps ?? []) {
+      const key = keys.get(wrap.credentialId);
+      if (!key) continue;
+      try {
+        const kr = await openKeyring(key, wrap.blob);
+        opened.set(wrap.credentialId, kr);
+        merged = mergeKeyrings(merged, kr);
+      } catch {
+        // Sealed by a passkey key this phone does not derive the same way: not ours to open.
+      }
+    }
+  } catch {
+    // Offline: the local keyring is what there is.
+  }
+  const current = new Set([...opened].filter(([, kr]) => same(kr, merged)).map(([id]) => id));
+  return { keyring: merged, current };
+}
+
 // --- the context --------------------------------------------------------------
 
 export type KeyringStatus =
@@ -93,14 +165,7 @@ export interface KeyringContextValue {
 
 const KeyringContext = createContext<KeyringContextValue | null>(null);
 
-export function KeyringProvider({
-  children,
-  onSave,
-}: {
-  children: React.ReactNode;
-  /** Phase 1: the server action that stores the blob in `keyrings`. */
-  onSave?: (blob: string) => Promise<void>;
-}) {
+export function KeyringProvider({ children }: { children: React.ReactNode }) {
   const [status, setStatus] = useState<KeyringStatus>("loading");
   const [keyring, setKeyring] = useState<Keyring>(emptyKeyring);
   const kkRef = useRef<CryptoKey | null>(null);
@@ -128,11 +193,17 @@ export function KeyringProvider({
             kr = emptyKeyring();
           }
         }
+        const restored = await restore(db, kr);
         if (cancelled) return;
         dbRef.current = db;
         kkRef.current = kk;
-        setKeyring(kr);
+        setKeyring(restored.keyring);
         setStatus("ready");
+        if (!same(restored.keyring, kr))
+          await idbPut(db, BLOB_ID, await sealKeyring(kk, restored.keyring));
+        if (Object.keys(restored.keyring.trips).length > 0) {
+          void backUp(db, restored.keyring, restored.current);
+        }
       } catch {
         if (!cancelled) setStatus("unavailable");
       }
@@ -142,19 +213,15 @@ export function KeyringProvider({
     };
   }, []);
 
-  const update = useCallback(
-    async (next: (current: Keyring) => Keyring) => {
-      const kr = next(keyringRef.current);
-      setKeyring(kr);
-      const kk = kkRef.current;
-      const db = dbRef.current;
-      if (!kk || !db) return;
-      const blob = await sealKeyring(kk, kr);
-      await idbPut(db, BLOB_ID, blob);
-      if (onSave) await onSave(blob);
-    },
-    [onSave],
-  );
+  const update = useCallback(async (next: (current: Keyring) => Keyring) => {
+    const kr = next(keyringRef.current);
+    setKeyring(kr);
+    const kk = kkRef.current;
+    const db = dbRef.current;
+    if (!kk || !db) return;
+    await idbPut(db, BLOB_ID, await sealKeyring(kk, kr));
+    void backUp(db, kr);
+  }, []);
 
   const value = useMemo<KeyringContextValue>(
     () => ({

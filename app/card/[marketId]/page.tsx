@@ -22,8 +22,8 @@ export async function generateMetadata({
   const verdict = card.verdict === "refunded" ? "Voided" : card.verdict.toUpperCase();
   return {
     title: card.question,
-    description: `${verdict} · ${card.trip.name} · Chiang Pai`,
-    openGraph: { title: card.question, description: `${verdict} on ${card.trip.name}` },
+    description: `${verdict} · ${card.tripName} · Chiang Pai`,
+    openGraph: { title: card.question, description: `${verdict} on ${card.tripName}` },
   };
 }
 
@@ -40,7 +40,7 @@ export default async function CardPage({ params }: { params: Promise<{ marketId:
       <div className="card overflow-hidden">
         <div className="bg-felt-deep px-5 py-4 text-[#f1eee4]">
           <p className="text-xs uppercase tracking-wider text-white/60">
-            {there?.flag} {card.trip.name} · {fmtDate(card.at)}
+            {there?.flag} {card.tripName} · {fmtDate(card.at)}
           </p>
           <p className="display mt-1 text-3xl font-extrabold leading-tight">{card.question}</p>
         </div>

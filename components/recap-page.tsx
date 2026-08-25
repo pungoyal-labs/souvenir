@@ -13,16 +13,8 @@ import { useOpenTrip } from "./trip-store";
 import { EmptyState } from "./ui";
 
 /** The season, summed up: the table, the rivalries, the biggest swing. */
-export function RecapPage({
-  tripName,
-  eyebrow,
-  minResolved,
-}: {
-  tripName: string;
-  eyebrow: string;
-  minResolved: number;
-}) {
-  const { tripId, me, t, roster, people, state } = useOpenTrip();
+export function RecapPage({ eyebrow, minResolved }: { eyebrow: string; minResolved: number }) {
+  const { tripId, me, t, roster, people, state, name: tripName } = useOpenTrip();
   const recap = tripRecap(state, tripId, roster, people, minResolved);
   const champion = recap.table[0];
   const name = (id: string) => people.get(id)?.name ?? "someone";
@@ -117,7 +109,7 @@ export function RecapPage({
           )}
 
           <ShareRecap
-            tripName={tripName}
+            tripName={tripName ?? t.sealedTripName}
             lines={recap.table
               .slice(0, 5)
               .map((s, i) => `${i + 1}. ${s.member.name} ${piesText(s.profitC, { sign: true })}`)}

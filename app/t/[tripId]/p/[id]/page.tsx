@@ -13,12 +13,7 @@ export default async function PredictionPage({
   const published = await publishedCards(tripId);
   return (
     <Sealed>
-      <MarketPage
-        marketId={id}
-        maxStakePies={trip.maxStakePies}
-        tripName={trip.name}
-        published={published.has(id)}
-      />
+      <MarketPage marketId={id} maxStakePies={trip.maxStakePies} published={published.has(id)} />
     </Sealed>
   );
 }

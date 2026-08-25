@@ -2,7 +2,14 @@
 
 import { useState, useTransition } from "react";
 import { beginPasskeySignInAction, finishPasskeySignInAction } from "@/app/actions";
-import { ceremonyError, fromBase64url, originMismatch, toBase64url } from "@/components/passkeys";
+import {
+  ceremonyError,
+  fromBase64url,
+  originMismatch,
+  prfExtension,
+  rememberPrfOf,
+  toBase64url,
+} from "@/components/passkeys";
 
 /**
  * One button, no field to type in: the challenge carries no credential list, so
@@ -41,6 +48,7 @@ export function PasskeySignIn({ next }: { next?: string }) {
             rpId: options.rpId,
             userVerification: options.userVerification,
             timeout: options.timeout,
+            extensions: prfExtension(),
           },
         })) as PublicKeyCredential | null;
       } catch (err) {
@@ -52,6 +60,8 @@ export function PasskeySignIn({ next }: { next?: string }) {
         return;
       }
 
+      // Before the redirect: the keyring restores itself from this passkey's backup on the next page.
+      await rememberPrfOf(credential);
       const response = credential.response as AuthenticatorAssertionResponse;
       const result = await finishPasskeySignInAction(
         {

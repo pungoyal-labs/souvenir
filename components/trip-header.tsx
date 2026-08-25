@@ -10,20 +10,18 @@ import { useTrip } from "./trip-store";
 /** The top of every trip page. The number and the inbox dot come from the replayed trip; a keyless phone shows neither. */
 export function TripHeader({
   tripId,
-  name,
   place,
   when,
   talkLabel,
   ended,
 }: {
   tripId: string;
-  name: string;
   place: string;
   when: string | null;
   talkLabel: string | null;
   ended: boolean;
 }) {
-  const { state, me, people, seenAt } = useTrip();
+  const { state, me, people, seenAt, name, t } = useTrip();
   const netC = state ? netOf(state, me.id) : null;
   const unread = !!state && inbox(state, tripId, people, me.id, seenAt, 1).unreadCount > 0;
   return (
@@ -35,7 +33,9 @@ export function TripHeader({
             {when && <span className="text-soft"> · {when}</span>}
           </p>
           <h1 className="display truncate text-3xl font-extrabold uppercase tracking-wide sm:text-4xl">
-            <Link href={routes.trip(tripId)}>{name}</Link>
+            <Link href={routes.trip(tripId)}>
+              {name === undefined ? "…" : (name ?? t.sealedTripName)}
+            </Link>
           </h1>
         </div>
         {netC !== null && (

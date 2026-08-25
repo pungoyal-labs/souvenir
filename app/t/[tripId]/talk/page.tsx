@@ -1,6 +1,6 @@
 import Link from "next/link";
+import { Sealed } from "@/components/sealed";
 import { Talk } from "@/components/talk";
-import { isOrganiser, listPhrases } from "@/lib/data";
 import { lingoOf } from "@/lib/lingo";
 import { llmEnabled } from "@/lib/llm";
 import { routes } from "@/lib/routes";
@@ -8,20 +8,11 @@ import { requireTrip } from "@/lib/session";
 import { speakEnabled } from "@/lib/speech";
 import { pairFor } from "@/lib/talk";
 
-/**
- * The one page in this app pointed at somebody who is not in the group.
- *
- * Nothing it does is recorded on its own: no turn, no clip, no transcript. The
- * conversation lives in the tab and ends with it, which is the only sensible
- * lifetime for a stranger's words.
- *
- * The exception is deliberate and is the member's, not the app's — a phrase
- * they pointed at and named is kept, for the whole trip to say again.
- */
+// The one page pointed at somebody outside the group. Nothing here is recorded
+// unless a member keeps a phrase, and that lands in the sealed log like anything else.
 export default async function TalkPage({ params }: { params: Promise<{ tripId: string }> }) {
   const { tripId } = await params;
-  const ctx = await requireTrip(tripId);
-  const { me, trip } = ctx;
+  const { me, trip } = await requireTrip(tripId);
   const t = lingoOf(me.lingo);
   const pair = pairFor(trip);
   if (!pair) {
@@ -40,7 +31,6 @@ export default async function TalkPage({ params }: { params: Promise<{ tripId: s
       </div>
     );
   }
-  const phrases = await listPhrases(tripId);
   return (
     <div className="mx-auto max-w-2xl">
       <p className="eyebrow">{pair.them.language}</p>
@@ -48,16 +38,9 @@ export default async function TalkPage({ params }: { params: Promise<{ tripId: s
         {t.talkTitle(pair.them.language)}
       </h1>
       <p className="mb-6 mt-1 text-sm text-soft">{t.talkSub(pair.them.language)}</p>
-      <Talk
-        tripId={tripId}
-        meId={me.id}
-        organiser={isOrganiser(ctx)}
-        pair={pair}
-        canInterpret={llmEnabled}
-        serverSpeaks={speakEnabled}
-        phrases={phrases}
-        phrasebookHeading={t.phrasebookHeading}
-      />
+      <Sealed>
+        <Talk pair={pair} canInterpret={llmEnabled} serverSpeaks={speakEnabled} />
+      </Sealed>
     </div>
   );
 }

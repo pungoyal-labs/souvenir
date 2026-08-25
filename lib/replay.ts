@@ -12,7 +12,6 @@
 // Settlement math is lib/engine's, untouched. The derived `ledger` is in the
 // shape of today's ledger rows so lib/stats keeps working over it unchanged.
 
-import type { LedgerRow } from "./db/schema.ts";
 import {
   computePositions,
   exposure,
@@ -25,6 +24,7 @@ import {
 import type { EventPayload, OpenEvent, UnknownEvent } from "./events.ts";
 import { MAX_PHRASES } from "./phrases.ts";
 import { CENTS } from "./pies.ts";
+import type { LedgerRow } from "./rows.ts";
 import { type BillEntry, buildEntries, SplitError } from "./split.ts";
 
 export interface ReplayConfig {
@@ -120,7 +120,6 @@ export interface Rejection {
 }
 
 export interface TripState {
-  name: string | null;
   organiserIds: Set<string>;
   markets: Map<string, MarketState>;
   /** Every pie movement, derived, in today's ledger shape and in event order. */
@@ -146,7 +145,6 @@ function refuse(reason: string): never {
 
 export function replayTrip(config: ReplayConfig, events: readonly OpenEvent[]): TripState {
   const state: TripState = {
-    name: null,
     organiserIds: new Set([config.creatorId]),
     markets: new Map(),
     ledger: [],
@@ -383,7 +381,7 @@ function apply(ctx: Ctx, ev: OpenEvent, p: Exclude<EventPayload, UnknownEvent>):
       }
       state.phrases.set(p.id, {
         id: p.id,
-        memberId: ev.authorId,
+        memberId: p.keeper && state.organiserIds.has(ev.authorId) ? p.keeper : ev.authorId,
         createdAt: ev.at,
         slug: p.slug,
         name: p.name,
@@ -419,11 +417,6 @@ function apply(ctx: Ctx, ev: OpenEvent, p: Exclude<EventPayload, UnknownEvent>):
         }
         state.organiserIds.delete(p.memberId);
       }
-      return;
-    }
-    case "trip.rename": {
-      if (!state.organiserIds.has(ev.authorId)) refuse("only an organiser renames the trip");
-      state.name = p.name.trim() || refuse("a trip needs a name");
       return;
     }
     default: {

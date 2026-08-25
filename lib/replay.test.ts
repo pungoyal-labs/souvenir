@@ -236,17 +236,28 @@ describe("roles", () => {
     expect(reasons(state)).toEqual(["only an organiser reopens"]);
   });
 
-  it("lets only an organiser rename", () => {
+  it("lets an organiser keep a phrase on somebody's behalf, and nobody else", () => {
+    const keep = (id: string, keeper?: string): EventPayload => ({
+      t: "phrase.keep",
+      id,
+      slug: id,
+      name: id,
+      side: "us",
+      heard: "hi",
+      said: "สวัสดี",
+      language: "Thai",
+      tag: "th-TH",
+      ...(keeper ? { keeper } : {}),
+    });
     const state = replayTrip(
       config,
       log([
-        ["a", { t: "trip.rename", name: "Nope" }],
-        ["org", { t: "trip.rename", name: "  Pai  " }],
-        ["org", { t: "trip.rename", name: "  " }],
+        ["org", keep("p1", "b")],
+        ["a", keep("p2", "b")],
       ]),
     );
-    expect(state.name).toBe("Pai");
-    expect(reasons(state)).toEqual(["only an organiser renames the trip", "a trip needs a name"]);
+    expect(state.phrases.get("p1")?.memberId).toBe("b");
+    expect(state.phrases.get("p2")?.memberId).toBe("a");
   });
 });
 

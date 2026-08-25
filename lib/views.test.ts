@@ -19,9 +19,11 @@ import {
   memberSplit,
   netOf,
   peopleOf,
+  phrasebook,
   type RosterMember,
   reactors,
   recentActivity,
+  resealPlan,
   seenBy,
   shouldRecordView,
   tripRecap,
@@ -388,5 +390,74 @@ describe("split bills", () => {
     expect(billError({ ...base, description: " ", kind: "settlement" })).toBeNull();
     expect(billError({ ...base, currency: "usd" })).toMatch(/currency/);
     expect(billError({ ...base, memberIds: ["z"] })).toMatch(/on the trip/);
+  });
+});
+
+describe("phrasebook", () => {
+  it("lists kept phrases newest first, dropped ones gone, keeper named", () => {
+    const keep = (id: string): EventPayload => ({
+      t: "phrase.keep",
+      id,
+      slug: id,
+      name: id,
+      side: "us",
+      heard: "hi",
+      said: "สวัสดี",
+      roman: "sawasdee",
+      language: "Thai",
+      tag: "th-TH",
+    });
+    const state = replayTrip(
+      config,
+      log([
+        ["a", keep("p1")],
+        ["b", keep("p2")],
+        ["a", keep("p3")],
+        ["b", { t: "phrase.drop", id: "p2" }],
+      ]),
+    );
+    const book = phrasebook(state);
+    expect(book.map((p) => p.id)).toEqual(["p3", "p1"]);
+    expect(book[1]).toMatchObject({ keptBy: "a", roman: "sawasdee", language: "Thai" });
+    expect("literal" in book[1]).toBe(false);
+  });
+});
+
+describe("resealPlan", () => {
+  it("keeps every phrase not yet on the record under its keeper, and names every id to drop", () => {
+    const p = (id: string) => ({
+      id,
+      slug: id,
+      side: "us" as const,
+      heard: "hi",
+      said: "สวัสดี",
+      language: "Thai",
+      tag: "th-TH",
+      keptBy: "b",
+    });
+    const state = replayTrip(
+      config,
+      log([["a", { ...p("p1"), t: "phrase.keep", name: "p1", keeper: "b" }]]),
+    );
+    const plan = resealPlan(
+      { name: "Pai", phrases: [p("p1"), { ...p("p2"), roman: "sa" }] },
+      state,
+    );
+    expect(plan.keeps).toEqual([
+      {
+        t: "phrase.keep",
+        id: "p2",
+        slug: "p2",
+        name: "p2",
+        side: "us",
+        heard: "hi",
+        said: "สวัสดี",
+        roman: "sa",
+        language: "Thai",
+        tag: "th-TH",
+        keeper: "b",
+      },
+    ]);
+    expect(plan.phraseIds).toEqual(["p1", "p2"]);
   });
 });

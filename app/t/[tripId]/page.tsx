@@ -18,7 +18,6 @@ export default async function TripHomePage({
       <TripHome
         showSettled={view === "settled"}
         starterTrip={{
-          name: trip.name,
           destination: trip.destination,
           homeCurrency: trip.homeCurrency,
           foreignCurrency: trip.foreignCurrency,

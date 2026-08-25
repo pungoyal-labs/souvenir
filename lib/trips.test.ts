@@ -9,14 +9,14 @@ import {
   TripError,
   tripConfig,
   tripCurrencies,
+  tripName,
   tripPhase,
   tripToday,
 } from "./trips.ts";
 
 describe("tripConfig", () => {
   it("derives the foreign currency from the destination", () => {
-    const t = tripConfig({ name: "  Chiang  Mai  ", destination: "th" });
-    expect(t.name).toBe("Chiang Mai");
+    const t = tripConfig({ destination: "th" });
     expect(t.destination).toBe("TH");
     expect(t.homeLanguage).toBe("en");
     expect(t.homeCurrency).toBe("inr");
@@ -26,49 +26,40 @@ describe("tripConfig", () => {
   });
 
   it("drops the foreign currency when it is the home one — a domestic trip", () => {
-    const goa = tripConfig({ name: "Goa", destination: "IN" });
+    const goa = tripConfig({ destination: "IN" });
     expect(goa.foreignCurrency).toBeNull();
     expect(isDomestic(goa)).toBe(true);
     expect(tripCurrencies(goa)).toEqual(["inr"]);
     expect(defaultCurrency(goa)).toBe("inr");
 
-    const london = tripConfig({ name: "London", destination: "GB", homeCurrency: "gbp" });
+    const london = tripConfig({ destination: "GB", homeCurrency: "gbp" });
     expect(london.foreignCurrency).toBeNull();
   });
 
   it("puts the destination's money first on a foreign trip", () => {
-    const t = tripConfig({ name: "Hanoi", destination: "VN" });
+    const t = tripConfig({ destination: "VN" });
     expect(tripCurrencies(t)).toEqual(["vnd", "inr"]);
     expect(defaultCurrency(t)).toBe("vnd");
     expect(isDomestic(t)).toBe(false);
   });
 
   it("refuses what it cannot make a trip of", () => {
-    expect(() => tripConfig({ name: "x", destination: "TH" })).toThrow(TripError);
-    expect(() => tripConfig({ name: "a".repeat(61), destination: "TH" })).toThrow(/under/);
-    expect(() => tripConfig({ name: "Mars", destination: "XX" })).toThrow(/destination/);
-    expect(() => tripConfig({ name: "T", destination: "TH", homeLanguage: "xx" })).toThrow(
-      /Give the trip a name/,
-    );
-    expect(() => tripConfig({ name: "Trip", destination: "TH", homeLanguage: "xx" })).toThrow(
-      /home language/,
-    );
-    expect(() => tripConfig({ name: "Trip", destination: "TH", homeCurrency: "xyz" })).toThrow(
-      /home currency/,
-    );
-    expect(() => tripConfig({ name: "Trip", destination: "TH", startsOn: "2026-13-40" })).toThrow(
-      /start date/,
-    );
+    expect(() => tripName("x")).toThrow(TripError);
+    expect(() => tripName("a".repeat(61))).toThrow(/under/);
+    expect(tripName("  Chiang  Mai  ")).toBe("Chiang Mai");
+    expect(() => tripConfig({ destination: "XX" })).toThrow(/destination/);
+    expect(() => tripConfig({ destination: "TH", homeLanguage: "xx" })).toThrow(/home language/);
+    expect(() => tripConfig({ destination: "TH", homeCurrency: "xyz" })).toThrow(/home currency/);
+    expect(() => tripConfig({ destination: "TH", startsOn: "2026-13-40" })).toThrow(/start date/);
     expect(() =>
-      tripConfig({ name: "Trip", destination: "TH", startsOn: "2026-11-10", endsOn: "2026-11-01" }),
+      tripConfig({ destination: "TH", startsOn: "2026-11-10", endsOn: "2026-11-01" }),
     ).toThrow(/end before/);
-    expect(() => tripConfig({ name: "Trip", destination: "TH", maxStakePies: 0 })).toThrow(/cap/);
-    expect(() => tripConfig({ name: "Trip", destination: "TH", maxStakePies: 2.5 })).toThrow(/cap/);
+    expect(() => tripConfig({ destination: "TH", maxStakePies: 0 })).toThrow(/cap/);
+    expect(() => tripConfig({ destination: "TH", maxStakePies: 2.5 })).toThrow(/cap/);
   });
 
   it("keeps dates as the calendar days they were typed", () => {
     const t = tripConfig({
-      name: "Diwali",
       destination: "TH",
       startsOn: "2026-11-06",
       endsOn: "2026-11-10",

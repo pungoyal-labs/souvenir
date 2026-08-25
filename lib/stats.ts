@@ -4,7 +4,6 @@
 // behavior. Settlement itself lives in lib/engine.ts; this file is everything
 // downstream of it.
 
-import type { LedgerRow, Market } from "./db/schema.ts";
 import {
   computePositions,
   exposure,
@@ -12,6 +11,7 @@ import {
   type Position,
   type Side,
 } from "./engine.ts";
+import type { LedgerRow, Market } from "./rows.ts";
 
 /** The bet/switch rows as engine events, in ledger order. */
 export function toEvents(rows: LedgerRow[]): MarketEvent[] {

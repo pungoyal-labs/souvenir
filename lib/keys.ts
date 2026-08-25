@@ -13,6 +13,7 @@
 
 import {
   CryptoError,
+  deriveKey,
   fromBase64Url,
   fromUtf8,
   importKey,
@@ -45,6 +46,20 @@ export class KeyringError extends Error {}
 
 export function emptyKeyring(): Keyring {
   return { v: KEYRING_VERSION, trips: {}, links: {} };
+}
+
+/** Everything both keyrings hold. Where both name the same key, the second wins. */
+export function mergeKeyrings(a: Keyring, b: Keyring): Keyring {
+  const trips: Keyring["trips"] = {};
+  for (const kr of [a, b]) {
+    for (const [tripId, epochs] of Object.entries(kr.trips)) {
+      trips[tripId] = { ...trips[tripId], ...epochs };
+    }
+  }
+  const merged: Keyring = { v: KEYRING_VERSION, trips, links: { ...a.links, ...b.links } };
+  const mk = b.mk ?? a.mk;
+  if (mk) merged.mk = mk;
+  return merged;
 }
 
 // --- trip keys ----------------------------------------------------------------
@@ -239,4 +254,25 @@ export async function unwrapPreview(secret: Uint8Array, blob: string): Promise<I
 
 function isStringList(v: unknown): v is string[] {
   return Array.isArray(v) && v.every((x) => typeof x === "string");
+}
+
+// --- the trip's name ------------------------------------------------------------
+
+/** The name is sealed under the trip key on its own, so a trips list can show it without the log. */
+export function sealName(tk: CryptoKey, tripId: string, name: string): Promise<string> {
+  return sealBlob(tk, `name:${tripId}`, utf8(name));
+}
+
+export async function openName(tk: CryptoKey, tripId: string, blob: string): Promise<string> {
+  return fromUtf8(await openBlob(tk, `name:${tripId}`, blob));
+}
+
+// --- passkey backup -------------------------------------------------------------
+
+/** What every passkey's PRF is evaluated on; the authenticator's own secret makes the output its own. */
+export const PRF_SALT = utf8("chiang-pai keyring v1");
+
+/** The key a passkey's PRF output opens this member's keyring backup with. */
+export function prfKeyringKey(prf: Uint8Array): Promise<CryptoKey> {
+  return deriveKey(prf, "keyring:prf");
 }

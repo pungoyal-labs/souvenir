@@ -6,7 +6,7 @@ import { stashSecret } from "./take-key";
 
 /** A few open questions, sealed under the link's secret by the phone that minted it. */
 export function JoinPreview({ code, sealed }: { code: string; sealed: string | null }) {
-  const [questions, setQuestions] = useState<string[] | null>(null);
+  const [preview, setPreview] = useState<{ name: string; questions: string[] } | null>(null);
   useEffect(() => {
     const secret = secretFromFragment(window.location.hash);
     if (!secret || !sealed) return;
@@ -14,7 +14,7 @@ export function JoinPreview({ code, sealed }: { code: string; sealed: string | n
     let cancelled = false;
     unwrapPreview(secret, sealed)
       .then((p) => {
-        if (!cancelled) setQuestions(p.questions);
+        if (!cancelled) setPreview(p);
       })
       .catch(() => {
         // A preview that will not open is no preview.
@@ -23,18 +23,23 @@ export function JoinPreview({ code, sealed }: { code: string; sealed: string | n
       cancelled = true;
     };
   }, [code, sealed]);
-  if (!questions?.length) return null;
+  if (!preview) return null;
   return (
-    <ul className="mt-3 space-y-1 border-t border-line pt-3 text-sm">
-      {questions.map((q) => (
-        <li key={q} className="flex gap-2">
-          <span aria-hidden className="text-gold">
-            ◆
-          </span>
-          <span className="font-semibold">{q}</span>
-        </li>
-      ))}
-    </ul>
+    <>
+      <p className="display text-2xl font-extrabold uppercase tracking-wide">{preview.name}</p>
+      {preview.questions.length > 0 && (
+        <ul className="mt-3 space-y-1 border-t border-line pt-3 text-sm">
+          {preview.questions.map((q) => (
+            <li key={q} className="flex gap-2">
+              <span aria-hidden className="text-gold">
+                ◆
+              </span>
+              <span className="font-semibold">{q}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </>
   );
 }
 

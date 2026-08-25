@@ -19,7 +19,16 @@
 //
 // Pure data in, pure data out; lib/data.ts does the I/O.
 
-import { type Pair, type Side, speakerOf, type VoicePreference } from "./talk.ts";
+import type { PhraseKeep } from "./events.ts";
+import {
+  clampUtterance,
+  otherSide,
+  type Pair,
+  type Side,
+  speakerOf,
+  type VoicePreference,
+  worthSaying,
+} from "./talk.ts";
 
 /** As typed by whoever saved it, before slugging. Longer than this is a note. */
 export const MAX_PHRASE_NAME = 40;
@@ -119,4 +128,53 @@ export function voiceFor(phrase: { tag: string }, pair: Pair): PhraseVoice {
     }
   }
   return { tag: phrase.tag, side: null };
+}
+
+export class PhraseError extends Error {}
+
+export interface KeepInput {
+  name: string;
+  side: Side;
+  heard: string;
+  said: string;
+  roman?: string;
+  literal?: string;
+}
+
+/**
+ * A turn kept under a name, as the event the phone seals. The slug is decided
+ * against the phrasebook as this phone sees it; replay refuses a second claim
+ * on the same one. The language is the other side's, read off the pair.
+ */
+export function keepPayload(
+  input: KeepInput,
+  pair: Pair,
+  taken: readonly string[],
+  id: string = crypto.randomUUID(),
+): PhraseKeep {
+  if (taken.length >= MAX_PHRASES) {
+    throw new PhraseError(`This trip has kept ${MAX_PHRASES} phrases. Drop one to keep another.`);
+  }
+  const said = input.said.trim().slice(0, 600);
+  if (!worthSaying(said)) throw new PhraseError("There's nothing here to keep.");
+  const name = input.name.trim().slice(0, MAX_PHRASE_NAME);
+  const slug = uniqueSlug(name, taken);
+  if (!slug) throw new PhraseError("Give it a name you'll recognise later.");
+  const spoken = speakerOf(pair, otherSide(input.side));
+  const payload: PhraseKeep = {
+    t: "phrase.keep",
+    id,
+    slug,
+    name,
+    side: input.side,
+    heard: clampUtterance(input.heard),
+    said,
+    language: spoken.language,
+    tag: spoken.tag,
+  };
+  const roman = input.roman?.trim().slice(0, 600);
+  const literal = input.literal?.trim().slice(0, 600);
+  if (roman) payload.roman = roman;
+  if (literal) payload.literal = literal;
+  return payload;
 }

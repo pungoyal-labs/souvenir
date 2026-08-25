@@ -72,6 +72,7 @@ export interface Lingo {
   recapEmptyTitle: string;
   recapEmptySub: string;
   sealedNote: string;
+  sealedTripName: string;
   keylessTitle: string;
   keylessSub: string;
   noKeyYet: (name: string) => string;

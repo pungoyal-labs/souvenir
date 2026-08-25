@@ -28,7 +28,7 @@
 - **Trip as a season.** Dates and phase ("In 12 days", "Last day", "Home"); starter predictions for an empty table; per-trip leaderboard; rivalries and a nemesis line on every profile; a recap page with a share-as-text button.
 - **The growth artifact.** `/card/[marketId]`: a public verdict card with an OG image built for WhatsApp, reachable from every resolved prediction with a share-sheet button and a `wa.me` link.
 - **Legal floor.** 18+ gate at every sign-up path; `/terms` and `/privacy` drafted against PROGA 2025, DPDP 2023/Rules 2025, GDPR; account deletion that scrubs identity and keeps the append-only ledger; no third-party cookies or analytics.
-- **Private trips.** Every prediction, call, comment and bill is encrypted on the phone under a key the server never holds; the key rides in the invite link's fragment and moves between members over short-lived key links. `/privacy` states what is sealed and what is not, plainly.
+- **Private trips.** Every prediction, call, comment, bill, kept phrase and the trip's own name is encrypted on the phone under a key the server never holds; the key rides in the invite link's fragment, moves between members over short-lived key links, and is backed up under each passkey's PRF secret. The plaintext tables are gone. `/privacy` states what is sealed and what is not, plainly.
 - **PWA.** Manifest, icons, Apple home-screen metadata. No store needed.
 - **Instrumentation.** `pnpm stats`: members, trips, mean roster, and the number that decides everything — *invited → founded* (how many people who arrived by somebody's link went on to open their own trip).
 
