@@ -332,7 +332,7 @@ export function BillForm({
             type="button"
             disabled={pending || totalC <= 0 || (split === "custom" && remainingC !== 0)}
             onClick={submit}
-            className="display rounded-md bg-felt px-4 py-2 text-base font-bold uppercase text-white hover:bg-felt-deep disabled:cursor-not-allowed disabled:opacity-40"
+            className="btn btn-felt display px-4 py-2 text-base font-bold uppercase"
           >
             {initial ? "Save changes" : "Add bill"}
           </button>
@@ -340,7 +340,7 @@ export function BillForm({
             type="button"
             disabled={pending}
             onClick={onDone}
-            className="rounded-md px-3 py-2 text-sm text-soft hover:underline disabled:opacity-40"
+            className="btn btn-link px-3 py-2 text-sm text-soft"
           >
             Cancel
           </button>

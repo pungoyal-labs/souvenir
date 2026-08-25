@@ -36,7 +36,7 @@ export function AccountForms({ name: initialName }: { name: string }) {
                 () => setNote("Renamed."),
               );
             }}
-            className="rounded-md border border-line px-3 py-2 text-sm font-semibold hover:bg-surface disabled:opacity-40"
+            className="btn btn-line px-3 py-2 text-sm"
           >
             Rename
           </button>
@@ -52,7 +52,7 @@ export function AccountForms({ name: initialName }: { name: string }) {
           Your name, email, picture, passkeys, key backups, and seats go at once, and nothing can
           sign in as you again. What stays is the record every trip keeps of its own game — the pies
           you won and lost, the bills you were on, the comments you wrote — under "Departed member",
-          because an append-only ledger can't forget a payout without breaking everybody else's
+          because an append-only ledger can't forget a win without breaking everybody else's
           numbers. Type DELETE to confirm.
         </p>
         <div className="mt-3 flex flex-wrap gap-2">
@@ -66,7 +66,7 @@ export function AccountForms({ name: initialName }: { name: string }) {
             type="button"
             disabled={pending || confirm !== "DELETE"}
             onClick={() => act(() => deleteAccountAction(confirm))}
-            className="rounded-md bg-no px-3 py-2 text-sm font-semibold text-white hover:bg-no-deep disabled:opacity-40"
+            className="btn btn-no px-3 py-2 text-sm"
           >
             Delete my account
           </button>

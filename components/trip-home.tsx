@@ -105,7 +105,7 @@ export function TripHome({
           </div>
           <Link
             href={routes.newMarket(tripId)}
-            className="display rounded-md bg-felt px-4 py-2 text-lg font-bold uppercase text-white hover:bg-felt-deep"
+            className="btn btn-felt display px-4 py-2 text-lg font-bold uppercase"
           >
             + New prediction
           </Link>

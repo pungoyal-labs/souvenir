@@ -122,6 +122,41 @@ body {
   border-top: 1px solid var(--color-line);
 }
 
+/* Buttons: four looks, one set of rules. Size and type stay utilities at the
+   call site (`btn btn-felt px-4 py-2 text-sm`); a disabled one fades and says
+   so with the cursor; the bordered one's hover works on paper and on surface. */
+.btn {
+  border-radius: 0.375rem;
+  font-weight: 600;
+}
+.btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.btn-felt {
+  background-color: var(--color-felt);
+  color: #fff;
+}
+.btn-felt:hover:not(:disabled) {
+  background-color: var(--color-felt-deep);
+}
+.btn-no {
+  background-color: var(--color-no);
+  color: #fff;
+}
+.btn-no:hover:not(:disabled) {
+  background-color: var(--color-no-deep);
+}
+.btn-line {
+  border: 1px solid var(--color-line);
+}
+.btn-line:hover:not(:disabled) {
+  background-color: color-mix(in oklab, var(--color-ink) 7%, transparent);
+}
+.btn-link:hover:not(:disabled) {
+  text-decoration: underline;
+}
+
 /* The π pie symbol always keeps the sans face — the display and mono
    faces draw π like a capital Π. */
 .pie {

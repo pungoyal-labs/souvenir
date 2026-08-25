@@ -262,7 +262,7 @@ export function PasskeyManager({ passkeys }: { passkeys: PasskeySummary[] }) {
                     return res;
                   })
                 }
-                className="rounded-md px-2 py-1 text-xs text-soft hover:underline disabled:opacity-40"
+                className="btn btn-link px-2 py-1 text-xs text-soft"
               >
                 Remove
               </button>

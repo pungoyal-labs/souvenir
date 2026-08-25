@@ -37,7 +37,7 @@ export function InviteForm() {
           type="button"
           disabled={pending || !label.trim()}
           onClick={mint}
-          className="rounded-md bg-felt px-4 py-2 text-sm font-semibold text-white hover:bg-felt-deep disabled:opacity-40"
+          className="btn btn-felt px-4 py-2 text-sm"
         >
           {pending ? "Minting…" : "Mint link"}
         </button>

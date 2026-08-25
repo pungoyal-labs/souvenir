@@ -24,7 +24,7 @@ export function ReopenPanel({ marketId }: { marketId: string }) {
           type="button"
           disabled={pending}
           onClick={() => setConfirming(true)}
-          className="rounded-md border border-line px-3 py-1.5 text-xs font-semibold hover:bg-paper disabled:opacity-40"
+          className="btn btn-line px-3 py-1.5 text-xs"
         >
           Reopen this prediction
         </button>
@@ -37,7 +37,7 @@ export function ReopenPanel({ marketId }: { marketId: string }) {
             type="button"
             disabled={pending}
             onClick={reopen}
-            className="rounded-md bg-felt px-3 py-1.5 text-xs font-semibold text-white hover:bg-felt-deep disabled:opacity-40"
+            className="btn btn-felt px-3 py-1.5 text-xs"
           >
             {pending ? "Reopening…" : "Yes, reopen it"}
           </button>
@@ -45,7 +45,7 @@ export function ReopenPanel({ marketId }: { marketId: string }) {
             type="button"
             disabled={pending}
             onClick={() => setConfirming(false)}
-            className="rounded-md px-3 py-1.5 text-xs font-semibold text-soft hover:underline disabled:opacity-40"
+            className="btn btn-link px-3 py-1.5 text-xs text-soft"
           >
             Back
           </button>

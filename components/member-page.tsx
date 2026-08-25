@@ -93,10 +93,7 @@ export function MemberPage({
           )}
         </div>
         {isMe && (
-          <Link
-            href={routes.account}
-            className="shrink-0 rounded-md border border-line px-3 py-1.5 text-sm font-semibold hover:bg-surface"
-          >
+          <Link href={routes.account} className="btn btn-line shrink-0 px-3 py-1.5 text-sm">
             Your account →
           </Link>
         )}

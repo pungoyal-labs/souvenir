@@ -253,7 +253,7 @@ export function TripForm({
         type="button"
         onClick={submit}
         disabled={pending || name.trim().length < 2}
-        className="display block w-full rounded-md bg-felt py-3 text-lg font-bold uppercase text-white hover:bg-felt-deep disabled:opacity-40"
+        className="btn btn-felt display block w-full py-3 text-lg font-bold uppercase"
       >
         {pending ? "One moment…" : initial ? "Save" : "Open the trip"}
       </button>

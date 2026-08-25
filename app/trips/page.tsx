@@ -31,7 +31,7 @@ export default async function TripsPage({
         </div>
         <Link
           href={routes.newTrip}
-          className="display rounded-md bg-felt px-4 py-2 text-lg font-bold uppercase text-white hover:bg-felt-deep"
+          className="btn btn-felt display px-4 py-2 text-lg font-bold uppercase"
         >
           + New trip
         </Link>

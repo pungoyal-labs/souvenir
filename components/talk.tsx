@@ -435,7 +435,7 @@ export function Talk({
           type="button"
           onClick={send}
           disabled={busy || !typed.trim()}
-          className="shrink-0 rounded-md bg-felt px-4 py-2.5 text-sm font-semibold text-[#f1eee4] disabled:opacity-40"
+          className="btn btn-felt shrink-0 px-4 py-2.5 text-sm"
         >
           Say it
         </button>
@@ -553,15 +553,11 @@ function KeepForm({
         type="button"
         onClick={() => onKeep(name)}
         disabled={busy || !slug}
-        className="shrink-0 rounded-md bg-felt px-3 py-2 text-sm font-semibold text-[#f1eee4] disabled:opacity-40"
+        className="btn btn-felt shrink-0 px-3 py-2 text-sm"
       >
         Keep
       </button>
-      <button
-        type="button"
-        onClick={onCancel}
-        className="shrink-0 rounded-md border border-line px-3 py-2 text-sm font-semibold hover:bg-paper"
-      >
+      <button type="button" onClick={onCancel} className="btn btn-line shrink-0 px-3 py-2 text-sm">
         Cancel
       </button>
       <p className="mono w-full text-xs text-soft">{slug ? `Kept as ${slug}` : " "}</p>
@@ -600,18 +596,10 @@ function Card({
           {turn.literal && outbound && ` · literally: ${turn.literal}`}
         </p>
         <div className="mt-4 flex justify-center gap-2">
-          <button
-            type="button"
-            onClick={onReplay}
-            className="rounded-md border border-line px-3 py-1.5 text-sm font-semibold hover:bg-paper"
-          >
+          <button type="button" onClick={onReplay} className="btn btn-line px-3 py-1.5 text-sm">
             🔊 Again
           </button>
-          <button
-            type="button"
-            onClick={onKeep}
-            className="rounded-md border border-line px-3 py-1.5 text-sm font-semibold hover:bg-paper"
-          >
+          <button type="button" onClick={onKeep} className="btn btn-line px-3 py-1.5 text-sm">
             ☆ Keep it
           </button>
         </div>

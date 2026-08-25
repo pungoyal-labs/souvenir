@@ -80,7 +80,7 @@ export function BetPanel({
               type="button"
               disabled={pending || mySide === "yes"}
               onClick={() => call("no")}
-              className="display rounded-md bg-no py-2.5 text-lg font-bold uppercase text-white hover:bg-no-press disabled:cursor-not-allowed disabled:opacity-40"
+              className="btn btn-no display py-2.5 text-lg font-bold uppercase"
             >
               Call NO
             </button>
@@ -101,7 +101,7 @@ export function BetPanel({
             type="button"
             disabled={pending}
             onClick={switchSide}
-            className="mt-1.5 rounded-md border border-line px-3 py-1.5 font-semibold hover:bg-paper disabled:opacity-40"
+            className="btn btn-line mt-1.5 px-3 py-1.5"
           >
             Switch your whole call to {other.toUpperCase()}
           </button>

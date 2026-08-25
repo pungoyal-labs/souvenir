@@ -93,7 +93,7 @@ export function ShareCard({
           type="button"
           disabled={pending}
           onClick={share}
-          className="rounded-md bg-felt px-3 py-1.5 text-sm font-semibold text-white hover:bg-felt-deep disabled:opacity-40"
+          className="btn btn-felt px-3 py-1.5 text-sm"
         >
           Share the verdict
         </button>
@@ -101,7 +101,7 @@ export function ShareCard({
           type="button"
           disabled={pending}
           onClick={whatsapp}
-          className="rounded-md border border-line px-3 py-1.5 text-sm font-semibold hover:bg-paper disabled:opacity-40"
+          className="btn btn-line px-3 py-1.5 text-sm"
         >
           WhatsApp
         </button>

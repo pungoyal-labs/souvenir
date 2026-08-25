@@ -111,7 +111,7 @@ export function Bills({
         type="button"
         disabled={pending}
         onClick={() => recordTransfer(transfer.from, transfer.to, currency, transfer.amountC)}
-        className="ml-auto rounded-md border border-line px-2 py-1 text-xs font-semibold hover:bg-paper disabled:opacity-40"
+        className="btn btn-line ml-auto px-2 py-1 text-xs"
       >
         Record payment
       </button>
@@ -214,7 +214,7 @@ export function Bills({
               setPaying(false);
               setEditingId(null);
             }}
-            className="display rounded-md bg-felt px-4 py-2 text-base font-bold uppercase text-white hover:bg-felt-deep"
+            className="btn btn-felt display px-4 py-2 text-base font-bold uppercase"
           >
             Add a bill
           </button>
@@ -226,7 +226,7 @@ export function Bills({
               setPaying(true);
               setAdding(false);
             }}
-            className="rounded-md border border-line px-3 py-2 text-sm font-semibold hover:bg-paper"
+            className="btn btn-line px-3 py-2 text-sm"
           >
             Record a payment
           </button>
@@ -329,7 +329,7 @@ export function Bills({
                                 setEditingId(bill.id);
                                 setAdding(false);
                               }}
-                              className="rounded-md border border-line px-2.5 py-1 text-xs font-semibold hover:bg-paper disabled:opacity-40"
+                              className="btn btn-line px-2.5 py-1 text-xs"
                             >
                               Edit
                             </button>
@@ -338,7 +338,7 @@ export function Bills({
                             type="button"
                             disabled={pending}
                             onClick={() => remove(bill)}
-                            className="rounded-md px-2.5 py-1 text-xs font-semibold text-no-deep hover:underline disabled:opacity-40"
+                            className="btn btn-link px-2.5 py-1 text-xs text-no-deep"
                           >
                             Delete
                           </button>
@@ -480,7 +480,7 @@ function PaymentForm({
             const receiver = members.find((m) => m.id === receiverId);
             if (payer && receiver && amountC) onRecord(payer, receiver, currency, amountC, onDate);
           }}
-          className="display rounded-md bg-felt px-4 py-2 text-base font-bold uppercase text-white hover:bg-felt-deep disabled:cursor-not-allowed disabled:opacity-40"
+          className="btn btn-felt display px-4 py-2 text-base font-bold uppercase"
         >
           Record
         </button>
@@ -488,7 +488,7 @@ function PaymentForm({
           type="button"
           disabled={pending}
           onClick={onCancel}
-          className="rounded-md px-3 py-2 text-sm text-soft hover:underline disabled:opacity-40"
+          className="btn btn-link px-3 py-2 text-sm text-soft"
         >
           Cancel
         </button>

@@ -74,7 +74,7 @@ export function AvatarPicker({ hasCustom }: { hasCustom: boolean }) {
           type="button"
           disabled={pending}
           onClick={() => inputRef.current?.click()}
-          className="rounded-md border border-line bg-surface px-2 py-1 text-xs font-semibold hover:bg-line/40 disabled:opacity-40"
+          className="btn btn-line px-2 py-1 text-xs"
         >
           {pending ? "Saving…" : "Change picture"}
         </button>
@@ -83,7 +83,7 @@ export function AvatarPicker({ hasCustom }: { hasCustom: boolean }) {
             type="button"
             disabled={pending}
             onClick={() => act(clearAvatarAction)}
-            className="rounded-md px-2 py-1 text-xs text-soft hover:underline disabled:opacity-40"
+            className="btn btn-link px-2 py-1 text-xs text-soft"
           >
             Use my initials
           </button>

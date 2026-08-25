@@ -27,16 +27,10 @@ export default async function Landing() {
           shared by one link, readable only by the people on it.
         </p>
         <div className="mt-6 flex flex-wrap justify-center gap-3">
-          <a
-            href="#start"
-            className="display rounded-md bg-felt px-5 py-3 text-xl font-bold uppercase text-white hover:bg-felt-deep"
-          >
+          <a href="#start" className="btn btn-felt display px-5 py-3 text-xl font-bold uppercase">
             Open a trip
           </a>
-          <Link
-            href={routes.signin}
-            className="rounded-md border border-line px-5 py-3 font-semibold hover:bg-surface"
-          >
+          <Link href={routes.signin} className="btn btn-line px-5 py-3">
             Sign in
           </Link>
         </div>

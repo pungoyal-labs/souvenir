@@ -58,7 +58,7 @@ export function RecoveryNotice({
             type="button"
             disabled={pending}
             onClick={() => act(() => shutOwnRecoveryAction(live.code))}
-            className="rounded-md bg-no px-4 py-2 text-sm font-semibold text-white hover:bg-no-press disabled:opacity-60"
+            className="btn btn-no px-4 py-2 text-sm"
           >
             Shut it
           </button>

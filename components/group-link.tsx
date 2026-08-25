@@ -44,7 +44,7 @@ export function GroupLink({
           type="button"
           disabled={pending}
           onClick={mint}
-          className="rounded-md border border-line px-3 py-2 text-sm font-semibold hover:bg-surface disabled:opacity-40"
+          className="btn btn-line px-3 py-2 text-sm"
         >
           {pending ? "Minting…" : "Create a group link"}
         </button>

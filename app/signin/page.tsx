@@ -61,10 +61,7 @@ export default async function SignInPage({
                 .
               </span>
             </label>
-            <button
-              type="submit"
-              className="mt-2 block w-full rounded-md border border-line py-3 font-semibold hover:bg-paper"
-            >
+            <button type="submit" className="btn btn-line mt-2 block w-full py-3">
               Continue with Google
             </button>
           </form>
@@ -113,10 +110,7 @@ export default async function SignInPage({
             placeholder="Display name"
             className="w-full rounded-md border border-line bg-paper px-3 py-2 text-sm"
           />
-          <button
-            type="submit"
-            className="w-full rounded-md border border-line py-2 text-sm font-semibold hover:bg-paper"
-          >
+          <button type="submit" className="btn btn-line w-full py-2 text-sm">
             Sign in as this person
           </button>
         </form>

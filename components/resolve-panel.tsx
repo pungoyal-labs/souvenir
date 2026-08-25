@@ -73,7 +73,7 @@ export function ResolvePanel({ marketId }: { marketId: string }) {
           type="button"
           disabled={!outcome || pending}
           onClick={() => setConfirming(true)}
-          className="mt-3 w-full rounded-md bg-felt py-2.5 font-semibold text-white hover:bg-felt-deep disabled:opacity-40"
+          className="btn btn-felt mt-3 w-full py-2.5"
         >
           Resolve this prediction
         </button>
@@ -83,7 +83,7 @@ export function ResolvePanel({ marketId }: { marketId: string }) {
             type="button"
             disabled={pending}
             onClick={resolve}
-            className="flex-1 rounded-md bg-felt py-2.5 font-semibold text-white hover:bg-felt-deep disabled:opacity-40"
+            className="btn btn-felt flex-1 py-2.5"
           >
             {pending
               ? "Resolving…"
@@ -93,7 +93,7 @@ export function ResolvePanel({ marketId }: { marketId: string }) {
             type="button"
             disabled={pending}
             onClick={() => setConfirming(false)}
-            className="rounded-md border border-line px-4 font-semibold hover:bg-paper"
+            className="btn btn-line px-4"
           >
             Back
           </button>

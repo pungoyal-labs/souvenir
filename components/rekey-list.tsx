@@ -27,7 +27,7 @@ export function ShutLink({
             return res;
           })
         }
-        className="rounded-md px-2 py-1 text-xs font-semibold text-no-deep hover:underline disabled:opacity-40"
+        className="btn btn-link px-2 py-1 text-xs text-no-deep"
       >
         {label}
       </button>

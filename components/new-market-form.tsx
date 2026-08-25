@@ -124,7 +124,7 @@ export function NewMarketForm({
                     setCriteria(suggestion.criteria);
                     setSuggestion(null);
                   }}
-                  className="rounded-md bg-felt px-3 py-1.5 text-sm font-semibold text-white hover:bg-felt-deep"
+                  className="btn btn-felt px-3 py-1.5 text-sm"
                 >
                   Use this version
                 </button>
@@ -132,7 +132,7 @@ export function NewMarketForm({
                   type="button"
                   disabled={busy}
                   onClick={() => setSuggestion(null)}
-                  className="rounded-md border border-line px-3 py-1.5 text-sm font-semibold hover:bg-paper"
+                  className="btn btn-line px-3 py-1.5 text-sm"
                 >
                   Keep mine
                 </button>
@@ -152,7 +152,7 @@ export function NewMarketForm({
         type="button"
         disabled={busy}
         onClick={publish}
-        className="display w-full rounded-md bg-felt py-3 text-xl font-bold uppercase text-white hover:bg-felt-deep disabled:opacity-40"
+        className="btn btn-felt display w-full py-3 text-xl font-bold uppercase"
       >
         {publishing ? "Publishing…" : "Publish to the group"}
       </button>

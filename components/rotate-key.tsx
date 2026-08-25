@@ -65,7 +65,7 @@ export function RotateKey({ since }: { since: Date | null }) {
               type="button"
               disabled={pending}
               onClick={rotate}
-              className="rounded-md bg-felt px-3 py-1.5 text-sm font-semibold text-white hover:bg-felt-deep disabled:opacity-40"
+              className="btn btn-felt px-3 py-1.5 text-sm"
             >
               Rotate the key
             </button>

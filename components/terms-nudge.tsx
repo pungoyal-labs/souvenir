@@ -35,7 +35,7 @@ export function TermsNudge() {
           type="button"
           disabled={pending}
           onClick={() => act(acceptTermsAction)}
-          className="rounded-md bg-felt px-4 py-2 text-sm font-semibold text-white hover:bg-felt-deep disabled:opacity-60"
+          className="btn btn-felt px-4 py-2 text-sm"
         >
           I'm 18+ and I agree
         </button>

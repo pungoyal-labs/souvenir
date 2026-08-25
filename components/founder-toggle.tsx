@@ -46,7 +46,7 @@ export function OrganiserToggle({
             return res;
           })
         }
-        className="mt-2 rounded-md border border-line px-3 py-2 text-sm font-semibold hover:bg-surface disabled:opacity-40"
+        className="btn btn-line mt-2 px-3 py-2 text-sm"
       >
         {pending
           ? "Saving…"

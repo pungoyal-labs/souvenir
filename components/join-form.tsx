@@ -109,7 +109,7 @@ export function JoinForm({ code, label }: { code?: string; label?: string }) {
         type="button"
         onClick={join}
         disabled={pending || !agreed || name.trim().length < 2}
-        className="mt-3 block w-full rounded-md bg-felt py-3 font-semibold text-white hover:bg-felt-deep disabled:opacity-40"
+        className="btn btn-felt mt-3 block w-full py-3"
       >
         {pending ? "Waiting for your device…" : "Create my passkey"}
       </button>

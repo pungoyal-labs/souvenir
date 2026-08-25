@@ -13,7 +13,7 @@ export function RevokeInvite({ code }: { code: string }) {
         type="button"
         disabled={pending}
         onClick={() => act(() => revokeInviteAction(code))}
-        className="rounded-md px-2 py-1 text-xs text-soft hover:underline disabled:opacity-40"
+        className="btn btn-link px-2 py-1 text-xs text-soft"
       >
         Revoke
       </button>

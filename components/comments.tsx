@@ -158,7 +158,7 @@ export function CommentsSection({
             type="button"
             disabled={pending || body.trim().length === 0}
             onClick={post}
-            className="rounded-md border border-line px-3 py-1.5 text-sm font-semibold hover:bg-paper disabled:cursor-not-allowed disabled:opacity-40"
+            className="btn btn-line px-3 py-1.5 text-sm"
           >
             Post
           </button>
