@@ -98,7 +98,10 @@ export async function rememberPrf(credential: PublicKeyCredential): Promise<void
     prf?: { results?: { first?: ArrayBuffer } };
   };
   const prf = results.prf?.results?.first;
-  if (!prf) return;
+  if (!prf) {
+    console.info("this passkey returned no PRF secret: the keyring cannot be backed up under it");
+    return;
+  }
   try {
     const { db } = await openStore();
     await idbPut(db, prfId(credential.id), await prfKeyringKey(new Uint8Array(prf)));
@@ -126,12 +129,24 @@ const same = (a: Keyring, b: Keyring) => encodeKeyring(a).join() === encodeKeyri
 async function backUp(kr: Keyring, keys: PrfKeys): Promise<void> {
   for (const [id, key] of keys) {
     try {
-      await saveKeyringWrapAction(id, await sealKeyring(key, kr));
-    } catch {
-      // Offline, or a credential since dropped: the next change tries again.
+      const res = await saveKeyringWrapAction(id, await sealKeyring(key, kr));
+      if (!res.ok) console.warn(`keyring backup refused: ${res.error}`);
+    } catch (err) {
+      console.warn(`keyring backup failed: ${err instanceof Error ? err.message : err}`);
     }
   }
 }
+
+/** Why the passkey backup did or did not come back on this phone — the keyless card says it. */
+export type BackupNote =
+  /** No passkey on this browser handed over a PRF secret. */
+  | "no-secret"
+  /** This passkey could open a backup, but none has been written under it yet. */
+  | "no-backup"
+  /** A backup exists for this passkey and would not open: written under a different secret. */
+  | "would-not-open"
+  | "offline"
+  | "restored";
 
 /**
  * Whatever this member's passkeys backed up that this phone can open, merged
@@ -140,9 +155,10 @@ async function backUp(kr: Keyring, keys: PrfKeys): Promise<void> {
 async function restore(
   local: Keyring,
   keys: PrfKeys,
-): Promise<{ keyring: Keyring; stale: PrfKeys }> {
+): Promise<{ keyring: Keyring; stale: PrfKeys; note: BackupNote }> {
   let merged = local;
   const opened = new Map<string, Keyring>();
+  let note: BackupNote = keys.size > 0 ? "no-backup" : "no-secret";
   if (keys.size > 0) {
     try {
       const res = await keyringWrapsAction();
@@ -153,12 +169,14 @@ async function restore(
           const kr = await openKeyring(key, wrap.blob);
           opened.set(wrap.credentialId, kr);
           merged = mergeKeyrings(merged, kr);
+          note = "restored";
         } catch {
-          // Sealed by a passkey key this phone does not derive the same way: not ours.
+          if (note !== "restored") note = "would-not-open";
+          console.warn(`the keyring backup for passkey ${wrap.credentialId} would not open here`);
         }
       }
     } catch {
-      // Offline: the local keyring is what there is.
+      note = "offline";
     }
   }
   const stale: PrfKeys = new Map();
@@ -166,7 +184,7 @@ async function restore(
     const backup = opened.get(id);
     if (!backup || !same(backup, merged)) stale.set(id, key);
   }
-  return { keyring: merged, stale };
+  return { keyring: merged, stale, note };
 }
 
 // --- the context --------------------------------------------------------------
@@ -184,6 +202,8 @@ export interface KeyringContextValue {
   keyring: Keyring;
   /** Replace the keyring, seal it, persist it, and back it up. */
   update(next: (current: Keyring) => Keyring): Promise<void>;
+  /** What the passkey backup did on this phone; null until known, or signed out. */
+  backup: BackupNote | null;
 }
 
 const KeyringContext = createContext<KeyringContextValue | null>(null);
@@ -201,6 +221,7 @@ export function KeyringProvider({
 }) {
   const [status, setStatus] = useState<KeyringStatus>("loading");
   const [keyring, setKeyring] = useState<Keyring>(emptyKeyring);
+  const [backup, setBackup] = useState<BackupNote | null>(null);
   const keyringRef = useRef(keyring);
   keyringRef.current = keyring;
   const signedInRef = useRef(signedIn);
@@ -221,13 +242,14 @@ export function KeyringProvider({
           }
         }
         const keys = await prfKeys(db);
-        let { keyring: next, stale } = signedIn
-          ? await restore(kr, keys)
-          : { keyring: kr, stale: keys };
+        const restored = signedIn ? await restore(kr, keys) : null;
+        let next = restored?.keyring ?? kr;
+        const stale = restored?.stale ?? keys;
         // A member key, once: the public half goes into every trip's log with the next hello.
         if (!next.mk) next = withMemberKey(next, (await newMemberKey()).privateKey);
         if (cancelled) return;
         setKeyring(next);
+        setBackup(restored?.note ?? null);
         setStatus("ready");
         if (!same(next, kr)) await idbPut(db, BLOB_ID, await sealKeyring(kk, next));
         if (signedIn && Object.keys(next.trips).length > 0) void backUp(next, stale);
@@ -255,8 +277,8 @@ export function KeyringProvider({
   }, []);
 
   const value = useMemo<KeyringContextValue>(
-    () => ({ status, keyring, update }),
-    [status, keyring, update],
+    () => ({ status, keyring, update, backup }),
+    [status, keyring, update, backup],
   );
 
   return <KeyringContext.Provider value={value}>{children}</KeyringContext.Provider>;

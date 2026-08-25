@@ -5,6 +5,7 @@
 
 import Link from "next/link";
 import { routes } from "@/lib/routes";
+import { useKeyring } from "./keyring";
 import { SendKey } from "./rekey";
 import { useOpenTrip, useTrip } from "./trip-store";
 
@@ -71,6 +72,7 @@ function Keyless() {
               button. The link only works for you, signed in as you.
             </p>
           </div>
+          <PasskeyBackup />
         </div>
         <p className="mt-4 text-xs text-soft">
           Bills and the interpreter still work without the key.{" "}
@@ -99,5 +101,28 @@ export function KeyStatus({ memberId, name }: { memberId: string; name: string }
       {!heard && <span>{t.noKeyYet(name)}</span>}
       <SendKey forMemberId={memberId} name={name} compact />
     </span>
+  );
+}
+
+const BACKUP_NOTES = {
+  "no-secret":
+    "This browser's passkey didn't hand over the secret a backup is sealed under, so it can't fetch one. Safari 18+ and Chrome with Google Password Manager do; here, use a key link.",
+  "no-backup":
+    "Your passkey can open a backup, but none has been written yet. Sign in with this passkey once on a phone that has the key, and the next visit here restores it.",
+  "would-not-open":
+    "A backup exists for your passkey but its secret didn't open it here — it was sealed under a different one. Sign in with that passkey, or use a key link.",
+  offline: "The backup couldn't be fetched just now. Reload to try again.",
+  restored: "Your passkey restored a backup, but it doesn't hold this trip's key yet.",
+} as const;
+
+/** The third way in, and why it did not work this time. */
+function PasskeyBackup() {
+  const { backup } = useKeyring();
+  if (!backup) return null;
+  return (
+    <div className="rounded-md border border-line bg-surface p-3">
+      <p className="font-semibold">Your passkey</p>
+      <p className="mt-0.5 text-xs text-soft">{BACKUP_NOTES[backup]}</p>
+    </div>
   );
 }
