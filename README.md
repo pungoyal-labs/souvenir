@@ -55,8 +55,9 @@ The full design is [`docs/private-trips.md`](docs/private-trips.md). In short:
   keyring (IndexedDB, `components/keyring.tsx`). It moves only through people:
   an invite link carries it in the URL fragment, which browsers never send; a
   *key link* (`/k/[code]`, `lib/rekeys.ts`, 30 minutes, minted by any member
-  for any seat) puts it on a second phone or a replacement one; a recovery link
-  carries it from the organiser who minted it. The server stores keys only
+  for any seat) puts it on a second phone or a replacement one, and is how a
+  member back from losing every passkey gets it too. A link is shown once,
+  where it was minted, never re-shown. The server stores keys only
   wrapped under secrets it has never seen, and no path returns one to it.
 - **Leaving.** A key cannot be taken back from a phone, so a seat that goes
   (removed, left, deleted) marks the trip for rotation: an organiser's phone

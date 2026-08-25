@@ -14,7 +14,6 @@ import {
   encodeKeyring,
   holdsKey,
   KeyringError,
-  linkSecretOf,
   linkWithSecret,
   memberPublicKey,
   mergeKeyrings,
@@ -30,7 +29,6 @@ import {
   tripKeyOf,
   unwrapPreview,
   unwrapTripKey,
-  withLinkSecret,
   withMemberKey,
   withTripKey,
   wrapPreview,
@@ -70,28 +68,18 @@ describe("keyring", () => {
     expect(await tripCryptoKey(kr, "t1", 2)).toBeNull();
   });
 
-  it("keeps link secrets by code", () => {
-    const s = newLinkSecret();
-    const kr = withLinkSecret(emptyKeyring(), "code-a", s);
-    expect(linkSecretOf(kr, "code-a")).toEqual(s);
-    expect(linkSecretOf(kr, "code-b")).toBeNull();
-  });
-
   it("encodes and decodes losslessly", async () => {
-    const kr = withLinkSecret(
-      withTripKey(emptyKeyring(), "t1", 0, await rawKey()),
-      "c",
-      newLinkSecret(),
-    );
+    const kr = withTripKey(emptyKeyring(), "t1", 0, await rawKey());
     expect(decodeKeyring(encodeKeyring(kr))).toEqual(kr);
+    // Old blobs carried the secrets of links this phone minted; they parse, minus that.
+    expect(parseKeyring({ ...kr, links: { c: "s" } })).toEqual(kr);
   });
 
   it("refuses shapes that are not keyrings", () => {
     expect(() => parseKeyring(null)).toThrow(KeyringError);
-    expect(() => parseKeyring({ v: 2, trips: {}, links: {} })).toThrow(KeyringError);
-    expect(() => parseKeyring({ v: 1, trips: [], links: {} })).toThrow(KeyringError);
-    expect(() => parseKeyring({ v: 1, trips: { t: { "0": 1 } }, links: {} })).toThrow(KeyringError);
-    expect(() => parseKeyring({ v: 1, trips: {}, links: { c: 1 } })).toThrow(KeyringError);
+    expect(() => parseKeyring({ v: 2, trips: {} })).toThrow(KeyringError);
+    expect(() => parseKeyring({ v: 1, trips: [] })).toThrow(KeyringError);
+    expect(() => parseKeyring({ v: 1, trips: { t: { "0": 1 } } })).toThrow(KeyringError);
     expect(() => parseKeyring({ v: 1, trips: {}, links: {}, mk: "x" })).toThrow(KeyringError);
     expect(() => decodeKeyring(new Uint8Array([1, 2, 3]))).toThrow(KeyringError);
   });
@@ -131,7 +119,7 @@ describe("links", () => {
     const raw = await rawKey();
     const blob = await wrapTripKey(s, "invite", raw);
     expect(await unwrapTripKey(s, "invite", blob)).toEqual(raw);
-    await expect(unwrapTripKey(s, "recover", blob)).rejects.toThrow(CryptoError);
+    await expect(unwrapTripKey(s, "rekey", blob)).rejects.toThrow(CryptoError);
     await expect(unwrapTripKey(newLinkSecret(), "invite", blob)).rejects.toThrow(CryptoError);
   });
 
@@ -154,14 +142,13 @@ describe("merging", () => {
   it("keeps every trip, epoch and link from both, the second winning a clash", () => {
     const k = new Uint8Array(32).fill(1);
     const k2 = new Uint8Array(32).fill(2);
-    const a = withLinkSecret(withTripKey(emptyKeyring(), "t1", 0, k), "L1", k);
+    const a = withTripKey(emptyKeyring(), "t1", 0, k);
     const b = withTripKey(withTripKey(emptyKeyring(), "t1", 1, k2), "t2", 0, k2);
     b.mk = { kty: "EC" };
     const m = mergeKeyrings(a, b);
     expect(tripKeyOf(m, "t1", 0)).toEqual(k);
     expect(tripKeyOf(m, "t1", 1)).toEqual(k2);
     expect(tripKeyOf(m, "t2", 0)).toEqual(k2);
-    expect(linkSecretOf(m, "L1")).toEqual(k);
     expect(m.mk).toEqual({ kty: "EC" });
     expect(mergeKeyrings(b, { ...a, mk: { kty: "EC", crv: "other" } }).mk).toEqual({ kty: "EC" });
     expect(mergeKeyrings(withTripKey(emptyKeyring(), "t1", 0, k2), a).trips.t1["0"]).toBe(

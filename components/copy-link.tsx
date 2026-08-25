@@ -1,50 +1,20 @@
 "use client";
 
 import { useState } from "react";
-import { linkSecretOf, linkWithSecret } from "@/lib/keys";
-import { useKeyring } from "./keyring";
 
-/**
- * Copy a link again. With `withSecretFor`, the link is whole only with the
- * secret this phone's keyring holds under that code; a phone that did not
- * mint it says so rather than copy a link that seats somebody keyless.
- */
-export function CopyLink({
-  url,
-  compact = false,
-  withSecretFor,
-}: {
-  url: string;
-  compact?: boolean;
-  withSecretFor?: string;
-}) {
+/** Copy a link that is whole as given. */
+export function CopyLink({ url, compact = false }: { url: string; compact?: boolean }) {
   const [state, setState] = useState<"idle" | "copied" | "failed">("idle");
-  const { keyring } = useKeyring();
-  const secret = withSecretFor ? linkSecretOf(keyring, withSecretFor) : null;
-  const whole = withSecretFor ? (secret ? linkWithSecret(url, secret) : null) : url;
-
-  if (!whole) {
-    return (
-      <span
-        className="text-xs text-soft"
-        title="Only the phone that minted this link has its key. Mint a fresh one."
-      >
-        minted elsewhere
-      </span>
-    );
-  }
-
   const copy = () =>
-    navigator.clipboard.writeText(whole).then(
+    navigator.clipboard.writeText(url).then(
       () => setState("copied"),
       () => setState("failed"),
     );
-
   return (
     <button
       type="button"
       onClick={copy}
-      title={state === "failed" ? "Couldn't copy — select the link by hand" : `Copy ${whole}`}
+      title={state === "failed" ? "Couldn't copy — select the link by hand" : `Copy ${url}`}
       className={
         compact
           ? "inline-flex shrink-0 items-center gap-1 rounded-md px-2 py-1 text-xs font-semibold text-soft hover:bg-surface"

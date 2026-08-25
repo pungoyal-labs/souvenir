@@ -166,7 +166,7 @@ export async function openBlob(key: CryptoKey, purpose: string, blob: string) {
 // --- link wraps ---------------------------------------------------------------
 
 /** Which kind of link a wrap rode in on; the wrong kind will not open it. */
-export type LinkPurpose = "invite" | "rekey" | "recover" | "preview";
+export type LinkPurpose = "invite" | "rekey" | "preview";
 
 export async function wrapForLink(secret: Uint8Array, purpose: LinkPurpose, plain: Uint8Array) {
   return sealBlob(await deriveKey(secret, `link:${purpose}`), purpose, plain);

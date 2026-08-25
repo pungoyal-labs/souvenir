@@ -5,9 +5,7 @@ import { useState } from "react";
 import { revokeInviteAction } from "@/app/actions";
 import { CopyLink } from "@/components/copy-link";
 import { fmtDate } from "@/lib/format";
-import { linkSecretOf, linkWithSecret } from "@/lib/keys";
 import { useMintInvite } from "./invite-links";
-import { useKeyring } from "./keyring";
 import { ActError, useAct } from "./use-act";
 
 /** One open door for the whole group, until it expires or an organiser shuts it. */
@@ -18,13 +16,11 @@ export function GroupLink({
 }) {
   const router = useRouter();
   const mintInvite = useMintInvite();
-  const { keyring } = useKeyring();
   const { pending, error, act } = useAct();
   const [minted, setMinted] = useState<string | null>(null);
 
-  // The link is whole only with its secret, which only the minting phone holds.
-  const secret = existing ? linkSecretOf(keyring, existing.code) : null;
-  const url = minted ?? (existing && secret ? linkWithSecret(existing.url, secret) : null);
+  // A link is whole only on the phone that minted it, and only until it leaves this page.
+  const url = minted;
 
   const mint = () =>
     act(async () => {
@@ -61,7 +57,7 @@ export function GroupLink({
     <div className="rounded-md border border-line bg-surface/60 px-3 py-2">
       <div className="flex items-center gap-2">
         <code className="mono min-w-0 flex-1 truncate rounded bg-surface px-2 py-1 text-xs">
-          {url ?? "Minted on another phone — shut it and mint a fresh one here to share it."}
+          {url ?? "Already minted — shut it and mint a fresh one to share it again."}
         </code>
         {url && <CopyLink url={url} />}
       </div>

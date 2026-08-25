@@ -155,7 +155,7 @@ describe("link wraps", () => {
     const raw = await exportKey(await newKey());
     const blob = await wrapForLink(secret, "invite", raw);
     await expect(unwrapFromLink(secret, "rekey", blob)).rejects.toThrow(CryptoError);
-    await expect(unwrapFromLink(secret, "recover", blob)).rejects.toThrow(CryptoError);
+    await expect(unwrapFromLink(secret, "rekey", blob)).rejects.toThrow(CryptoError);
   });
 
   it("another secret does not open it", async () => {

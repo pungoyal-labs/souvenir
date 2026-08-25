@@ -1,0 +1,1199 @@
+{
+  "id": "78be39af-8733-4aeb-a33b-2c4da3324261",
+  "prevId": "e3324bae-3470-40d8-aac7-70613904ed37",
+  "version": "7",
+  "dialect": "postgresql",
+  "tables": {
+    "public.avatars": {
+      "name": "avatars",
+      "schema": "",
+      "columns": {
+        "member_id": {
+          "name": "member_id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "content_type": {
+          "name": "content_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "data": {
+          "name": "data",
+          "type": "bytea",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "avatars_member_id_members_id_fk": {
+          "name": "avatars_member_id_members_id_fk",
+          "tableFrom": "avatars",
+          "tableTo": "members",
+          "columnsFrom": [
+            "member_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.cards": {
+      "name": "cards",
+      "schema": "",
+      "columns": {
+        "market_id": {
+          "name": "market_id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "trip_id": {
+          "name": "trip_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "published_by": {
+          "name": "published_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "at": {
+          "name": "at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "trip_name": {
+          "name": "trip_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "''"
+        },
+        "question": {
+          "name": "question",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "verdict": {
+          "name": "verdict",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "lines": {
+          "name": "lines",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "cards_trip_id_trips_id_fk": {
+          "name": "cards_trip_id_trips_id_fk",
+          "tableFrom": "cards",
+          "tableTo": "trips",
+          "columnsFrom": [
+            "trip_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "cards_published_by_members_id_fk": {
+          "name": "cards_published_by_members_id_fk",
+          "tableFrom": "cards",
+          "tableTo": "members",
+          "columnsFrom": [
+            "published_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.credentials": {
+      "name": "credentials",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "member_id": {
+          "name": "member_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "public_key": {
+          "name": "public_key",
+          "type": "bytea",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "alg": {
+          "name": "alg",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "sign_count": {
+          "name": "sign_count",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "backed_up": {
+          "name": "backed_up",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "last_used_at": {
+          "name": "last_used_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "credentials_member_idx": {
+          "name": "credentials_member_idx",
+          "columns": [
+            {
+              "expression": "member_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "credentials_member_id_members_id_fk": {
+          "name": "credentials_member_id_members_id_fk",
+          "tableFrom": "credentials",
+          "tableTo": "members",
+          "columnsFrom": [
+            "member_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.events": {
+      "name": "events",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "bigserial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "at": {
+          "name": "at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "trip_id": {
+          "name": "trip_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "author_id": {
+          "name": "author_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "epoch": {
+          "name": "epoch",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "body": {
+          "name": "body",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {
+        "events_trip_id_idx": {
+          "name": "events_trip_id_idx",
+          "columns": [
+            {
+              "expression": "trip_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "events_trip_id_trips_id_fk": {
+          "name": "events_trip_id_trips_id_fk",
+          "tableFrom": "events",
+          "tableTo": "trips",
+          "columnsFrom": [
+            "trip_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "events_author_id_members_id_fk": {
+          "name": "events_author_id_members_id_fk",
+          "tableFrom": "events",
+          "tableTo": "members",
+          "columnsFrom": [
+            "author_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "events_body_size": {
+          "name": "events_body_size",
+          "value": "length(\"events\".\"body\") <= 16384"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.invites": {
+      "name": "invites",
+      "schema": "",
+      "columns": {
+        "trip_id": {
+          "name": "trip_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "code": {
+          "name": "code",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "label": {
+          "name": "label",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "is_open": {
+          "name": "is_open",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "use_count": {
+          "name": "use_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "wrapped_key": {
+          "name": "wrapped_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "epoch": {
+          "name": "epoch",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "preview": {
+          "name": "preview",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "invited_by": {
+          "name": "invited_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "expires_at": {
+          "name": "expires_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "invites_trip_id_trips_id_fk": {
+          "name": "invites_trip_id_trips_id_fk",
+          "tableFrom": "invites",
+          "tableTo": "trips",
+          "columnsFrom": [
+            "trip_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "invites_invited_by_members_id_fk": {
+          "name": "invites_invited_by_members_id_fk",
+          "tableFrom": "invites",
+          "tableTo": "members",
+          "columnsFrom": [
+            "invited_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.key_grants": {
+      "name": "key_grants",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "trip_id": {
+          "name": "trip_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "epoch": {
+          "name": "epoch",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "to_member_id": {
+          "name": "to_member_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "from_member_id": {
+          "name": "from_member_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "wrapped": {
+          "name": "wrapped",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "at": {
+          "name": "at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "taken_at": {
+          "name": "taken_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "key_grants_to_idx": {
+          "name": "key_grants_to_idx",
+          "columns": [
+            {
+              "expression": "trip_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "to_member_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "epoch",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "key_grants_trip_id_trips_id_fk": {
+          "name": "key_grants_trip_id_trips_id_fk",
+          "tableFrom": "key_grants",
+          "tableTo": "trips",
+          "columnsFrom": [
+            "trip_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "key_grants_to_member_id_members_id_fk": {
+          "name": "key_grants_to_member_id_members_id_fk",
+          "tableFrom": "key_grants",
+          "tableTo": "members",
+          "columnsFrom": [
+            "to_member_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "key_grants_from_member_id_members_id_fk": {
+          "name": "key_grants_from_member_id_members_id_fk",
+          "tableFrom": "key_grants",
+          "tableTo": "members",
+          "columnsFrom": [
+            "from_member_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.keyring_wraps": {
+      "name": "keyring_wraps",
+      "schema": "",
+      "columns": {
+        "credential_id": {
+          "name": "credential_id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "member_id": {
+          "name": "member_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "blob": {
+          "name": "blob",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "keyring_wraps_member_idx": {
+          "name": "keyring_wraps_member_idx",
+          "columns": [
+            {
+              "expression": "member_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "keyring_wraps_credential_id_credentials_id_fk": {
+          "name": "keyring_wraps_credential_id_credentials_id_fk",
+          "tableFrom": "keyring_wraps",
+          "tableTo": "credentials",
+          "columnsFrom": [
+            "credential_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "keyring_wraps_member_id_members_id_fk": {
+          "name": "keyring_wraps_member_id_members_id_fk",
+          "tableFrom": "keyring_wraps",
+          "tableTo": "members",
+          "columnsFrom": [
+            "member_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.members": {
+      "name": "members",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "email": {
+          "name": "email",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "image": {
+          "name": "image",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "joined_at": {
+          "name": "joined_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "lingo": {
+          "name": "lingo",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'english'"
+        },
+        "avatar_updated_at": {
+          "name": "avatar_updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "terms_accepted_at": {
+          "name": "terms_accepted_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "deleted_at": {
+          "name": "deleted_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "members_email_unique": {
+          "name": "members_email_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "email"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.memberships": {
+      "name": "memberships",
+      "schema": "",
+      "columns": {
+        "trip_id": {
+          "name": "trip_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "member_id": {
+          "name": "member_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "role": {
+          "name": "role",
+          "type": "membership_role",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'member'"
+        },
+        "joined_at": {
+          "name": "joined_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "invited_with": {
+          "name": "invited_with",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "inbox_seen_at": {
+          "name": "inbox_seen_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "memberships_member_idx": {
+          "name": "memberships_member_idx",
+          "columns": [
+            {
+              "expression": "member_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "memberships_trip_id_trips_id_fk": {
+          "name": "memberships_trip_id_trips_id_fk",
+          "tableFrom": "memberships",
+          "tableTo": "trips",
+          "columnsFrom": [
+            "trip_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "memberships_member_id_members_id_fk": {
+          "name": "memberships_member_id_members_id_fk",
+          "tableFrom": "memberships",
+          "tableTo": "members",
+          "columnsFrom": [
+            "member_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "memberships_trip_id_member_id_pk": {
+          "name": "memberships_trip_id_member_id_pk",
+          "columns": [
+            "trip_id",
+            "member_id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.recoveries": {
+      "name": "recoveries",
+      "schema": "",
+      "columns": {
+        "code": {
+          "name": "code",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "member_id": {
+          "name": "member_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "minted_by": {
+          "name": "minted_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "expires_at": {
+          "name": "expires_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "used_at": {
+          "name": "used_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "recoveries_member_idx": {
+          "name": "recoveries_member_idx",
+          "columns": [
+            {
+              "expression": "member_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "recoveries_member_id_members_id_fk": {
+          "name": "recoveries_member_id_members_id_fk",
+          "tableFrom": "recoveries",
+          "tableTo": "members",
+          "columnsFrom": [
+            "member_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "recoveries_minted_by_members_id_fk": {
+          "name": "recoveries_minted_by_members_id_fk",
+          "tableFrom": "recoveries",
+          "tableTo": "members",
+          "columnsFrom": [
+            "minted_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.rekeys": {
+      "name": "rekeys",
+      "schema": "",
+      "columns": {
+        "code": {
+          "name": "code",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "trip_id": {
+          "name": "trip_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "for_member_id": {
+          "name": "for_member_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "minted_by": {
+          "name": "minted_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "wrapped_key": {
+          "name": "wrapped_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "epoch": {
+          "name": "epoch",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "expires_at": {
+          "name": "expires_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "used_at": {
+          "name": "used_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "rekeys_trip_member_idx": {
+          "name": "rekeys_trip_member_idx",
+          "columns": [
+            {
+              "expression": "trip_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "for_member_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "rekeys_trip_id_trips_id_fk": {
+          "name": "rekeys_trip_id_trips_id_fk",
+          "tableFrom": "rekeys",
+          "tableTo": "trips",
+          "columnsFrom": [
+            "trip_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "rekeys_for_member_id_members_id_fk": {
+          "name": "rekeys_for_member_id_members_id_fk",
+          "tableFrom": "rekeys",
+          "tableTo": "members",
+          "columnsFrom": [
+            "for_member_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "rekeys_minted_by_members_id_fk": {
+          "name": "rekeys_minted_by_members_id_fk",
+          "tableFrom": "rekeys",
+          "tableTo": "members",
+          "columnsFrom": [
+            "minted_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.trips": {
+      "name": "trips",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "destination": {
+          "name": "destination",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "home_language": {
+          "name": "home_language",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'en'"
+        },
+        "home_currency": {
+          "name": "home_currency",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "foreign_currency": {
+          "name": "foreign_currency",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "starts_on": {
+          "name": "starts_on",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "ends_on": {
+          "name": "ends_on",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "max_stake_pies": {
+          "name": "max_stake_pies",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 10
+        },
+        "key_epoch": {
+          "name": "key_epoch",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "name_enc": {
+          "name": "name_enc",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "key_stale_since": {
+          "name": "key_stale_since",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_by": {
+          "name": "created_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "trips_created_by_members_id_fk": {
+          "name": "trips_created_by_members_id_fk",
+          "tableFrom": "trips",
+          "tableTo": "members",
+          "columnsFrom": [
+            "created_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    }
+  },
+  "enums": {
+    "public.membership_role": {
+      "name": "membership_role",
+      "schema": "public",
+      "values": [
+        "organiser",
+        "member"
+      ]
+    }
+  },
+  "schemas": {},
+  "sequences": {},
+  "roles": {},
+  "policies": {},
+  "views": {},
+  "_meta": {
+    "columns": {},
+    "schemas": {},
+    "tables": {}
+  }
+}

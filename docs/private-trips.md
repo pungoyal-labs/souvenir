@@ -203,9 +203,9 @@ The creator's client: `TK[0] ← random`, into the keyring, keyring uploaded,
 The organiser's client: `s ← random`; `wrapped_key = AES(HKDF(s,"invite"),
 TK[cur])`; `preview = AES(HKDF(s,"preview"), { name, names, questions })`;
 `mintInvite(label, isOpen, epoch, wrapped_key, preview)`. The link shown is
-`/join/<code>#<s>`. `s` is kept in the minter's keyring so the members page
-can show the full link again. Other organisers cannot re-share a link they did
-not mint; they mint their own.
+`/join/<code>#<s>`. The link is shown once, on the phone that minted it;
+nobody re-shows a link, they mint a fresh one (decided 2026-08-25 — the
+keyring used to keep `s` for re-sharing, and that was complexity for a tap).
 
 ### 4.4 Join
 
@@ -306,7 +306,7 @@ historical key. That is the state to document until Phase 3 ships.
   that page a member did not choose to put there — which is what the rule in
   `AGENTS.md` already asks.
 - `/join/[code]`: the preview is a snapshot at mint time, encrypted under the
-  link; re-sharing from the members page refreshes it.
+  link.
 
 ### 4.12 Polisher, interpreter, speech
 
@@ -393,9 +393,10 @@ What differs from the plan, and why:
 - **Device links are rekey-for-self.** A member mints a rekey link for their
   own seat from the phone that has the key and opens it on the other; no
   whole-keyring wrap, no extra schema.
-- **Recovery links name a trip.** `recoveries.trip_id`/`epoch` (migration
-  `0021`) say which trip's key the wrap is; an organiser's phone wraps the
-  trip they share.
+- **Recovery links carried a trip's key** (migration `0021`) until
+  2026-08-25, when that was cut (migration `0026`): recovery restores the
+  seat, and the key comes by the ordinary key link from anyone on the trip.
+  Same security, one wrap path fewer.
 - **A link's secret survives sign-in** by being parked in the tab's
   `sessionStorage` under the link's code — never in the `next` query string
   the server reads.
@@ -529,6 +530,16 @@ library (reuse is not a goal and a library would not vouch for the app that
 uses it), and the per-trip hash chain (tamper-evident ordering was never part
 of the promise, and it was the one piece of the design whose complexity
 bought nothing a member asked for).
+
+### Simplifications — 2026-08-25
+
+With everything sealed and deployed, two paths went because the promise did
+not need them: recovery links no longer carry a key (`0026`; the key link
+does that job for everyone), and links are not re-shown (the keyring no
+longer keeps link secrets; `CopyLink` copies what it is given). The sealed
+join preview stays. The keyless card now names password managers as the
+usual reason a passkey backup is unavailable — Bitwarden returns no PRF to
+third-party sites in any client, as of August 2026.
 
 ## 8. Decisions — settled 2026-08-24
 

@@ -47,7 +47,6 @@ import {
   myGrant,
   noteCredentialUse,
   publishCard,
-  type RecoveryKey,
   recoverWithLink,
   removeCredential,
   removeMember,
@@ -750,11 +749,10 @@ const recoverSchema = z.object({
 export async function mintRecoveryAction(
   tripId: string,
   memberId: string,
-  key: { epoch: number; wrappedKey: string } | null,
 ): Promise<ActionResult & { url?: string; code?: string }> {
   return mutate(
     async (actorId) => {
-      const code = await mintRecovery(actorId, memberId, key ? { tripId, ...key } : null);
+      const code = await mintRecovery(actorId, memberId);
       return { url: recoveryUrl(RP_ORIGIN, code), code };
     },
     [routes.members(tripId), routes.member(tripId, memberId)],
@@ -790,9 +788,7 @@ export async function beginRecoveryAction(
 }
 
 /** Returns the key wrap the link carried, if any; the phone opens it before going anywhere. */
-export async function finishRecoveryAction(
-  input: unknown,
-): Promise<ActionResult & { key?: RecoveryKey | null }> {
+export async function finishRecoveryAction(input: unknown): Promise<ActionResult> {
   const ceremony = await takeCeremony(recoverSchema, input, "recover");
   if (!ceremony?.pending.link) {
     return { ok: false, error: "That took too long. Open the link again." };
@@ -822,5 +818,5 @@ export async function finishRecoveryAction(
     "member signed in after a recovery",
   );
   // The phone sends them to their own page, where every key that can sign in as them is listed.
-  return { ok: true, key: recovered.key };
+  return { ok: true };
 }

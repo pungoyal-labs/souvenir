@@ -1,4 +1,3 @@
-import { CopyLink } from "@/components/copy-link";
 import { GroupLink } from "@/components/group-link";
 import { InviteForm } from "@/components/invite-form";
 import { Leaderboard } from "@/components/leaderboard";
@@ -124,20 +123,8 @@ export default async function MembersPage({ params }: { params: Promise<{ tripId
                 who={i.label}
                 detail={`invited by ${nameById.get(i.invitedBy) ?? "an organiser"} · link expires ${fmtDate(i.expiresAt)}`}
               >
-                {/* A live link is an invitation in itself, so only organisers lift one off this
-                    page — and only the phone that minted it still has its secret. */}
-                {canInvite && (
-                  <>
-                    <Sealed>
-                      <CopyLink
-                        url={inviteUrl(env.AUTH_URL, i.code)}
-                        compact
-                        withSecretFor={i.code}
-                      />
-                    </Sealed>
-                    <RevokeInvite code={i.code} />
-                  </>
-                )}
+                {/* The link was whole only where it was minted; here it can only be shut. */}
+                {canInvite && <RevokeInvite code={i.code} />}
               </Row>
             ))}
           </ul>

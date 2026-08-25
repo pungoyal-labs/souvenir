@@ -2,8 +2,7 @@
 // See docs/private-trips.md §2–§4.
 //
 // The keyring is one JSON object per member holding every trip key they have
-// ever been handed, by trip and by epoch, the secrets of links they minted (so
-// the members page can show a link again), and their member key. It travels
+// ever been handed, by trip and by epoch, and their member key. It travels
 // as a blob under a key the server never sees — to IndexedDB on the phone, and
 // to `keyring_wraps` under each passkey's PRF secret.
 //
@@ -36,8 +35,6 @@ export interface Keyring {
   v: typeof KEYRING_VERSION;
   /** tripId → epoch (as a string key) → raw AES key, base64url. */
   trips: Record<string, Record<string, string>>;
-  /** invite / rekey link code → its secret, base64url. */
-  links: Record<string, string>;
   /** The member's long-term key: the private half. The public half is announced in the log. */
   mk?: JsonWebKey;
 }
@@ -49,7 +46,7 @@ function check32(bytes: Uint8Array, what: string): void {
 }
 
 export function emptyKeyring(): Keyring {
-  return { v: KEYRING_VERSION, trips: {}, links: {} };
+  return { v: KEYRING_VERSION, trips: {} };
 }
 
 /** Everything both keyrings hold. Where both name the same key, the second wins. */
@@ -60,7 +57,7 @@ export function mergeKeyrings(a: Keyring, b: Keyring): Keyring {
       trips[tripId] = { ...trips[tripId], ...epochs };
     }
   }
-  const merged: Keyring = { v: KEYRING_VERSION, trips, links: { ...a.links, ...b.links } };
+  const merged: Keyring = { v: KEYRING_VERSION, trips };
   // The member key already announced in a log is the one to keep: the first, not the newest.
   const mk = a.mk ?? b.mk;
   if (mk) merged.mk = mk;
@@ -101,16 +98,6 @@ export async function tripCryptoKey(kr: Keyring, tripId: string, epoch: number) 
 
 // --- link secrets -------------------------------------------------------------
 
-export function withLinkSecret(kr: Keyring, code: string, secret: Uint8Array): Keyring {
-  check32(secret, "link secret");
-  return { ...kr, links: { ...kr.links, [code]: toBase64Url(secret) } };
-}
-
-export function linkSecretOf(kr: Keyring, code: string): Uint8Array | null {
-  const s = kr.links[code];
-  return s ? fromBase64Url(s) : null;
-}
-
 // --- the blob -----------------------------------------------------------------
 
 const isRecord = (v: unknown): v is Record<string, unknown> =>
@@ -126,10 +113,10 @@ const isStringList = (v: unknown): v is string[] =>
 export function parseKeyring(value: unknown): Keyring {
   if (!isRecord(value)) throw new KeyringError("not a keyring");
   if (value.v !== KEYRING_VERSION) throw new KeyringError("unknown keyring version");
-  const { trips, links, mk } = value;
+  // `links` (secrets of links this phone minted) was dropped; old blobs still carry it.
+  const { trips, mk } = value;
   if (!isTrips(trips)) throw new KeyringError("bad trips");
-  if (!isStringMap(links)) throw new KeyringError("bad links");
-  const out: Keyring = { v: KEYRING_VERSION, trips, links };
+  const out: Keyring = { v: KEYRING_VERSION, trips };
   if (mk !== undefined) {
     if (!isRecord(mk)) throw new KeyringError("bad mk");
     out.mk = mk as JsonWebKey;

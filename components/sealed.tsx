@@ -106,7 +106,7 @@ export function KeyStatus({ memberId, name }: { memberId: string; name: string }
 
 const BACKUP_NOTES = {
   "no-secret":
-    "This browser's passkey didn't hand over the secret a backup is sealed under, so it can't fetch one. Safari 18+ and Chrome with Google Password Manager do; here, use a key link.",
+    "This passkey didn't hand over the secret a backup is sealed under, so it can't fetch one. Passkeys kept in iCloud Keychain or Google Password Manager do; most password managers (Bitwarden among them) don't yet. Here, use a key link.",
   "no-backup":
     "Your passkey can open a backup, but none has been written yet. Sign in with this passkey once on a phone that has the key, and the next visit here restores it.",
   "would-not-open":

@@ -287,9 +287,6 @@ async function dropSeat(
   if (gone.length === 0) throw new DataError("No such member on this trip.");
   await tx.delete(rekeys).where(and(eq(rekeys.tripId, tripId), eq(rekeys.forMemberId, memberId)));
   await tx
-    .delete(recoveries)
-    .where(and(eq(recoveries.tripId, tripId), eq(recoveries.memberId, memberId)));
-  await tx
     .update(trips)
     .set({ keyStaleSince: sql`coalesce(${trips.keyStaleSince}, now())` })
     .where(eq(trips.id, tripId));
@@ -879,27 +876,9 @@ async function organisesWith(actorId: string, memberId: string): Promise<boolean
   return Boolean(row);
 }
 
-/** Which trip's key a recovery link carries, sealed on the organiser's phone. */
-export interface RecoveryKey {
-  tripId: string;
-  epoch: number;
-  wrappedKey: string;
-}
-
-async function createRecovery(
-  memberId: string,
-  mintedBy: string | null,
-  key: RecoveryKey | null,
-): Promise<string> {
+async function createRecovery(memberId: string, mintedBy: string | null): Promise<string> {
   const member = await getMember(memberId);
   if (!member) throw new DataError("No such member.");
-  if (key) {
-    checkWrapped(key.wrappedKey);
-    const trip = await getTrip(key.tripId);
-    if (!trip) throw new DataError(STALE_KEY);
-    checkEpoch(trip, key.epoch);
-  }
-
   const code = newRecoveryCode();
   const now = new Date();
   await db.transaction(async (tx) => {
@@ -912,44 +891,27 @@ async function createRecovery(
           or(eq(recoveries.memberId, memberId), lte(recoveries.expiresAt, now)),
         ),
       );
-    await tx.insert(recoveries).values({
-      code,
-      memberId,
-      mintedBy,
-      wrappedKey: key?.wrappedKey ?? null,
-      tripId: key?.tripId ?? null,
-      epoch: key?.epoch ?? null,
-      expiresAt: recoveryExpiresAt(now),
-    });
+    await tx
+      .insert(recoveries)
+      .values({ code, memberId, mintedBy, expiresAt: recoveryExpiresAt(now) });
   });
   logger.warn({ memberId, mintedBy }, "recovery link minted");
   return code;
 }
 
 /**
- * An organiser of a shared trip — of the trip whose key the link carries, when it carries one;
- * the real check, who is asking, is theirs, out of band.
+ * An organiser of a trip they share; the real check, who is asking, is theirs, out of band. The
+ * link restores the seat only — the key comes afterwards from anyone on the trip.
  */
-export async function mintRecovery(
-  actorId: string,
-  memberId: string,
-  key: RecoveryKey | null,
-): Promise<string> {
-  if (key) {
-    await requireOrganiser(key.tripId, actorId);
-    await requireMembership(key.tripId, memberId);
-  } else if (!(await organisesWith(actorId, memberId))) {
+export async function mintRecovery(actorId: string, memberId: string): Promise<string> {
+  if (!(await organisesWith(actorId, memberId))) {
     throw new DataError("Only an organiser of a trip they're on can mint a recovery link.");
   }
-  return createRecovery(memberId, actorId, key);
+  return createRecovery(memberId, actorId);
 }
 
-/**
- * The failsafe, skipping the organiser check: only scripts/recovery-link.ts, whose runner already
- * holds DATABASE_URL. Never call it from a server action. Restores seats, never keys (§9).
- */
 export async function mintRecoveryFromConsole(memberId: string): Promise<string> {
-  return createRecovery(memberId, null, null);
+  return createRecovery(memberId, null);
 }
 
 export async function findRecovery(code: string): Promise<RecoveryRow | null> {
@@ -1007,7 +969,7 @@ export async function recoverWithLink(input: {
   code: string;
   memberId: string;
   credential: VerifiedRegistration;
-}): Promise<{ member: Member; key: RecoveryKey | null }> {
+}): Promise<{ member: Member }> {
   return db.transaction(async (tx) => {
     const [row] = await tx
       .select()
@@ -1030,10 +992,8 @@ export async function recoverWithLink(input: {
       { memberId: member.id, mintedBy: row.mintedBy },
       "seat recovered — a new passkey was added through a recovery link",
     );
-    const handover = handoverOf(row);
     return {
       member,
-      key: handover && row.tripId !== null ? { tripId: row.tripId, ...handover } : null,
     };
   });
 }

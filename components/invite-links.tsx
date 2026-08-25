@@ -2,24 +2,17 @@
 
 // Minting a link that carries the key (docs/private-trips.md §4.3): this phone
 // makes the secret, wraps the trip key and a peek at the table under it, and
-// keeps the secret in its keyring so the link can be shown again. The server
-// never sees it.
+// shows the link once. The server never sees the secret; neither does this
+// phone keep it — a link is minted, not re-shown.
 
 import { mintInviteAction } from "@/app/actions";
-import {
-  linkWithSecret,
-  newLinkSecret,
-  tripKeyOf,
-  withLinkSecret,
-  wrapPreview,
-  wrapTripKey,
-} from "@/lib/keys";
+import { linkWithSecret, newLinkSecret, tripKeyOf, wrapPreview, wrapTripKey } from "@/lib/keys";
 import { listMarkets } from "@/lib/views";
 import { useKeyring } from "./keyring";
 import { useTrip } from "./trip-store";
 
 export function useMintInvite() {
-  const { tripId, epoch, me, roster, people, state } = useTrip();
+  const { tripId, epoch, me, roster, people, state, name } = useTrip();
   const keyring = useKeyring();
   return async (
     label: string,
@@ -33,7 +26,7 @@ export function useMintInvite() {
     const [wrappedKey, preview] = await Promise.all([
       wrapTripKey(secret, "invite", raw),
       wrapPreview(secret, {
-        name: "",
+        name: name ?? "",
         names: roster.slice(0, 6).map((m) => m.name),
         questions: open.slice(0, 4).map((v) => v.market.question),
       }),
@@ -44,11 +37,9 @@ export function useMintInvite() {
       epoch,
       preview,
     });
-    const code = res.code;
-    if (!res.ok || !res.url || !code) {
+    if (!res.ok || !res.url) {
       return { ok: false, error: res.error ?? "Couldn't mint an invite." };
     }
-    await keyring.update((kr) => withLinkSecret(kr, code, secret));
     return { ok: true, url: linkWithSecret(res.url, secret) };
   };
 }

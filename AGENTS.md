@@ -60,7 +60,7 @@ Pre-commit (husky): biome on staged files, tsc, full test suite.
   only from an organiser, because the one pre-sealing phrasebook was put on
   the record that way; nothing new should set it.
 - **Keys move only through people.** A key reaches a phone through a link
-  fragment — invite, rekey (`lib/rekeys`, `/k/[code]`), recovery — opened by
+  fragment — invite, rekey (`lib/rekeys`, `/k/[code]`) — opened by
   that phone and put in its keyring (`components/keyring.tsx`, IndexedDB).
   The keyring is also backed up under each passkey's PRF secret
   (`keyring_wraps`, `lib/keys` `prfKeyringKey`): the authenticator derives
@@ -159,8 +159,9 @@ Pre-commit (husky): biome on staged files, tsc, full test suite.
   its URL fragment, which never reaches the server; a link copied without it
   seats a member keyless, and the key comes by rekey. A member of one trip opening a link
   to another is seated with one tap (`joinTripWithInvite`). The code is the
-  row's primary key and is stored as-is, so an organiser can re-share a link; invites survive on being
-  short-lived and revocable rather than unreadable (`lib/invites.ts`).
+  row's primary key and is stored as-is; a link is shown once, on the phone
+  that minted it, and is never re-shown — mint a fresh one. Invites survive
+  on being short-lived and revocable rather than unreadable (`lib/invites.ts`).
   `use_count` is the only record of acceptance — it is what spends a personal
   link. Accepting one creates the member, their passkey, and spends it in one
   transaction with the row locked.
@@ -196,7 +197,7 @@ Pre-commit (husky): biome on staged files, tsc, full test suite.
   the member it names, and the member it names is followed by a banner on
   every page (`recoveryNoticeFor`, root layout) until a live link is shut or a
   spent one has been theirs for a week — the one person who must not miss it
-  cannot be assumed to open a members page inside a 30-minute window. Recovery adds a passkey and never removes one, so a member who
+  cannot be assumed to open a members page inside a 30-minute window. Recovery restores the seat only — the key comes afterwards by a key link from anyone on the trip — and adds a passkey without removing one, so a member who
   still holds a key keeps it and can drop the intruder. `pnpm recovery:link`
   is the failsafe under that (`minted_by` null = console), for when no
   organiser can sign in; it needs `DATABASE_URL`, which is where the trust
