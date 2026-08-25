@@ -60,8 +60,7 @@ Pre-commit (husky): biome on staged files, tsc, full test suite.
   phrasebook (`phrase.keep`/`phrase.drop`) are events too; the trip's name
   is sealed on its own into `trips.name_enc` (`lib/keys` `sealName`) so the
   trips list can show it without the log. The schema has no plaintext
-  content column — `lib/rows.ts` is the shape `Market`/`LedgerRow` kept
-  when the tables went. `phrase.keep` carries an optional `keeper`, honoured
+  content column. `phrase.keep` carries an optional `keeper`, honoured
   only from an organiser, because the one pre-sealing phrasebook was put on
   the record that way; nothing new should set it.
 - **Keys move only through people.** A key reaches a phone through a link
@@ -80,9 +79,11 @@ Pre-commit (husky): biome on staged files, tsc, full test suite.
   supplied; never add a path that returns a key to the server. The console (`pnpm recovery:link`)
   restores seats, never keys; `pnpm seed` mints console rekey links because
   it holds the key for the one moment it exists in the clear.
-- The `ledger` is append-only and still the shape every derivation uses —
-  `lib/replay` emits `LedgerRow`s so `lib/stats` is unchanged. Never store a
-  balance, score, or profile.
+- Each replayed market carries its positions and the settlement that stands
+  (`MarketState.settlement`), and that is what `lib/stats` reads; the
+  `ledger` is the same story as a feed — every pie movement in order, for
+  the pages that show what happened. Never store a balance, score, or
+  profile.
 - Pure math lives in tested modules (`engine`, `stats`, `recommend`);
   `lib/data.ts` does I/O + assembly only. New derivation logic goes in a pure
   module with tests — `data.ts`'s import chain needs env + a DB pool, so

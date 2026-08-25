@@ -24,10 +24,10 @@ export function TripHome({
 }) {
   const { tripId, me, lingo, t, roster, people, state, name } = useOpenTrip();
   const [seen] = useState(() => seenMarkets(tripId));
-  const { open, resolved, forYou } = listMarkets(state, tripId, people, me.id, new Date(), seen);
+  const { open, resolved, forYou } = listMarkets(state, people, me.id, new Date(), seen);
   const netC = netOf(state, me.id);
-  const results = memberResults(state, tripId, me.id);
-  const activity = recentActivity(state, tripId, people, 10);
+  const results = memberResults(state, me.id);
+  const activity = recentActivity(state, people, 10);
 
   const committedC = open.reduce((s, v) => s + v.myStakeC, 0);
   const committedCount = open.filter((v) => v.myStakeC > 0).length;
@@ -82,7 +82,7 @@ export function TripHome({
             </div>
             <div className="mt-3 grid gap-4 sm:grid-cols-2">
               {forYou.map((v) => (
-                <MarketCard key={v.market.id} view={v} lingo={lingo} />
+                <MarketCard key={v.market.id} view={v} tripId={tripId} lingo={lingo} />
               ))}
             </div>
           </section>
@@ -116,6 +116,7 @@ export function TripHome({
             <MarketCard
               key={v.market.id}
               view={v}
+              tripId={tripId}
               myProfitC={showSettled ? profitByMarket.get(v.market.id) : undefined}
               lingo={lingo}
             />
@@ -147,7 +148,7 @@ export function TripHome({
           {t.activityHeading}
         </h2>
         <div className="mt-3">
-          <ActivityFeed items={activity} showMarket lingo={lingo} />
+          <ActivityFeed items={activity} tripId={tripId} showMarket lingo={lingo} />
         </div>
       </aside>
     </div>

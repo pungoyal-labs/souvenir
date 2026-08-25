@@ -23,7 +23,7 @@ export function TripHeader({
 }) {
   const { state, me, people, seenAt, name, t } = useTrip();
   const netC = state ? netOf(state, me.id) : null;
-  const unread = !!state && inbox(state, tripId, people, me.id, seenAt, 1).unreadCount > 0;
+  const unread = !!state && inbox(state, people, me.id, seenAt, 1).unreadCount > 0;
   return (
     <div>
       <div className="-mt-2 flex flex-wrap items-end justify-between gap-x-4 gap-y-2">

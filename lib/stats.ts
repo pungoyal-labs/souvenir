@@ -1,38 +1,16 @@
-// Pure accounting derived from ledger rows: replay into positions, roll a
-// market's rows into per-member outcomes, and roll outcomes into the stats the
-// UI shows. No I/O — lib/data.ts feeds it rows and lib/stats.test.ts pins the
+// Pure accounting over a replayed market: what each member ended up with, and
+// the roll-ups the pages show — results, the season's rivalries, its biggest
+// swings. No I/O; lib/replay hands it markets and lib/stats.test.ts pins the
 // behavior. Settlement itself lives in lib/engine.ts; this file is everything
 // downstream of it.
 
-import {
-  computePositions,
-  exposure,
-  type MarketEvent,
-  type Position,
-  type Side,
-} from "./engine.ts";
-import type { LedgerRow, Market } from "./rows.ts";
-
-/** The bet/switch rows as engine events, in ledger order. */
-export function toEvents(rows: LedgerRow[]): MarketEvent[] {
-  return rows
-    .filter((r) => r.kind === "bet" || r.kind === "switch")
-    .map((r) => ({
-      memberId: r.memberId,
-      kind: r.kind as "bet" | "switch",
-      side: r.side as Side,
-      amountC: r.amountC,
-    }));
-}
-
-export function replay(rows: LedgerRow[]): Map<string, Position> {
-  return computePositions(toEvents(rows));
-}
+import { exposure, type Side } from "./engine.ts";
+import type { MarketState } from "./replay.ts";
 
 /**
- * Per-participant outcome of one market: final side/stake plus what came back.
- * `rows` must be in ledger order — a `reversal` only means "forget the
- * settlement so far" if what came before it is known.
+ * Per-participant outcome of one market: final side and stake, plus what the
+ * settlement that stands gave back. A reopened market has no settlement, so
+ * nothing has come back — which is exactly the case.
  */
 export interface MemberOutcome {
   side: Side;
@@ -41,37 +19,26 @@ export interface MemberOutcome {
   refundC: number;
 }
 
-export function marketOutcomes(rows: LedgerRow[]): Map<string, MemberOutcome> {
+export function marketOutcomes(
+  market: Pick<MarketState, "positions" | "settlement">,
+): Map<string, MemberOutcome> {
   const outcomes = new Map<string, MemberOutcome>();
-  for (const [memberId, pos] of replay(rows)) {
+  for (const [memberId, pos] of market.positions) {
     const stakeC = exposure(pos);
     if (stakeC === 0) continue;
+    const backC = market.settlement?.paidC.get(memberId) ?? 0;
     outcomes.set(memberId, {
       side: pos.yesC > 0 ? "yes" : "no",
       stakeC,
-      payoutC: 0,
-      refundC: 0,
+      payoutC: market.settlement?.kind === "payout" ? backC : 0,
+      refundC: market.settlement?.kind === "refund" ? backC : 0,
     });
-  }
-  for (const row of rows) {
-    const outcome = outcomes.get(row.memberId);
-    if (!outcome) continue;
-    if (row.kind === "payout") outcome.payoutC += row.amountC;
-    if (row.kind === "refund") outcome.refundC += row.amountC;
-    // Reopening hands the whole settlement back, so a market resolved twice
-    // counts only what the resolution that stands paid out. Rows arrive in
-    // ledger order, which is what makes "everything before this" the right
-    // thing to forget.
-    if (row.kind === "reversal") {
-      outcome.payoutC = 0;
-      outcome.refundC = 0;
-    }
   }
   return outcomes;
 }
 
 export interface MarketResult {
-  market: Market;
+  market: MarketState;
   side: Side;
   stakeC: number;
   returnedC: number;
@@ -84,7 +51,7 @@ export interface MarketResult {
  * was voided or the winning side was empty — means no contest: the stake came
  * back and the market carries no skill signal.
  */
-export function toResult(market: Market, outcome: MemberOutcome): MarketResult {
+export function toResult(market: MarketState, outcome: MemberOutcome): MarketResult {
   const noContest = market.status === "refunded" || outcome.refundC > 0;
   return {
     market,
@@ -138,7 +105,7 @@ export interface Rivalry {
  * no-contest markets drop out — a refund is nobody's win.
  */
 export function rivalries(
-  markets: { status: Market["status"]; outcomes: Map<string, MemberOutcome> }[],
+  markets: { status: MarketState["status"]; outcomes: Map<string, MemberOutcome> }[],
 ): Rivalry[] {
   const byPair = new Map<string, Rivalry>();
   for (const { status, outcomes } of markets) {

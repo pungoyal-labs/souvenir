@@ -9,8 +9,10 @@
 // reason, never patched; a modified client that posts one only lies to its own
 // screen.
 //
-// Settlement math is lib/engine's, untouched. The derived `ledger` is in the
-// shape of the old ledger rows so lib/stats keeps working over it unchanged.
+// Settlement math is lib/engine's, untouched. Each market carries its live
+// positions and the settlement that stands, which is what lib/stats reads;
+// the `ledger` is the same story as a feed — every pie movement, in order —
+// for the pages that show what happened rather than where it ended up.
 
 import {
   computePositions,
@@ -25,11 +27,9 @@ import {
 import type { EventPayload, OpenEvent, UnknownEvent } from "./events.ts";
 import { MAX_PHRASES } from "./phrases.ts";
 import { CENTS } from "./pies.ts";
-import type { LedgerRow } from "./rows.ts";
 import { type BillEntry, buildEntries, SplitError } from "./split.ts";
 
 export interface ReplayConfig {
-  tripId: string;
   /** The first organiser, before any `member.role` says otherwise. */
   creatorId: string;
   maxStakePies: number;
@@ -47,8 +47,31 @@ export interface MarketState {
   resolvedAt: Date | null;
   resolutionNote: string | null;
   positions: Map<string, Position>;
-  /** What each member still holds from the settlement: payouts and refunds, less reversals. */
-  outstanding: Map<string, number>;
+  /** The settlement that stands, or null while open (or reopened). */
+  settlement: Settlement | null;
+}
+
+/** Who got what when the market closed: the pool to the winners, or every stake back. */
+export interface Settlement {
+  kind: "payout" | "refund";
+  paidC: Map<string, number>;
+}
+
+export type LedgerKind = "bet" | "switch" | "payout" | "refund" | "reversal";
+
+/**
+ * One pie movement. `amountC` is the size, `balanceDeltaC` its sign for the
+ * member: bet −, switch 0, payout/refund +, reversal −.
+ */
+export interface LedgerRow {
+  id: number;
+  at: Date;
+  memberId: string;
+  marketId: string;
+  kind: LedgerKind;
+  side: Side | null;
+  amountC: number;
+  balanceDeltaC: number;
 }
 
 export interface CommentState {
@@ -194,7 +217,7 @@ function apply(ctx: Ctx, ev: OpenEvent, p: Exclude<EventPayload, UnknownEvent>):
         resolvedAt: null,
         resolutionNote: null,
         positions: new Map(),
-        outstanding: new Map(),
+        settlement: null,
       });
       return;
     }
@@ -224,26 +247,23 @@ function apply(ctx: Ctx, ev: OpenEvent, p: Exclude<EventPayload, UnknownEvent>):
       const market = marketOf(state, p.marketId);
       if (market.creatorId !== ev.authorId) refuse("only the creator resolves");
       if (market.status !== "open") refuse("already resolved");
-      let paid: Map<string, number>;
-      let kind: LedgerRow["kind"];
+      let settlement: Settlement;
       if (p.outcome === "refunded") {
-        paid = refundAll(market.positions);
-        kind = "refund";
+        settlement = { kind: "refund", paidC: refundAll(market.positions) };
       } else {
         const result = settle(market.positions, p.outcome);
-        paid = result.payoutsC;
-        kind = result.autoRefunded ? "refund" : "payout";
+        settlement = { kind: result.autoRefunded ? "refund" : "payout", paidC: result.payoutsC };
       }
-      for (const [memberId, amountC] of paid) {
+      for (const [memberId, amountC] of settlement.paidC) {
         pushLedger(ctx, ev, {
           marketId: market.id,
           memberId,
-          kind,
+          kind: settlement.kind,
           amountC,
           balanceDeltaC: amountC,
         });
-        market.outstanding.set(memberId, amountC);
       }
+      market.settlement = settlement;
       market.status = p.outcome;
       market.resolvedAt = ev.at;
       market.resolutionNote = p.note.trim() || null;
@@ -253,7 +273,7 @@ function apply(ctx: Ctx, ev: OpenEvent, p: Exclude<EventPayload, UnknownEvent>):
       const market = marketOf(state, p.marketId);
       if (!state.organiserIds.has(ev.authorId)) refuse("only an organiser reopens");
       if (market.status === "open") refuse("already open");
-      for (const [memberId, amountC] of market.outstanding) {
+      for (const [memberId, amountC] of market.settlement?.paidC ?? []) {
         if (amountC <= 0) continue;
         pushLedger(ctx, ev, {
           marketId: market.id,
@@ -263,7 +283,7 @@ function apply(ctx: Ctx, ev: OpenEvent, p: Exclude<EventPayload, UnknownEvent>):
           balanceDeltaC: -amountC,
         });
       }
-      market.outstanding = new Map();
+      market.settlement = null;
       market.status = "open";
       market.resolvedAt = null;
       market.resolutionNote = null;
@@ -441,7 +461,7 @@ function pushLedger(
   row: {
     marketId: string;
     memberId?: string;
-    kind: LedgerRow["kind"];
+    kind: LedgerKind;
     side?: Side;
     amountC: number;
     balanceDeltaC: number;
@@ -450,14 +470,12 @@ function pushLedger(
   ctx.state.ledger.push({
     id: ctx.nextLedgerId++,
     at: ev.at,
-    tripId: ctx.config.tripId,
     memberId: row.memberId ?? ev.authorId,
     marketId: row.marketId,
     kind: row.kind,
     side: row.side ?? null,
     amountC: row.amountC,
     balanceDeltaC: row.balanceDeltaC,
-    note: null,
   });
 }
 
@@ -472,7 +490,7 @@ export function netByMember(state: TripState): Map<string, number> {
   return net;
 }
 
-/** The ledger rows of one market, for lib/stats. */
+/** The ledger rows of one market, oldest first. */
 export function marketRows(state: TripState, marketId: string): LedgerRow[] {
   return state.ledger.filter((r) => r.marketId === marketId);
 }
@@ -481,7 +499,6 @@ export function marketRows(state: TripState, marketId: string): LedgerRow[] {
 export function rowsByMarket(state: TripState): Map<string, LedgerRow[]> {
   const by = new Map<string, LedgerRow[]>();
   for (const row of state.ledger) {
-    if (row.marketId === null) continue;
     const rows = by.get(row.marketId);
     if (rows) rows.push(row);
     else by.set(row.marketId, [row]);

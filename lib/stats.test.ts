@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type { Side } from "./engine.ts";
-import type { LedgerRow, Market } from "./rows.ts";
+import type { Position, Side } from "./engine.ts";
+import type { MarketState, Settlement } from "./replay.ts";
 import {
   marketOutcomes,
   nemesisOf,
@@ -8,128 +8,78 @@ import {
   rivalries,
   summarizeResults,
   superlatives,
-  toEvents,
   toResult,
 } from "./stats.ts";
 
-const market = (over: Partial<Market> = {}): Market => ({
-  id: "m1",
-  creatorId: "creator",
-  question: "Will it happen?",
-  criteria: "Somehow.",
-  tripId: "t1",
-  createdAt: new Date("2026-08-01T00:00:00Z"),
-  status: "yes",
-  resolvedAt: new Date("2026-08-02T00:00:00Z"),
-  resolutionNote: null,
-  ...over,
-});
+/** A market as replay leaves it: positions per member and the settlement that stands. */
+function market(
+  over: Partial<Omit<MarketState, "positions" | "settlement">> = {},
+  stakes: Array<[string, Side, number]> = [],
+  settlement: Settlement | null = null,
+): MarketState {
+  const positions = new Map<string, Position>();
+  for (const [memberId, side, pies] of stakes) {
+    const pos = positions.get(memberId) ?? { yesC: 0, noC: 0 };
+    pos[side === "yes" ? "yesC" : "noC"] += pies * 100;
+    positions.set(memberId, pos);
+  }
+  return {
+    id: "m1",
+    creatorId: "creator",
+    question: "Will it happen?",
+    criteria: "Somehow.",
+    createdAt: new Date("2026-08-01T00:00:00Z"),
+    status: "yes",
+    resolvedAt: new Date("2026-08-02T00:00:00Z"),
+    resolutionNote: null,
+    positions,
+    settlement,
+    ...over,
+  };
+}
 
-let seq = 0;
-const row = (
-  memberId: string,
-  kind: LedgerRow["kind"],
-  over: Partial<LedgerRow> = {},
-): LedgerRow => ({
-  id: ++seq,
-  at: new Date("2026-08-01T12:00:00Z"),
-  tripId: "t1",
-  memberId,
-  marketId: "m1",
-  side: null,
-  amountC: 0,
-  balanceDeltaC: 0,
-  note: null,
-  ...over,
+const paid = (kind: Settlement["kind"], ...lines: Array<[string, number]>): Settlement => ({
   kind,
-});
-
-const bet = (memberId: string, side: Side, pies: number) =>
-  row(memberId, "bet", { side, amountC: pies * 100, balanceDeltaC: -pies * 100 });
-const payout = (memberId: string, side: Side, amountC: number) =>
-  row(memberId, "payout", { side, amountC, balanceDeltaC: amountC });
-const refund = (memberId: string, amountC: number) =>
-  row(memberId, "refund", { amountC, balanceDeltaC: amountC });
-const reversal = (memberId: string, amountC: number) =>
-  row(memberId, "reversal", { amountC, balanceDeltaC: -amountC });
-
-describe("toEvents", () => {
-  it("keeps only bets and switches, in order, with engine fields", () => {
-    const events = toEvents([
-      bet("a", "yes", 3),
-      payout("a", "yes", 600),
-      refund("b", 200),
-      row("a", "switch", { side: "no", amountC: 300 }),
-    ]);
-    expect(events).toEqual([
-      { memberId: "a", kind: "bet", side: "yes", amountC: 300 },
-      { memberId: "a", kind: "switch", side: "no", amountC: 300 },
-    ]);
-  });
+  paidC: new Map(lines),
 });
 
 describe("marketOutcomes", () => {
-  it("rolls stakes and returns into per-member outcomes", () => {
-    const outcomes = marketOutcomes([
-      bet("a", "yes", 3),
-      bet("a", "yes", 2),
-      bet("b", "no", 4),
-      payout("a", "yes", 900),
-    ]);
+  it("reads each member's side, stake and what the settlement gave back", () => {
+    const outcomes = marketOutcomes(
+      market(
+        {},
+        [
+          ["a", "yes", 3],
+          ["a", "yes", 2],
+          ["b", "no", 4],
+        ],
+        paid("payout", ["a", 900]),
+      ),
+    );
     expect(outcomes.get("a")).toEqual({ side: "yes", stakeC: 500, payoutC: 900, refundC: 0 });
     expect(outcomes.get("b")).toEqual({ side: "no", stakeC: 400, payoutC: 0, refundC: 0 });
   });
 
-  it("forgets a settlement that was handed back when the call reopened", () => {
-    const outcomes = marketOutcomes([
-      bet("a", "yes", 3),
-      bet("b", "no", 4),
-      payout("a", "yes", 700),
-      reversal("a", 700),
-    ]);
+  it("has nothing back on a reopened market — the settlement was handed back", () => {
+    const outcomes = marketOutcomes(
+      market({ status: "open", resolvedAt: null }, [
+        ["a", "yes", 3],
+        ["b", "no", 4],
+      ]),
+    );
     expect(outcomes.get("a")).toEqual({ side: "yes", stakeC: 300, payoutC: 0, refundC: 0 });
   });
 
-  it("counts only the resolution that stands after a reopen", () => {
-    const outcomes = marketOutcomes([
-      bet("a", "yes", 3),
-      bet("b", "no", 4),
-      payout("a", "yes", 700),
-      reversal("a", 700),
-      payout("b", "no", 700),
-    ]);
-    expect(outcomes.get("a")).toEqual({ side: "yes", stakeC: 300, payoutC: 0, refundC: 0 });
-    expect(outcomes.get("b")).toEqual({ side: "no", stakeC: 400, payoutC: 700, refundC: 0 });
-  });
-
-  it("clears a refund too, so a voided-then-reopened market is no longer no-contest", () => {
-    const rows = [
-      bet("a", "yes", 3),
-      refund("a", 300),
-      reversal("a", 300),
-      payout("a", "yes", 700),
-    ];
-    const outcomes = marketOutcomes(rows);
-    expect(outcomes.get("a")).toEqual({ side: "yes", stakeC: 300, payoutC: 700, refundC: 0 });
-    expect(toResult(market(), outcomes.get("a")!).noContest).toBe(false);
-  });
-
-  it("reports the final side after a switch", () => {
-    const outcomes = marketOutcomes([
-      bet("a", "yes", 5),
-      row("a", "switch", { side: "no", amountC: 500 }),
-    ]);
-    expect(outcomes.get("a")).toEqual({ side: "no", stakeC: 500, payoutC: 0, refundC: 0 });
-  });
-
-  it("ignores return rows for members with no stake", () => {
-    const outcomes = marketOutcomes([bet("a", "yes", 1), refund("ghost", 300)]);
-    expect(outcomes.has("ghost")).toBe(false);
-  });
-
-  it("sums multiple refund rows", () => {
-    const outcomes = marketOutcomes([bet("a", "yes", 4), refund("a", 100), refund("a", 300)]);
+  it("files a refund as a refund, never a payout", () => {
+    const outcomes = marketOutcomes(
+      market({ status: "refunded" }, [["a", "yes", 4]], paid("refund", ["a", 400])),
+    );
     expect(outcomes.get("a")).toEqual({ side: "yes", stakeC: 400, payoutC: 0, refundC: 400 });
+  });
+
+  it("skips a member whose stake is zero", () => {
+    const outcomes = marketOutcomes(market({}, [["a", "yes", 1]], paid("refund", ["ghost", 300])));
+    expect(outcomes.has("ghost")).toBe(false);
   });
 });
 
@@ -224,23 +174,17 @@ describe("summarizeResults", () => {
 describe("rivalries", () => {
   // Three resolved markets: ann beats bob twice, cat beats ann once; the
   // fourth is a void and counts for nobody.
+  const clash = (status: MarketState["status"], ...stakes: Array<[string, Side, number]>) => ({
+    status,
+    outcomes: marketOutcomes(
+      market({ status }, stakes, status === "refunded" ? paid("refund") : null),
+    ),
+  });
   const table = [
-    {
-      status: "yes" as const,
-      outcomes: marketOutcomes([bet("ann", "yes", 5), bet("bob", "no", 5)]),
-    },
-    {
-      status: "no" as const,
-      outcomes: marketOutcomes([bet("ann", "no", 2), bet("bob", "yes", 2)]),
-    },
-    {
-      status: "yes" as const,
-      outcomes: marketOutcomes([bet("cat", "yes", 1), bet("ann", "no", 1), bet("bob", "no", 1)]),
-    },
-    {
-      status: "refunded" as const,
-      outcomes: marketOutcomes([bet("ann", "yes", 9), bet("bob", "no", 9), refund("ann", 900)]),
-    },
+    clash("yes", ["ann", "yes", 5], ["bob", "no", 5]),
+    clash("no", ["ann", "no", 2], ["bob", "yes", 2]),
+    clash("yes", ["cat", "yes", 1], ["ann", "no", 1], ["bob", "no", 1]),
+    clash("refunded", ["ann", "yes", 9], ["bob", "no", 9]),
   ];
 
   it("counts who beat whom, most clashes first, and skips no-contests", () => {
@@ -261,16 +205,25 @@ describe("rivalries", () => {
   });
 
   it("drops members whose stake was refunded inside a contested market", () => {
-    const mixed = marketOutcomes([
-      bet("ann", "yes", 5),
-      bet("bob", "no", 5),
-      bet("cat", "no", 5),
-      payout("ann", "yes", 1500),
-      refund("cat", 500),
-    ]);
-    const [only] = rivalries([{ status: "yes", outcomes: mixed }]);
-    expect(only).toMatchObject({ a: "ann", b: "bob", clashes: 1, aWins: 1 });
+    const mixed = marketOutcomes(
+      market(
+        { status: "yes" },
+        [
+          ["ann", "yes", 5],
+          ["bob", "no", 5],
+          ["cat", "no", 5],
+        ],
+        { kind: "refund", paidC: new Map([["cat", 500]]) },
+      ),
+    );
+    // A refund settlement gives cat their stake back and nobody else anything: no contest for cat.
     expect(rivalries([{ status: "yes", outcomes: mixed }])).toHaveLength(1);
+    expect(rivalries([{ status: "yes", outcomes: mixed }])[0]).toMatchObject({
+      a: "ann",
+      b: "bob",
+      clashes: 1,
+      aWins: 1,
+    });
   });
 });
 

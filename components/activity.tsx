@@ -24,10 +24,12 @@ function phrase(item: ActivityItem): string {
 
 export function ActivityFeed({
   items,
+  tripId,
   showMarket,
   lingo = "english",
 }: {
   items: ActivityItem[];
+  tripId: string;
   showMarket?: boolean;
   lingo?: string;
 }) {
@@ -46,7 +48,7 @@ export function ActivityFeed({
               <>
                 {" — "}
                 <Link
-                  href={routes.market(item.market.tripId, item.market.id)}
+                  href={routes.market(tripId, item.market.id)}
                   className="text-felt underline decoration-line underline-offset-2 hover:decoration-felt"
                 >
                   {item.market.question}

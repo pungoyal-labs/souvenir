@@ -22,7 +22,7 @@ export function useMintInvite() {
     const raw = tripKeyOf(keyring.keyring, tripId, epoch);
     if (!raw) return { ok: false, error: "This phone has no key to put in a link." };
     const secret = newLinkSecret();
-    const { open } = listMarkets(state, tripId, people, me.id, new Date());
+    const { open } = listMarkets(state, people, me.id, new Date());
     const [wrappedKey, preview] = await Promise.all([
       wrapTripKey(secret, "invite", raw),
       wrapPreview(secret, {

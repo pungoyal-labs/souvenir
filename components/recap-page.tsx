@@ -15,7 +15,7 @@ import { EmptyState } from "./ui";
 /** The season, summed up: the table, the rivalries, the biggest swing. */
 export function RecapPage({ eyebrow, minResolved }: { eyebrow: string; minResolved: number }) {
   const { tripId, me, t, roster, people, state, name: tripName } = useOpenTrip();
-  const recap = tripRecap(state, tripId, roster, people, minResolved);
+  const recap = tripRecap(state, roster, people, minResolved);
   const champion = recap.table[0];
   const name = (id: string) => people.get(id)?.name ?? "someone";
 

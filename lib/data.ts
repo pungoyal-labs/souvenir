@@ -36,8 +36,8 @@ import { expiresAfter, linkState, newLinkCode } from "./links.ts";
 import { logger } from "./logger.ts";
 import { RECOVERY_TTL_MS, visibleRecoveries } from "./recovery.ts";
 import { CONSOLE_REKEY_TTL_MS, liveRekeys, REKEY_TTL_MS } from "./rekeys.ts";
-import { DEPARTED_NAME } from "./rows.ts";
 import { TripError, type TripInput, tripConfig } from "./trips.ts";
+import { DEPARTED_NAME } from "./views.ts";
 import type { VerifiedRegistration } from "./webauthn.ts";
 
 /** User-facing failures (closed market, not on the trip, …). */

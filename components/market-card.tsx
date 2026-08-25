@@ -12,10 +12,12 @@ import { tone } from "./ui";
 
 export function MarketCard({
   view,
+  tripId,
   myProfitC,
   lingo = "english",
 }: {
   view: MarketView;
+  tripId: string;
   /** For resolved predictions: the viewer's net result, if they took part. */
   myProfitC?: number;
   lingo?: string;
@@ -45,7 +47,7 @@ export function MarketCard({
 
   return (
     <Link
-      href={routes.market(market.tripId, market.id)}
+      href={routes.market(tripId, market.id)}
       className="block card p-4 shadow-[0_1px_0_rgba(33,38,31,0.06)] transition-[transform,box-shadow] hover:-translate-y-0.5 hover:shadow-[0_8px_18px_-10px_rgba(20,48,36,0.4)]"
     >
       <div className="flex items-center justify-between gap-2">

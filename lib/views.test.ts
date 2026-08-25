@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
 import type { EventPayload, OpenEvent } from "./events.ts";
 import { type ReplayConfig, replayTrip } from "./replay.ts";
-import { DEPARTED_NAME } from "./rows.ts";
 import {
   billComments,
   billError,
   billsOverview,
   commentError,
+  DEPARTED_NAME,
   draftError,
   inbox,
   leaderboard,
@@ -28,7 +28,6 @@ import {
 } from "./views.ts";
 
 const config: ReplayConfig = {
-  tripId: "trip",
   creatorId: "org",
   maxStakePies: 10,
   currencies: ["inr", "thb"],
@@ -94,7 +93,7 @@ describe("markets", () => {
   it("splits open from resolved and ranks a For-you rail", () => {
     const state = replayTrip(config, season);
     const people = peopleOf(roster, state);
-    const { open, resolved, forYou } = listMarkets(state, "trip", people, "b", at(20));
+    const { open, resolved, forYou } = listMarkets(state, people, "b", at(20));
     expect(open.map((v) => v.market.id)).toEqual(["m3"]);
     expect(resolved.map((v) => v.market.id)).toEqual(["m2", "m1"]);
     expect(open[0]?.watchers).toBe(1);
@@ -103,13 +102,13 @@ describe("markets", () => {
     // b has not called m3 and did not create it: it is picked for them.
     expect(forYou.map((v) => v.market.id)).toEqual(["m3"]);
     // a is in it already: nothing to pick.
-    expect(listMarkets(state, "trip", people, "a", at(20)).forYou).toEqual([]);
+    expect(listMarkets(state, people, "a", at(20)).forYou).toEqual([]);
   });
 
   it("carries the viewer's own side and stake", () => {
     const state = replayTrip(config, season);
     const people = peopleOf(roster, state);
-    const { open } = listMarkets(state, "trip", people, "a", at(20));
+    const { open } = listMarkets(state, people, "a", at(20));
     expect(open[0]?.mySide).toBe("yes");
     expect(open[0]?.myStakeC).toBe(100);
   });
@@ -118,7 +117,7 @@ describe("markets", () => {
     const state = replayTrip(config, season);
     const people = peopleOf(roster.slice(0, 3), state);
     expect(people.get("c")?.name).toBe(DEPARTED_NAME);
-    const { open } = listMarkets(state, "trip", people, "a", at(20));
+    const { open } = listMarkets(state, people, "a", at(20));
     expect(open[0]?.creator.name).toBe(DEPARTED_NAME);
   });
 });
@@ -126,7 +125,7 @@ describe("markets", () => {
 describe("activity and ledgers", () => {
   it("lists the trip's latest moves newest first", () => {
     const state = replayTrip(config, season);
-    const items = recentActivity(state, "trip", peopleOf(roster, state), 3);
+    const items = recentActivity(state, peopleOf(roster, state), 3);
     expect(items.map((i) => i.row.kind)).toEqual(["bet", "payout", "bet"]);
     expect(items[0]?.market?.id).toBe("m3");
   });
@@ -143,7 +142,7 @@ describe("activity and ledgers", () => {
         ["a", resolve("m", "no")],
       ]),
     );
-    const { activity, settlements } = marketActivity(state, "trip", peopleOf(roster, state), "m");
+    const { activity, settlements } = marketActivity(state, peopleOf(roster, state), "m");
     expect(activity.map((i) => i.member.id)).toEqual(["c", "b"]);
     expect(settlements.map((i) => i.member.id)).toEqual(["c"]);
   });
@@ -152,14 +151,15 @@ describe("activity and ledgers", () => {
     const state = replayTrip(config, season);
     expect(netOf(state, "b")).toBe(200);
     expect(netOf(state, "c")).toBe(-300);
-    const results = memberResults(state, "trip", "c");
+    const results = memberResults(state, "c");
     expect(results.map((r) => [r.market.id, r.profitC])).toEqual([
       ["m2", -100],
       ["m1", -200],
     ]);
-    expect(
-      memberLedger(state, "trip", peopleOf(roster, state), "b").map((i) => i.row.kind),
-    ).toEqual(["payout", "bet"]);
+    expect(memberLedger(state, peopleOf(roster, state), "b").map((i) => i.row.kind)).toEqual([
+      "payout",
+      "bet",
+    ]);
   });
 });
 
@@ -176,7 +176,7 @@ describe("the table", () => {
 
   it("sums the season up", () => {
     const state = replayTrip(config, season);
-    const recap = tripRecap(state, "trip", roster, peopleOf(roster, state), 5);
+    const recap = tripRecap(state, roster, peopleOf(roster, state), 5);
     expect(recap.resolvedCount).toBe(2);
     expect(recap.openCount).toBe(1);
     expect(recap.totalPoolC).toBe(800);
@@ -212,7 +212,7 @@ describe("inbox", () => {
   it("collects what concerns me, marks unread past the cursor", () => {
     const state = replayTrip(config, season);
     const people = peopleOf(roster, state);
-    const { items, unreadCount } = inbox(state, "trip", people, "b", at(7));
+    const { items, unreadCount } = inbox(state, people, "b", at(7));
     const kinds = items.map((i) => `${i.kind}:${i.market?.id ?? ""}`);
     // b: created m2 (calls on it), called m1 (its verdict, c's call), watches m3
     // (a's call and mention), and sees every new prediction by others.
@@ -233,7 +233,7 @@ describe("inbox", () => {
 
   it("reports my own result on a verdict", () => {
     const state = replayTrip(config, season);
-    const { items } = inbox(state, "trip", peopleOf(roster, state), "c", null);
+    const { items } = inbox(state, peopleOf(roster, state), "c", null);
     const verdicts = items.filter((i) => i.kind === "resolved");
     expect(verdicts.map((i) => i.kind === "resolved" && i.myProfitC)).toEqual([-100, -200]);
   });
@@ -242,7 +242,7 @@ describe("inbox", () => {
 describe("the card", () => {
   it("prints first names and pies, nothing else", () => {
     const state = replayTrip(config, season);
-    const card = marketCard(state, "trip", peopleOf(roster, state), "m1");
+    const card = marketCard(state, peopleOf(roster, state), "m1");
     expect(card).toEqual({
       question: "Q m1",
       status: "yes",
@@ -251,7 +251,7 @@ describe("the card", () => {
       winners: [{ name: "B", profitC: 200 }],
       losers: [{ name: "C", profitC: -200 }],
     });
-    expect(marketCard(state, "trip", peopleOf(roster, state), "ghost")).toBeNull();
+    expect(marketCard(state, peopleOf(roster, state), "ghost")).toBeNull();
   });
 });
 
@@ -422,17 +422,14 @@ describe("split bills", () => {
     );
     const people = peopleOf(roster, state);
     expect(billComments(state, people).b1?.map((c) => c.author.id)).toEqual(["b", "a", "c"]);
-    const { items } = inbox(state, "trip", people, "a", null);
+    const { items } = inbox(state, people, "a", null);
     expect(items.map((i) => `${i.kind}:${"bill" in i ? i.bill?.label : ""}`)).toEqual([
       "comment:Dinner",
       "mention:Dinner",
     ]);
     // b started the thread, so the replies reach them; org never joined it.
-    expect(inbox(state, "trip", people, "b", null).items.map((i) => i.actor.id)).toEqual([
-      "c",
-      "a",
-    ]);
-    expect(inbox(state, "trip", people, "org", null).items).toEqual([]);
+    expect(inbox(state, people, "b", null).items.map((i) => i.actor.id)).toEqual(["c", "a"]);
+    expect(inbox(state, people, "org", null).items).toEqual([]);
   });
 
   it("refuses what addBill refused", () => {

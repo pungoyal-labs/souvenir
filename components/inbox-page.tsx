@@ -29,7 +29,7 @@ export function InboxPage() {
     void markInboxSeenAction(tripId).then(() => markSeen());
   }, [tripId]);
 
-  const { items } = inbox(state, tripId, people, me.id, cursor);
+  const { items } = inbox(state, people, me.id, cursor);
 
   return (
     <div className="mx-auto max-w-2xl">

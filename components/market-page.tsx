@@ -52,9 +52,9 @@ export function MarketPage({
     );
   }
 
-  const view = marketView(state, tripId, people, m, me.id);
+  const view = marketView(state, people, m, me.id);
   const { market, creator } = view;
-  const { activity, settlements } = marketActivity(state, tripId, people, marketId);
+  const { activity, settlements } = marketActivity(state, people, marketId);
   const isOpen = market.status === "open";
   const totalPoolC = view.yesPoolC + view.noPoolC;
   const pulse = [
@@ -133,7 +133,7 @@ export function MarketPage({
             </div>
           )}
           <ShareCard
-            card={marketCard(state, tripId, people, marketId)}
+            card={marketCard(state, people, marketId)}
             marketId={marketId}
             published={published}
           />
@@ -211,7 +211,7 @@ export function MarketPage({
       <section className="mt-7">
         <h2 className={heading}>{t.activitySoFarHeading}</h2>
         <div className="mt-3">
-          <ActivityFeed items={activity} lingo={lingo} />
+          <ActivityFeed items={activity} tripId={tripId} lingo={lingo} />
         </div>
       </section>
     </div>

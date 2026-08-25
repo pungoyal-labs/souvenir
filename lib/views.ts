@@ -1,6 +1,5 @@
 // What the pages show, derived on the phone from a replayed trip (docs/private-trips.md §4.5).
-// Pure: state and people in, view out. The shapes are the ones the components rendered before
-// sealing — `Market` and `LedgerRow` are the schema's own — so lib/stats carries over unchanged.
+// Pure: state and people in, view out.
 
 import { exposure, type Position, type Side } from "./engine.ts";
 import { type CombinedNet, combinedNets, combinedPlan, type FxRate } from "./fx.ts";
@@ -9,13 +8,13 @@ import { type CandidateMarket, type MarketHistory, recommend } from "./recommend
 import {
   type BillState,
   type CommentState,
+  type LedgerRow,
   type MarketState,
   marketRows,
   netByMember,
   rowsByMarket,
   type TripState,
 } from "./replay.ts";
-import { DEPARTED_NAME, type LedgerRow, type Market } from "./rows.ts";
 import {
   type BillKind,
   type Currency,
@@ -50,6 +49,9 @@ export interface RosterMember extends Person {
 
 type People = Map<string, Person>;
 
+/** What the record calls a member whose account is gone. */
+export const DEPARTED_NAME = "Departed member";
+
 const departed = (id: string): Person => ({ id, name: DEPARTED_NAME, avatarUpdatedAt: null });
 const who = (people: People, id: string): Person => people.get(id) ?? departed(id);
 const known = (people: People, ids: readonly string[]): Person[] =>
@@ -81,20 +83,6 @@ export function peopleOf(roster: readonly RosterMember[], state: TripState): Peo
   return people;
 }
 
-function toMarket(m: MarketState, tripId: string): Market {
-  return {
-    id: m.id,
-    tripId,
-    creatorId: m.creatorId,
-    question: m.question,
-    criteria: m.criteria,
-    createdAt: m.createdAt,
-    status: m.status,
-    resolvedAt: m.resolvedAt,
-    resolutionNote: m.resolutionNote,
-  };
-}
-
 const settled = (state: TripState) =>
   [...state.markets.values()].filter((m) => m.status !== "open");
 /** Who reacted one way to a prediction, oldest first. */
@@ -110,7 +98,7 @@ export interface ParticipantPosition {
 }
 
 export interface MarketView {
-  market: Market;
+  market: MarketState;
   creator: Person;
   yesPoolC: number;
   noPoolC: number;
@@ -134,7 +122,6 @@ function participantsOf(positions: Map<string, Position>, people: People): Parti
 
 export function marketView(
   state: TripState,
-  tripId: string,
   people: People,
   m: MarketState,
   viewerId: string,
@@ -148,7 +135,7 @@ export function marketView(
   const mine = m.positions.get(viewerId);
   const myStakeC = mine ? exposure(mine) : 0;
   return {
-    market: toMarket(m, tripId),
+    market: m,
     creator: who(people, m.creatorId),
     yesPoolC,
     noPoolC,
@@ -165,14 +152,13 @@ export function marketView(
 /** `seen` is which predictions this phone has opened — kept on the phone, never in the log. */
 export function listMarkets(
   state: TripState,
-  tripId: string,
   people: People,
   viewerId: string,
   now: Date,
   seen: ReadonlySet<string> = new Set(),
 ): { open: MarketView[]; resolved: MarketView[]; forYou: MarketView[] } {
   const all = [...state.markets.values()].sort((a, b) => newestFirst(a.createdAt, b.createdAt));
-  const views = all.map((m) => marketView(state, tripId, people, m, viewerId));
+  const views = all.map((m) => marketView(state, people, m, viewerId));
   const open = views.filter((v) => v.market.status === "open");
   const resolved = views
     .filter((v) => v.market.status !== "open")
@@ -220,35 +206,32 @@ function forYou(
 export interface ActivityItem {
   row: LedgerRow;
   member: Person;
-  market: Market | null;
+  market: MarketState | null;
 }
 
-function toItem(state: TripState, tripId: string, people: People, row: LedgerRow): ActivityItem {
-  const m = row.marketId ? state.markets.get(row.marketId) : undefined;
-  return { row, member: who(people, row.memberId), market: m ? toMarket(m, tripId) : null };
+function toItem(state: TripState, people: People, row: LedgerRow): ActivityItem {
+  return {
+    row,
+    member: who(people, row.memberId),
+    market: state.markets.get(row.marketId) ?? null,
+  };
 }
 
 /** The trip's latest pie movements, newest first. */
-export function recentActivity(
-  state: TripState,
-  tripId: string,
-  people: People,
-  limit = 12,
-): ActivityItem[] {
+export function recentActivity(state: TripState, people: People, limit = 12): ActivityItem[] {
   return [...state.ledger]
     .reverse()
     .slice(0, limit)
-    .map((row) => toItem(state, tripId, people, row));
+    .map((row) => toItem(state, people, row));
 }
 
 /** One prediction's calls (newest first) and the settlement that stands. */
 export function marketActivity(
   state: TripState,
-  tripId: string,
   people: People,
   marketId: string,
 ): { activity: ActivityItem[]; settlements: ActivityItem[] } {
-  const items = marketRows(state, marketId).map((row) => toItem(state, tripId, people, row));
+  const items = marketRows(state, marketId).map((row) => toItem(state, people, row));
   return {
     activity: items.filter((i) => i.row.kind === "bet" || i.row.kind === "switch").reverse(),
     // Anything before the last reopen was handed back and is no longer where the pool went.
@@ -259,16 +242,11 @@ export function marketActivity(
 }
 
 /** Everything one member's pies did, newest first. */
-export function memberLedger(
-  state: TripState,
-  tripId: string,
-  people: People,
-  memberId: string,
-): ActivityItem[] {
+export function memberLedger(state: TripState, people: People, memberId: string): ActivityItem[] {
   return state.ledger
     .filter((r) => r.memberId === memberId)
     .reverse()
-    .map((row) => toItem(state, tripId, people, row));
+    .map((row) => toItem(state, people, row));
 }
 
 export function netOf(state: TripState, memberId: string): number {
@@ -276,13 +254,12 @@ export function netOf(state: TripState, memberId: string): number {
 }
 
 /** One member's outcome in every resolved prediction they took part in, newest first. */
-export function memberResults(state: TripState, tripId: string, memberId: string): MarketResult[] {
-  const byMarket = rowsByMarket(state);
+export function memberResults(state: TripState, memberId: string): MarketResult[] {
   return settled(state)
     .sort(byResolved)
     .flatMap((m) => {
-      const outcome = marketOutcomes(byMarket.get(m.id) ?? []).get(memberId);
-      return outcome ? [toResult(toMarket(m, tripId), outcome)] : [];
+      const outcome = marketOutcomes(m).get(memberId);
+      return outcome ? [toResult(m, outcome)] : [];
     });
 }
 
@@ -330,9 +307,8 @@ export function leaderboard(
       },
     ]),
   );
-  const byMarket = rowsByMarket(state);
   for (const m of state.markets.values()) {
-    for (const [memberId, outcome] of marketOutcomes(byMarket.get(m.id) ?? [])) {
+    for (const [memberId, outcome] of marketOutcomes(m)) {
       const s = stats.get(memberId);
       if (!s) continue;
       if (m.status === "open") {
@@ -369,8 +345,8 @@ export function leaderboard(
 export interface TripRecap {
   table: MemberStats[];
   rivalries: Rivalry[];
-  biggestWin: (Superlative & { member: Person; market: Market }) | null;
-  biggestLoss: (Superlative & { member: Person; market: Market }) | null;
+  biggestWin: (Superlative & { member: Person; market: MarketState }) | null;
+  biggestLoss: (Superlative & { member: Person; market: MarketState }) | null;
   resolvedCount: number;
   openCount: number;
   totalPoolC: number;
@@ -378,28 +354,23 @@ export interface TripRecap {
 
 export function tripRecap(
   state: TripState,
-  tripId: string,
   roster: readonly RosterMember[],
   people: People,
   minResolved: number,
 ): TripRecap {
   const { ranked, unranked } = leaderboard(state, roster, minResolved);
-  const byMarket = rowsByMarket(state);
   const perMarket = settled(state).map((m) => ({
     market: m,
     status: m.status,
-    outcomes: marketOutcomes(byMarket.get(m.id) ?? []),
+    outcomes: marketOutcomes(m),
   }));
   const results = perMarket.flatMap(({ market, outcomes }) =>
-    [...outcomes].map(([memberId, o]) => ({
-      memberId,
-      result: toResult(toMarket(market, tripId), o),
-    })),
+    [...outcomes].map(([memberId, o]) => ({ memberId, result: toResult(market, o) })),
   );
   const { biggestWin, biggestLoss } = superlatives(results);
   const dress = (s: Superlative | null) => {
     const m = s ? state.markets.get(s.marketId) : undefined;
-    return s && m ? { ...s, member: who(people, s.memberId), market: toMarket(m, tripId) } : null;
+    return s && m ? { ...s, member: who(people, s.memberId), market: m } : null;
   };
   let totalPoolC = 0;
   for (const { outcomes } of perMarket) for (const o of outcomes.values()) totalPoolC += o.stakeC;
@@ -457,18 +428,25 @@ type Talk = {
   commentId: string;
   body: string;
   /** Where the talk is: exactly one of these is set. */
-  market: Market | null;
+  market: MarketState | null;
   bill: { id: string; label: string } | null;
 };
 
 export type InboxItem =
-  | { kind: "new_market"; at: Date; unread: boolean; market: Market; actor: Person }
-  | { kind: "activity"; at: Date; unread: boolean; market: Market; actor: Person; row: LedgerRow }
+  | { kind: "new_market"; at: Date; unread: boolean; market: MarketState; actor: Person }
+  | {
+      kind: "activity";
+      at: Date;
+      unread: boolean;
+      market: MarketState;
+      actor: Person;
+      row: LedgerRow;
+    }
   | {
       kind: "resolved";
       at: Date;
       unread: boolean;
-      market: Market;
+      market: MarketState;
       actor: Person;
       myProfitC: number | null;
     }
@@ -478,7 +456,6 @@ export type InboxItem =
 /** Derived, not stored: the only read state is the membership's `seenAt` cursor. */
 export function inbox(
   state: TripState,
-  tripId: string,
   people: People,
   memberId: string,
   seenAt: Date | null,
@@ -491,7 +468,7 @@ export function inbox(
   const mine = new Set<string>();
   for (const m of state.markets.values()) if (m.creatorId === memberId) mine.add(m.id);
   for (const row of state.ledger) {
-    if (row.memberId === memberId && row.kind === "bet" && row.marketId) mine.add(row.marketId);
+    if (row.memberId === memberId && row.kind === "bet") mine.add(row.marketId);
   }
   for (const r of state.reactions) {
     if (r.memberId === memberId && r.kind === "watch") mine.add(r.marketId);
@@ -500,7 +477,7 @@ export function inbox(
   const items: InboxItem[] = [];
   const byMarket = rowsByMarket(state);
   for (const m of state.markets.values()) {
-    const market = toMarket(m, tripId);
+    const market = m;
     const creator = who(people, m.creatorId);
     if (m.creatorId !== memberId) {
       items.push({
@@ -512,8 +489,7 @@ export function inbox(
       });
     }
     if (!mine.has(m.id)) continue;
-    const rows = byMarket.get(m.id) ?? [];
-    for (const row of rows) {
+    for (const row of byMarket.get(m.id) ?? []) {
       if (row.memberId === memberId || (row.kind !== "bet" && row.kind !== "switch")) continue;
       items.push({
         kind: "activity",
@@ -525,7 +501,7 @@ export function inbox(
       });
     }
     if (m.status !== "open" && m.resolvedAt && m.creatorId !== memberId) {
-      const outcome = marketOutcomes(rows).get(memberId);
+      const outcome = marketOutcomes(m).get(memberId);
       items.push({
         kind: "resolved",
         at: m.resolvedAt,
@@ -566,7 +542,7 @@ export function inbox(
       actor: who(people, c.authorId),
       commentId: c.id,
       body: c.body,
-      market: m ? toMarket(m, tripId) : null,
+      market: m ?? null,
       bill: c.billId ? billOf(c.billId) : null,
     });
   }
@@ -771,23 +747,17 @@ export function billError(input: {
 /** The public face of one resolved prediction: first names and pies, nothing else. */
 export interface MarketCard {
   question: string;
-  status: Market["status"];
+  status: MarketState["status"];
   resolvedAt: Date | null;
   poolC: number;
   winners: { name: string; profitC: number }[];
   losers: { name: string; profitC: number }[];
 }
 
-export function marketCard(
-  state: TripState,
-  tripId: string,
-  people: People,
-  marketId: string,
-): MarketCard | null {
-  const m = state.markets.get(marketId);
-  if (!m) return null;
-  const market = toMarket(m, tripId);
-  const outcomes = marketOutcomes(marketRows(state, marketId));
+export function marketCard(state: TripState, people: People, marketId: string): MarketCard | null {
+  const market = state.markets.get(marketId);
+  if (!market) return null;
+  const outcomes = marketOutcomes(market);
   const lines = [...outcomes].flatMap(([memberId, o]) => {
     const r = toResult(market, o);
     if (r.noContest && market.status !== "open") return [];

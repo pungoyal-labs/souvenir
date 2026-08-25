@@ -46,9 +46,9 @@ export function MemberPage({
   const canAdmin = state.organiserIds.has(me.id);
 
   const netC = netOf(state, member.id);
-  const results = memberResults(state, tripId, member.id);
-  const { open } = listMarkets(state, tripId, people, member.id, new Date());
-  const recap = tripRecap(state, tripId, roster, people, minResolved);
+  const results = memberResults(state, member.id);
+  const { open } = listMarkets(state, people, member.id, new Date());
+  const recap = tripRecap(state, roster, people, minResolved);
   const split = memberSplit(state, people, member.id);
   const stats = summarizeResults(results);
   const openPositions = open.filter((v) => v.myStakeC > 0);
@@ -60,7 +60,7 @@ export function MemberPage({
   // Running balance, replayed from the append-only ledger; shown newest first.
   const withBalance = [];
   let running = 0;
-  for (const item of memberLedger(state, tripId, people, member.id).reverse()) {
+  for (const item of memberLedger(state, people, member.id).reverse()) {
     running += item.row.balanceDeltaC;
     withBalance.unshift({ item, afterC: running });
   }

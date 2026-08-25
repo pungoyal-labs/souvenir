@@ -129,7 +129,7 @@ export function TripStoreProvider({
   tripId: string;
   epoch: number;
   nameEnc: string | null;
-  config: Omit<ReplayConfig, "tripId">;
+  config: ReplayConfig;
   me: RosterMember;
   lingo: string;
   roster: RosterMember[];
@@ -237,8 +237,8 @@ export function TripStoreProvider({
   );
 
   const state = useMemo<TripState | null | undefined>(
-    () => (key ? replayTrip({ tripId, ...config }, events) : key),
-    [key, tripId, config, events],
+    () => (key ? replayTrip(config, events) : key),
+    [key, config, events],
   );
 
   const sealEvent = useCallback(
@@ -252,7 +252,7 @@ export function TripStoreProvider({
         epoch,
         payload,
       };
-      const refused = replayTrip({ tripId, ...config }, [...events, trial]).rejected.find(
+      const refused = replayTrip(config, [...events, trial]).rejected.find(
         (r) => r.id === trial.id,
       );
       if (refused) return { ok: false as const, error: refused.reason };

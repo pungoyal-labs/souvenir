@@ -4,7 +4,6 @@ import { marketRows, netByMember, type ReplayConfig, replayTrip } from "./replay
 import { marketOutcomes } from "./stats.ts";
 
 const config: ReplayConfig = {
-  tripId: "trip",
   creatorId: "org",
   maxStakePies: 10,
   currencies: ["inr", "thb"],
@@ -63,7 +62,7 @@ describe("predictions", () => {
     expect(state.markets.get("m")?.status).toBe("yes");
   });
 
-  it("feeds lib/stats unchanged", () => {
+  it("feeds lib/stats", () => {
     const state = replayTrip(
       config,
       log([
@@ -73,7 +72,7 @@ describe("predictions", () => {
         ["a", resolve("m", "no")],
       ]),
     );
-    const outcomes = marketOutcomes(marketRows(state, "m"));
+    const outcomes = marketOutcomes(state.markets.get("m")!);
     expect(outcomes.get("r")).toEqual({ side: "no", stakeC: 200, payoutC: 400, refundC: 0 });
     expect(outcomes.get("p")).toEqual({ side: "yes", stakeC: 200, payoutC: 0, refundC: 0 });
   });
