@@ -83,13 +83,19 @@ function Keyless() {
   );
 }
 
-/** Beside a member the log has not heard from. */
+/**
+ * Beside a member the log has not heard from — and always beside your own
+ * name, since a second phone of yours is keyless too and nobody else's table
+ * page will offer you the button once this one has said hello.
+ */
 export function KeyStatus({ memberId, name }: { memberId: string; name: string }) {
-  const { state, t } = useOpenTrip();
-  if (state.hellos.has(memberId)) return null;
+  const { state, me, t } = useOpenTrip();
+  const self = memberId === me.id;
+  const heard = state.hellos.has(memberId);
+  if (heard && !self) return null;
   return (
     <span className="inline-flex flex-wrap items-center gap-2 text-xs text-soft">
-      <span>{t.noKeyYet(name)}</span>
+      {!heard && <span>{t.noKeyYet(name)}</span>}
       <SendKey forMemberId={memberId} name={name} compact />
     </span>
   );
