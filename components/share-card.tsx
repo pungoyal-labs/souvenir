@@ -6,7 +6,7 @@ import { publishCardAction, unpublishCardAction } from "@/app/actions";
 import { routes } from "@/lib/routes";
 import type { MarketCard } from "@/lib/views";
 import { useTrip } from "./trip-store";
-import { useAct } from "./use-act";
+import { ActError, useAct } from "./use-act";
 
 /**
  * Share a verdict into the group chat. The server cannot draw the card, so
@@ -116,7 +116,7 @@ export function ShareCard({
           </button>
         )}
         {done && <span className="text-xs text-soft">{done}</span>}
-        {error && <span className="text-xs font-semibold text-no-deep">{error}</span>}
+        <ActError error={error} />
       </div>
       <p className="mt-1.5 text-xs text-soft">{isUp ? "The card is up." : t.cardPublishNote}</p>
     </div>

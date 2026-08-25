@@ -13,7 +13,6 @@ import {
   primaryKey,
   text,
   timestamp,
-  uniqueIndex,
 } from "drizzle-orm/pg-core";
 
 const bytea = customType<{ data: Buffer; driverData: Buffer }>({
@@ -24,17 +23,16 @@ const bytea = customType<{ data: Buffer; driverData: Buffer }>({
 
 export const members = pgTable("members", {
   id: text("id").primaryKey(),
-  // Nullable since invite links arrived: a member who joined by link has no
-  // address anywhere in the system. Google sign-ins still fill it, until the
-  // column goes entirely.
+  // Null for a member who joined by link: they have no address anywhere in
+  // the system. Google sign-ins still fill it, until the column goes entirely.
   email: text("email").unique(),
   name: text("name").notNull(),
+  /** Google's picture URL; nothing reads it any more (avatars are uploads or monograms). */
   image: text("image"),
   joinedAt: timestamp("joined_at", { withTimezone: true }).notNull().defaultNow(),
-  // The lingo the UI speaks to this member in; a lib/lingo.ts key.
+  /** The lingo the UI speaks to this member in; a lib/lingo.ts key. */
   lingo: text("lingo").notNull().default("english"),
-  // Set when the member uploaded their own picture (see `avatars`); it wins
-  // over `image` and doubles as the cache-buster in the avatar URL.
+  /** Set when the member uploaded a picture (see `avatars`); doubles as the cache-buster in the avatar URL. */
   avatarUpdatedAt: timestamp("avatar_updated_at", { withTimezone: true }),
   /**
    * When they ticked "I'm 18+ and I agree to the terms". Null only for
@@ -68,8 +66,6 @@ export const membershipRoleEnum = pgEnum("membership_role", ["organiser", "membe
 
 export const trips = pgTable("trips", {
   id: text("id").primaryKey(),
-  /** Plaintext only on a trip named before names were sealed; a phone with the key moves it to `nameEnc`. */
-  name: text("name"),
   /** A key of lib/talk DESTINATIONS — where the group is going. */
   destination: text("destination").notNull(),
   /** A key of lib/talk HOME — what the group speaks among themselves. */
@@ -83,13 +79,14 @@ export const trips = pgTable("trips", {
   /** Exposure cap per prediction, in whole pies. */
   maxStakePies: integer("max_stake_pies").notNull().default(10),
   /**
-   * Private trips (docs/private-trips.md): which trip-key epoch new events
-   * must be sealed under. Null until the trip is sealed — the flag Phase 1
-   * reads to tell a sealed trip from one still on the plaintext tables.
+   * Which trip-key epoch new events must be sealed under (docs/private-trips.md).
+   * Every trip is created at 0; the column is nullable only by history.
    */
   keyEpoch: integer("key_epoch"),
   /** The name, sealed under the trip key (lib/keys `sealName`). */
   nameEnc: text("name_enc"),
+  /** Set when a seat went (removal, leaving, deletion) and the key has not been rotated since. */
+  keyStaleSince: timestamp("key_stale_since", { withTimezone: true }),
   createdBy: text("created_by")
     .notNull()
     .references(() => members.id),
@@ -113,8 +110,7 @@ export const memberships = pgTable(
     joinedAt: timestamp("joined_at", { withTimezone: true }).notNull().defaultNow(),
     /** Which invite brought them, if any — the trace a founding rate is read from. */
     invitedWith: text("invited_with"),
-    // Inbox read cursor: events after this instant count as unread. The inbox
-    // itself is derived entirely from markets + ledger — no notification rows.
+    /** Inbox read cursor: events after this instant count as unread. The inbox itself is derived on the phone. */
     inboxSeenAt: timestamp("inbox_seen_at", { withTimezone: true }),
   },
   (t) => [
@@ -123,9 +119,9 @@ export const memberships = pgTable(
   ],
 );
 
-// Uploaded profile pictures, one per member, overriding the Google `image`.
-// The bytes live in their own table so the frequent full-members scans in
-// lib/data.ts never drag image data along.
+// Uploaded profile pictures, one per member. The bytes live in their own
+// table so the frequent full-members scans in lib/data.ts never drag image
+// data along.
 export const avatars = pgTable("avatars", {
   memberId: text("member_id")
     .primaryKey()
@@ -137,7 +133,7 @@ export const avatars = pgTable("avatars", {
 
 // Invite links. Two kinds: a personal one, spent by the first person to walk
 // through it, and an open group link anyone in the chat can use. Both are
-// readable capabilities — the code is stored so a founder can re-share what
+// readable capabilities — the code is stored so an organiser can re-share what
 // they already sent — and both survive on being short-lived and revocable
 // instead (lib/invites.ts). Acceptance runs in the transaction that creates
 // the member, with the row locked, so a personal link cannot be spent twice.
@@ -154,11 +150,9 @@ export const invites = pgTable("invites", {
   /** What spends a personal invite, and what counts arrivals through an open one. */
   useCount: integer("use_count").notNull().default(0),
   /**
-   * Private trips: the trip key wrapped under the link's secret, which lives
-   * in the URL fragment and never reaches this server; the epoch it is; and
-   * the join page's peek at the table, wrapped under the same secret.
-   * Null on links minted before the trip was sealed — they seat a member
-   * keyless, and the key comes by rekey.
+   * The trip key wrapped under the link's secret, which lives in the URL
+   * fragment and never reaches this server; the epoch it is; and the join
+   * page's peek at the table, wrapped under the same secret.
    */
   wrappedKey: text("wrapped_key"),
   epoch: integer("epoch"),
@@ -170,8 +164,8 @@ export const invites = pgTable("invites", {
   expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
 });
 
-// Recovery links: the way back to an existing seat, minted by a founder for a
-// member who has lost every passkey they held. Nothing like an invite, despite
+// Recovery links: the way back to an existing seat, minted by an organiser for
+// a member who has lost every passkey they held. Nothing like an invite, despite
 // the shape — walking through one makes you somebody who is already at the
 // table, so the trade is the opposite way round and the guards are tighter
 // (lib/recovery.ts): half an hour, one use, one live row per member, and named
@@ -186,16 +180,16 @@ export const recoveries = pgTable(
     memberId: text("member_id")
       .notNull()
       .references(() => members.id),
-    /** The founder who vouched — null when it came from scripts/recovery-link.ts. */
+    /** The organiser who vouched — null when it came from scripts/recovery-link.ts. */
     mintedBy: text("minted_by").references(() => members.id),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
     /** Set the moment a passkey is added through it; the row is spent from then on. */
     usedAt: timestamp("used_at", { withTimezone: true }),
     /**
-     * Private trips: one trip's key under the link's secret, put there by the
-     * organiser's browser, with which trip and which epoch it is. Null when
-     * minted from the console, which can give a seat back and nothing more.
+     * One trip's key under the link's secret, put there by the organiser's
+     * phone, with which trip and which epoch it is. Null when minted from the
+     * console, which can give a seat back and nothing more.
      */
     wrappedKey: text("wrapped_key"),
     tripId: text("trip_id").references(() => trips.id),
@@ -230,61 +224,16 @@ export const credentials = pgTable(
   (t) => [index("credentials_member_idx").on(t.memberId)],
 );
 
-// ---------- kept phrases (the one thing /talk writes down) ----------
-
-export const talkSideEnum = pgEnum("talk_side", ["us", "them"]);
-
-// A turn from the talk page that one member decided to keep, under a name they
-// chose. Everything else about a conversation with a stranger still dies with
-// the tab — no turn, no clip, no transcript; this is the exception somebody
-// asked for by name, one row per deliberate tap, and theirs alone to delete.
-//
-// `language` and `tag` are snapshots, like bill_entries snapshot their split:
-// which two languages this deploy interprets between is configuration and
-// configuration moves, and a Thai line replayed next year has to be read by a
-// Thai voice or by none (lib/phrases.ts).
-export const phrases = pgTable(
-  "phrases",
-  {
-    id: text("id").primaryKey(),
-    /** The trip's phrasebook: everyone on it can read and play; only the keeper deletes. */
-    tripId: text("trip_id")
-      .notNull()
-      .references(() => trips.id),
-    memberId: text("member_id")
-      .notNull()
-      .references(() => members.id),
-    /** Slug of the name they typed; unique per member, and how they refer to it. */
-    slug: text("slug").notNull(),
-    /** Who said it — the phrase itself is in the other side's language. */
-    side: talkSideEnum("side").notNull(),
-    heard: text("heard").notNull(),
-    said: text("said").notNull(),
-    roman: text("roman"),
-    literal: text("literal"),
-    /** What `said` is in, named as the pair named it the day it was saved. */
-    language: text("language").notNull(),
-    /** BCP-47 for `said`, for picking a voice long after the trip. */
-    tag: text("tag").notNull(),
-    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-  },
-  (t) => [
-    index("phrases_trip_idx").on(t.tripId),
-    uniqueIndex("phrases_trip_slug_idx").on(t.tripId, t.slug),
-  ],
-);
-
 // ---------- private trips (docs/private-trips.md) ----------
 //
 // A sealed trip is one append-only table of envelopes the server orders and
-// cannot open, a keyring blob per member it cannot open either, and links
-// that carry keys under secrets it never sees. Nothing here is read by a page
-// yet — Phase 0 lands the shape and the pure modules; Phase 1 writes to it.
+// cannot open, a keyring backup per passkey it cannot open either, and links
+// and grants that carry keys under secrets it never sees.
 
 /**
  * Every event on a sealed trip, in the order the server received them, under
  * the trip key for `epoch`. The server checks the author holds a seat, that
- * `epoch` is the trip's current one, the body's size, and a rate — and can
+ * `epoch` is the trip's current one, and the body's size and shape — and can
  * check nothing else, because the type and everything after it is inside the
  * envelope. Positions, balances, bills, the phrasebook: all replayed from
  * here on the phone (lib/replay.ts).
@@ -333,6 +282,33 @@ export const keyringWraps = pgTable(
 );
 
 /**
+ * A rotated trip key on its way to a member: TK[epoch] wrapped to the member
+ * key they announced in the log (lib/crypto `wrapToMember`), by the organiser
+ * phone that rotated. Opaque here. `bumpEpoch` accepts a rotation only with
+ * one of these for every seat, so nobody is left behind by it.
+ */
+export const keyGrants = pgTable(
+  "key_grants",
+  {
+    id: text("id").primaryKey(),
+    tripId: text("trip_id")
+      .notNull()
+      .references(() => trips.id),
+    epoch: integer("epoch").notNull(),
+    toMemberId: text("to_member_id")
+      .notNull()
+      .references(() => members.id),
+    fromMemberId: text("from_member_id")
+      .notNull()
+      .references(() => members.id),
+    wrapped: text("wrapped").notNull(),
+    at: timestamp("at", { withTimezone: true }).notNull().defaultNow(),
+    takenAt: timestamp("taken_at", { withTimezone: true }),
+  },
+  (t) => [index("key_grants_to_idx").on(t.tripId, t.toMemberId, t.epoch)],
+);
+
+/**
  * A key for a member who already has a seat: how a phone that lost its
  * keyring gets one back from anyone on the trip. Same primitive as an invite
  * — a code in a URL, the key under the fragment's secret — pointed at a
@@ -365,8 +341,8 @@ export const rekeys = pgTable(
 /**
  * The one deliberate plaintext on a sealed trip: a prediction's verdict, put
  * on the public card page by a member who tapped *share*. First names and
- * pies, as the card shows today — chosen, not leaked. Unpublished by the
- * publisher or an organiser.
+ * pies, as the card shows today — chosen, not leaked. Anyone on the trip can
+ * take it down.
  */
 export const cards = pgTable("cards", {
   marketId: text("market_id").primaryKey(),
@@ -392,7 +368,6 @@ export type MembershipRole = MembershipRow["role"];
 export type CredentialRow = typeof credentials.$inferSelect;
 export type InviteRow = typeof invites.$inferSelect;
 export type RecoveryRow = typeof recoveries.$inferSelect;
-export type PhraseRow = typeof phrases.$inferSelect;
 export type EventRow = typeof events.$inferSelect;
 export type RekeyRow = typeof rekeys.$inferSelect;
 export type CardRow = typeof cards.$inferSelect;

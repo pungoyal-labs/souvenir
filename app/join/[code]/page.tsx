@@ -1,10 +1,11 @@
 import Link from "next/link";
 import { JoinAsMember } from "@/components/join-as-member";
 import { JoinForm } from "@/components/join-form";
-import { JoinPreview, SignInToJoin } from "@/components/join-preview";
-import { SignedOutCard, SignedOutNotice } from "@/components/signed-out-card";
+import { JoinPreview } from "@/components/join-preview";
+import { deadLink, SignedOutCard, SignedOutNotice } from "@/components/signed-out-card";
+import { SignInKeepingSecret } from "@/components/take-key";
 import { findInvite, tripFor, tripPreview } from "@/lib/data";
-import { type InviteState, inviteState } from "@/lib/invites";
+import { inviteState } from "@/lib/invites";
 import { routes, signInThen } from "@/lib/routes";
 import { currentMember } from "@/lib/session";
 import { DESTINATIONS } from "@/lib/talk";
@@ -67,17 +68,17 @@ export default async function JoinPage({ params }: { params: Promise<{ code: str
           <JoinForm code={code} label={invite.label} />
           <p className="mt-4 text-xs text-soft">
             Already on another trip?{" "}
-            <SignInToJoin code={code} href={signInThen(routes.join(code))} /> and this link will
-            seat you.
+            <SignInKeepingSecret
+              code={code}
+              href={signInThen(routes.join(code))}
+              className="text-felt hover:underline"
+            >
+              Sign in
+            </SignInKeepingSecret>{" "}
+            and this link will seat you.
           </p>
         </>
       )}
     </SignedOutCard>
   );
-}
-
-function deadLink(state: InviteState | null): string {
-  if (state === "used") return "That link has already been used.";
-  if (state === "expired") return "That link has expired.";
-  return "That invite link isn't valid.";
 }

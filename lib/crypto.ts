@@ -3,17 +3,16 @@
 //
 // WebCrypto only — `globalThis.crypto.subtle` is the same object in every
 // target browser and in Node, so this file runs unchanged on a phone and under
-// vitest, and there is no library to audit. Three shapes come out of it:
+// vitest, and there is no library to audit. The shapes that come out of it:
 //
-//   envelope   v1.<epoch>.<iv>.<ct>   one event on a trip, under the trip key
-//   blob       v1.<iv>.<ct>           bytes under any key: a keyring, a wrap
-//   link wrap  a blob under a key derived from a link's secret
+//   envelope     v1.<epoch>.<iv>.<ct>          one event on a trip, under the trip key
+//   blob         v1.<iv>.<ct>                  bytes under any key: a keyring, a wrap
+//   link wrap    a blob under a key derived from a link's secret
+//   member wrap  v1.<ephemeral pub>.<iv>.<ct>  bytes to a member's long-term key
 //
 // Everything is AES-256-GCM with a fresh 96-bit IV and additional data that
-// names what the ciphertext is *for*. The additional data is what makes a row
-// that has been moved or relabelled fail to open instead of quietly reading as
-// somebody else's — an envelope carries the trip, the author and the epoch;
-// a wrap carries which kind of link it rode in on.
+// names what the ciphertext is *for*, so a row that has been moved or
+// relabelled fails to open instead of quietly reading as somebody else's.
 
 const ALG = "AES-GCM";
 const KEY_BITS = 256;
@@ -67,19 +66,29 @@ export function fromBase64Url(text: string): Uint8Array {
   return out;
 }
 
-// WebCrypto wants a BufferSource whose buffer is an ArrayBuffer, and a
-// Uint8Array over a SharedArrayBuffer (or a subarray) would not do. Copying is
-// cheap at these sizes and removes the question.
+// WebCrypto wants a BufferSource over a plain ArrayBuffer — not a SharedArrayBuffer or a subarray.
 function buf(bytes: Uint8Array): ArrayBuffer {
   return bytes.slice().buffer as ArrayBuffer;
+}
+
+// --- shapes -------------------------------------------------------------------
+
+function joined(...parts: string[]): string {
+  return [VERSION, ...parts].join(".");
+}
+
+/** The parts after the version, or a CryptoError unless there are exactly `n` of them. */
+function split(text: string, n: number, what: string): string[] {
+  const parts = text.split(".");
+  if (parts.length !== n + 1 || parts[0] !== VERSION) throw new CryptoError(`not ${what}`);
+  return parts.slice(1);
 }
 
 // --- keys ---------------------------------------------------------------------
 
 /**
- * A fresh AES-256-GCM key. Extractable, because a trip key has to be put into
- * a keyring and a keyring has to be put into a wrap; what keeps it private is
- * that it only ever leaves this process under another key.
+ * A fresh AES-256-GCM key. Extractable by default: a trip key has to be put into a keyring and a
+ * keyring into a wrap, and it only ever leaves under another key.
  */
 export function newKey(extractable = true): Promise<CryptoKey> {
   return subtle.generateKey({ name: ALG, length: KEY_BITS }, extractable, ["encrypt", "decrypt"]);
@@ -100,9 +109,8 @@ export function newSecret(): Uint8Array {
 }
 
 /**
- * Derive a wrap key from a secret and a purpose. The purpose is what stops a
- * secret minted for one kind of link from opening what another kind carries:
- * HKDF's `info` differs, so the keys differ.
+ * A wrap key from a secret and a purpose. The purpose is HKDF's `info`, which is what stops a
+ * secret minted for one kind of link from opening what another kind carries.
  */
 export async function deriveKey(secret: Uint8Array, purpose: string): Promise<CryptoKey> {
   if (secret.length !== SECRET_BYTES) throw new CryptoError("secret is not 256 bits");
@@ -118,6 +126,7 @@ export async function deriveKey(secret: Uint8Array, purpose: string): Promise<Cr
 
 // --- blobs --------------------------------------------------------------------
 
+/** `[iv, ct]`, both base64url. */
 async function encrypt(key: CryptoKey, aad: string, plain: Uint8Array): Promise<string[]> {
   const iv = randomBytes(IV_BYTES);
   const ct = await subtle.encrypt(
@@ -146,19 +155,18 @@ async function decrypt(key: CryptoKey, aad: string, ivB: string, ctB: string) {
 
 /** Bytes under a key, bound to a purpose. `v1.<iv>.<ct>`. */
 export async function sealBlob(key: CryptoKey, purpose: string, plain: Uint8Array) {
-  return [VERSION, ...(await encrypt(key, purpose, plain))].join(".");
+  return joined(...(await encrypt(key, purpose, plain)));
 }
 
 export async function openBlob(key: CryptoKey, purpose: string, blob: string) {
-  const parts = blob.split(".");
-  if (parts.length !== 3 || parts[0] !== VERSION) throw new CryptoError("not a blob");
-  return decrypt(key, purpose, parts[1]!, parts[2]!);
+  const [iv, ct] = split(blob, 2, "a blob");
+  return decrypt(key, purpose, iv!, ct!);
 }
 
 // --- link wraps ---------------------------------------------------------------
 
 /** Which kind of link a wrap rode in on; the wrong kind will not open it. */
-export type LinkPurpose = "invite" | "rekey" | "recover" | "device" | "preview";
+export type LinkPurpose = "invite" | "rekey" | "recover" | "preview";
 
 export async function wrapForLink(secret: Uint8Array, purpose: LinkPurpose, plain: Uint8Array) {
   return sealBlob(await deriveKey(secret, `link:${purpose}`), purpose, plain);
@@ -187,32 +195,97 @@ export interface EnvelopeHeader {
   epoch: number;
 }
 
+function checkEpoch(epoch: number): void {
+  if (!Number.isInteger(epoch) || epoch < 0) throw new CryptoError("bad epoch");
+}
+
+function splitEnvelope(envelope: string): [number, string, string] {
+  const [epochText, iv, ct] = split(envelope, 3, "an envelope");
+  const epoch = Number(epochText);
+  checkEpoch(epoch);
+  if (String(epoch) !== epochText) throw new CryptoError("bad epoch");
+  return [epoch, iv!, ct!];
+}
+
 export function parseEnvelope(envelope: string): EnvelopeHeader {
-  const parts = envelope.split(".");
-  if (parts.length !== 4 || parts[0] !== VERSION) throw new CryptoError("not an envelope");
-  const epoch = Number(parts[1]);
-  if (!Number.isInteger(epoch) || epoch < 0 || String(epoch) !== parts[1]) {
-    throw new CryptoError("bad epoch");
-  }
-  return { version: parts[0], epoch };
+  return { version: VERSION, epoch: splitEnvelope(envelope)[0] };
 }
 
 /** One event, under the trip key for `binding.epoch`. `v1.<epoch>.<iv>.<ct>`. */
 export async function seal(key: CryptoKey, binding: EnvelopeBinding, plain: Uint8Array) {
-  if (!Number.isInteger(binding.epoch) || binding.epoch < 0) throw new CryptoError("bad epoch");
-  return [VERSION, String(binding.epoch), ...(await encrypt(key, bindingAad(binding), plain))].join(
-    ".",
-  );
+  checkEpoch(binding.epoch);
+  return joined(String(binding.epoch), ...(await encrypt(key, bindingAad(binding), plain)));
 }
 
 /**
- * Open an envelope with the key for the epoch it names. The caller passes the
- * row's trip, author and epoch; if any of them is not what the writer sealed
- * against, the row has been moved and this throws.
+ * Open an envelope with the key for the epoch it names. If the row's trip, author or epoch is
+ * not what the writer sealed against, the row has been moved and this throws.
  */
 export async function open(key: CryptoKey, binding: EnvelopeBinding, envelope: string) {
-  const header = parseEnvelope(envelope);
-  if (header.epoch !== binding.epoch) throw new CryptoError("epoch mismatch");
-  const parts = envelope.split(".");
-  return decrypt(key, bindingAad(binding), parts[2]!, parts[3]!);
+  const [epoch, iv, ct] = splitEnvelope(envelope);
+  if (epoch !== binding.epoch) throw new CryptoError("epoch mismatch");
+  return decrypt(key, bindingAad(binding), iv, ct);
+}
+
+// --- member keys ------------------------------------------------------------------
+// A member's long-term key (docs/private-trips.md §2, "MK"): P-256, the public
+// half announced in the log, the private half in the keyring. A rotated trip
+// key is wrapped to it with an ephemeral ECDH agreement, so nothing the server
+// stores — the announcement or the wrap — opens anything on its own.
+
+const ECDH = { name: "ECDH", namedCurve: "P-256" } as const;
+const MEMBER_WRAP = "member-key";
+
+export interface MemberKeyPair {
+  privateKey: JsonWebKey;
+  publicKey: JsonWebKey;
+}
+
+export async function newMemberKey(): Promise<MemberKeyPair> {
+  const pair = await subtle.generateKey(ECDH, true, ["deriveKey"]);
+  return {
+    privateKey: await subtle.exportKey("jwk", pair.privateKey),
+    publicKey: await subtle.exportKey("jwk", pair.publicKey),
+  };
+}
+
+function importPublic(jwk: JsonWebKey): Promise<CryptoKey> {
+  return subtle.importKey("jwk", jwk, ECDH, true, []);
+}
+
+async function agreedKey(priv: CryptoKey, pub: CryptoKey): Promise<CryptoKey> {
+  return subtle.deriveKey(
+    { name: "ECDH", public: pub },
+    priv,
+    { name: ALG, length: KEY_BITS },
+    false,
+    ["encrypt", "decrypt"],
+  );
+}
+
+/** Bytes to a member: `v1.<ephemeral public jwk b64url>.<iv>.<ct>`. */
+export async function wrapToMember(theirPublic: JsonWebKey, plain: Uint8Array): Promise<string> {
+  let pub: CryptoKey;
+  try {
+    pub = await importPublic(theirPublic);
+  } catch {
+    throw new CryptoError("not a member key");
+  }
+  const eph = await subtle.generateKey(ECDH, true, ["deriveKey"]);
+  const ephPub = utf8(JSON.stringify(await subtle.exportKey("jwk", eph.publicKey)));
+  const key = await agreedKey(eph.privateKey, pub);
+  return joined(toBase64Url(ephPub), ...(await encrypt(key, MEMBER_WRAP, plain)));
+}
+
+export async function unwrapFromMember(myPrivate: JsonWebKey, blob: string): Promise<Uint8Array> {
+  const [ephB, iv, ct] = split(blob, 3, "a member wrap");
+  let priv: CryptoKey;
+  let ephPub: CryptoKey;
+  try {
+    priv = await subtle.importKey("jwk", myPrivate, ECDH, false, ["deriveKey"]);
+    ephPub = await importPublic(JSON.parse(fromUtf8(fromBase64Url(ephB!))));
+  } catch {
+    throw new CryptoError("would not open");
+  }
+  return decrypt(await agreedKey(priv, ephPub), MEMBER_WRAP, iv!, ct!);
 }

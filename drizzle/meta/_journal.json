@@ -169,6 +169,20 @@
       "when": 1787621290671,
       "tag": "0023_keyring_wraps",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1787632277907,
+      "tag": "0024_no_plaintext_left",
+      "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1787632460769,
+      "tag": "0025_key_grants",
+      "breakpoints": true
     }
   ]
 }

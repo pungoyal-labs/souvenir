@@ -131,7 +131,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         {member && needsPasskey && !needsTerms && (
           <PasskeyNudge memberId={member.id} needsPicture={member.avatarUpdatedAt == null} />
         )}
-        <KeyringProvider>
+        <KeyringProvider signedIn={member != null}>
           <main className="mx-auto max-w-5xl px-4 py-6">{children}</main>
         </KeyringProvider>
         <footer className="mx-auto flex max-w-5xl flex-wrap items-center gap-x-4 gap-y-1 px-4 pb-8 pt-4 text-xs text-soft">

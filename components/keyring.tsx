@@ -1,16 +1,13 @@
 "use client";
 
-// The keyring on this phone. See docs/private-trips.md §4.1 and §4.8.3.
+// The keyring on this phone (docs/private-trips.md §4.1, §4.8.3). IndexedDB
+// holds a non-extractable keyring key, the keyring blob sealed under it, and
+// one key per passkey used here, derived from the passkey's PRF output — the
+// same on every phone that passkey syncs to, so the keyring is backed up under
+// each in `keyring_wraps` and restored from there after a sign-in.
 //
-// IndexedDB holds the keyring key — non-extractable, so not even this page can
-// read its bytes — and the keyring blob sealed under it. It also holds one
-// derived key per passkey this phone has used: the passkey's PRF output makes
-// the same key on every phone that passkey syncs to, so the keyring is backed
-// up under each in `keyring_wraps` and restored from there after a sign-in.
-//
-// Storage can be missing (a private window, Safari after a week away, a
-// browser told to block site data): every read is wrapped, and an empty or
-// broken store is a keyless phone, not a crash.
+// Storage can be missing (a private window, Safari after a week away): an
+// empty or broken store is a keyless phone, not a crash.
 
 import {
   createContext,
@@ -22,17 +19,17 @@ import {
   useState,
 } from "react";
 import { keyringWrapsAction, saveKeyringWrapAction } from "@/app/actions";
-import { newKey } from "@/lib/crypto";
+import { newKey, newMemberKey } from "@/lib/crypto";
 import {
   emptyKeyring,
   encodeKeyring,
-  holdsKey,
   type Keyring,
   mergeKeyrings,
   openKeyring,
   prfKeyringKey,
   sealKeyring,
   tripCryptoKey,
+  withMemberKey,
 } from "@/lib/keys";
 
 const DB_NAME = "chiang-pai-keys";
@@ -77,23 +74,45 @@ function idbPut(db: IDBDatabase, id: string, value: unknown): Promise<void> {
   });
 }
 
+// The store and its key, opened once per page: a second concurrent open (dev
+// StrictMode) would otherwise mint a second keyring key over the first.
+let store: Promise<{ db: IDBDatabase; kk: CryptoKey }> | null = null;
+function openStore() {
+  store ??= (async () => {
+    const db = await openDb();
+    let kk = await idbGet<CryptoKey>(db, KK_ID);
+    if (!kk) {
+      kk = await newKey(false);
+      await idbPut(db, KK_ID, kk);
+    }
+    return { db, kk };
+  })();
+  return store;
+}
+
 // --- passkeys -------------------------------------------------------------------
 
-/** After a ceremony that returned a PRF result: keep the key it derives, for this credential. */
-export async function rememberPrf(credentialId: string, prf: ArrayBuffer): Promise<void> {
+/** After a ceremony: keep the key this credential's PRF output derives, if it gave one. */
+export async function rememberPrf(credential: PublicKeyCredential): Promise<void> {
+  const results = credential.getClientExtensionResults() as {
+    prf?: { results?: { first?: ArrayBuffer } };
+  };
+  const prf = results.prf?.results?.first;
+  if (!prf) return;
   try {
-    const db = await openDb();
-    const key = await prfKeyringKey(new Uint8Array(prf));
-    await idbPut(db, prfId(credentialId), key);
+    const { db } = await openStore();
+    await idbPut(db, prfId(credential.id), await prfKeyringKey(new Uint8Array(prf)));
     const ids = (await idbGet<string[]>(db, PRF_IDS)) ?? [];
-    if (!ids.includes(credentialId)) await idbPut(db, PRF_IDS, [...ids, credentialId]);
+    if (!ids.includes(credential.id)) await idbPut(db, PRF_IDS, [...ids, credential.id]);
   } catch {
     // No storage: nothing to back up into, and nothing to restore from.
   }
 }
 
-async function prfKeys(db: IDBDatabase): Promise<Map<string, CryptoKey>> {
-  const out = new Map<string, CryptoKey>();
+type PrfKeys = Map<string, CryptoKey>;
+
+async function prfKeys(db: IDBDatabase): Promise<PrfKeys> {
+  const out: PrfKeys = new Map();
   for (const id of (await idbGet<string[]>(db, PRF_IDS)) ?? []) {
     const key = await idbGet<CryptoKey>(db, prfId(id));
     if (key) out.set(id, key);
@@ -103,10 +122,9 @@ async function prfKeys(db: IDBDatabase): Promise<Map<string, CryptoKey>> {
 
 const same = (a: Keyring, b: Keyring) => encodeKeyring(a).join() === encodeKeyring(b).join();
 
-/** The keyring under every passkey key this phone holds, to the server. Best effort. */
-async function backUp(db: IDBDatabase, kr: Keyring, skip?: Set<string>): Promise<void> {
-  for (const [id, key] of await prfKeys(db)) {
-    if (skip?.has(id)) continue;
+/** The keyring sealed under each passkey key, to the server. Best effort. */
+async function backUp(kr: Keyring, keys: PrfKeys): Promise<void> {
+  for (const [id, key] of keys) {
     try {
       await saveKeyringWrapAction(id, await sealKeyring(key, kr));
     } catch {
@@ -117,37 +135,44 @@ async function backUp(db: IDBDatabase, kr: Keyring, skip?: Set<string>): Promise
 
 /**
  * Whatever this member's passkeys backed up that this phone can open, merged
- * into what it holds. Returns the merged keyring and which backups already match it.
+ * into what it holds; `stale` is the passkey keys whose backup no longer matches.
  */
-async function restore(db: IDBDatabase, local: Keyring) {
-  const keys = await prfKeys(db);
-  if (keys.size === 0) return { keyring: local, current: new Set<string>() };
+async function restore(
+  local: Keyring,
+  keys: PrfKeys,
+): Promise<{ keyring: Keyring; stale: PrfKeys }> {
   let merged = local;
   const opened = new Map<string, Keyring>();
-  try {
-    const res = await keyringWrapsAction();
-    for (const wrap of res.wraps ?? []) {
-      const key = keys.get(wrap.credentialId);
-      if (!key) continue;
-      try {
-        const kr = await openKeyring(key, wrap.blob);
-        opened.set(wrap.credentialId, kr);
-        merged = mergeKeyrings(merged, kr);
-      } catch {
-        // Sealed by a passkey key this phone does not derive the same way: not ours to open.
+  if (keys.size > 0) {
+    try {
+      const res = await keyringWrapsAction();
+      for (const wrap of res.wraps ?? []) {
+        const key = keys.get(wrap.credentialId);
+        if (!key) continue;
+        try {
+          const kr = await openKeyring(key, wrap.blob);
+          opened.set(wrap.credentialId, kr);
+          merged = mergeKeyrings(merged, kr);
+        } catch {
+          // Sealed by a passkey key this phone does not derive the same way: not ours.
+        }
       }
+    } catch {
+      // Offline: the local keyring is what there is.
     }
-  } catch {
-    // Offline: the local keyring is what there is.
   }
-  const current = new Set([...opened].filter(([, kr]) => same(kr, merged)).map(([id]) => id));
-  return { keyring: merged, current };
+  const stale: PrfKeys = new Map();
+  for (const [id, key] of keys) {
+    const backup = opened.get(id);
+    if (!backup || !same(backup, merged)) stale.set(id, key);
+  }
+  return { keyring: merged, stale };
 }
 
 // --- the context --------------------------------------------------------------
 
 export type KeyringStatus =
-  /** Still opening storage. Pages show nothing sealed yet. */
+  /** Storage is still opening; nothing is known yet. */
   | "loading"
   /** A keyring is open on this phone (it may still hold no key for a given trip). */
   | "ready"
@@ -157,32 +182,35 @@ export type KeyringStatus =
 export interface KeyringContextValue {
   status: KeyringStatus;
   keyring: Keyring;
-  /** Replace the keyring, seal it, persist it, and hand the blob to `onSave` if there is one. */
+  /** Replace the keyring, seal it, persist it, and back it up. */
   update(next: (current: Keyring) => Keyring): Promise<void>;
-  /** True when this phone can read the trip at the epoch the server says it is on. */
-  holds(tripId: string, epoch: number | null): boolean;
 }
 
 const KeyringContext = createContext<KeyringContextValue | null>(null);
 
-export function KeyringProvider({ children }: { children: React.ReactNode }) {
+/**
+ * `signedIn` gates the server round trips: the actions redirect a signed-out
+ * caller to /signin, which from a join or card page would be a bounce.
+ */
+export function KeyringProvider({
+  signedIn,
+  children,
+}: {
+  signedIn: boolean;
+  children: React.ReactNode;
+}) {
   const [status, setStatus] = useState<KeyringStatus>("loading");
   const [keyring, setKeyring] = useState<Keyring>(emptyKeyring);
-  const kkRef = useRef<CryptoKey | null>(null);
-  const dbRef = useRef<IDBDatabase | null>(null);
   const keyringRef = useRef(keyring);
   keyringRef.current = keyring;
+  const signedInRef = useRef(signedIn);
+  signedInRef.current = signedIn;
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
-        const db = await openDb();
-        let kk = await idbGet<CryptoKey>(db, KK_ID);
-        if (!kk) {
-          kk = await newKey(false);
-          await idbPut(db, KK_ID, kk);
-        }
+        const { db, kk } = await openStore();
         let kr = emptyKeyring();
         const blob = await idbGet<string>(db, BLOB_ID);
         if (blob) {
@@ -190,20 +218,19 @@ export function KeyringProvider({ children }: { children: React.ReactNode }) {
             kr = await openKeyring(kk, blob);
           } catch {
             // A blob this key cannot open is a keyless phone, not a broken one.
-            kr = emptyKeyring();
           }
         }
-        const restored = await restore(db, kr);
+        const keys = await prfKeys(db);
+        let { keyring: next, stale } = signedIn
+          ? await restore(kr, keys)
+          : { keyring: kr, stale: keys };
+        // A member key, once: the public half goes into every trip's log with the next hello.
+        if (!next.mk) next = withMemberKey(next, (await newMemberKey()).privateKey);
         if (cancelled) return;
-        dbRef.current = db;
-        kkRef.current = kk;
-        setKeyring(restored.keyring);
+        setKeyring(next);
         setStatus("ready");
-        if (!same(restored.keyring, kr))
-          await idbPut(db, BLOB_ID, await sealKeyring(kk, restored.keyring));
-        if (Object.keys(restored.keyring.trips).length > 0) {
-          void backUp(db, restored.keyring, restored.current);
-        }
+        if (!same(next, kr)) await idbPut(db, BLOB_ID, await sealKeyring(kk, next));
+        if (signedIn && Object.keys(next.trips).length > 0) void backUp(next, stale);
       } catch {
         if (!cancelled) setStatus("unavailable");
       }
@@ -211,25 +238,24 @@ export function KeyringProvider({ children }: { children: React.ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [signedIn]);
 
   const update = useCallback(async (next: (current: Keyring) => Keyring) => {
     const kr = next(keyringRef.current);
     setKeyring(kr);
-    const kk = kkRef.current;
-    const db = dbRef.current;
-    if (!kk || !db) return;
+    let db: IDBDatabase;
+    let kk: CryptoKey;
+    try {
+      ({ db, kk } = await openStore());
+    } catch {
+      return;
+    }
     await idbPut(db, BLOB_ID, await sealKeyring(kk, kr));
-    void backUp(db, kr);
+    if (signedInRef.current) void backUp(kr, await prfKeys(db));
   }, []);
 
   const value = useMemo<KeyringContextValue>(
-    () => ({
-      status,
-      keyring,
-      update,
-      holds: (tripId, epoch) => epoch !== null && holdsKey(keyring, tripId, epoch),
-    }),
+    () => ({ status, keyring, update }),
     [status, keyring, update],
   );
 
@@ -251,18 +277,10 @@ export function useTripKey(tripId: string, epoch: number | null): CryptoKey | nu
   const { status, keyring } = useKeyring();
   const [key, setKey] = useState<CryptoKey | null | undefined>(undefined);
   useEffect(() => {
+    if (status === "loading") return setKey(undefined);
+    if (epoch === null) return setKey(null);
     let cancelled = false;
-    if (status === "loading") {
-      setKey(undefined);
-      return;
-    }
-    if (epoch === null) {
-      setKey(null);
-      return;
-    }
-    tripCryptoKey(keyring, tripId, epoch).then((k) => {
-      if (!cancelled) setKey(k);
-    });
+    tripCryptoKey(keyring, tripId, epoch).then((k) => !cancelled && setKey(k));
     return () => {
       cancelled = true;
     };

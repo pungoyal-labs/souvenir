@@ -55,12 +55,10 @@ Pre-commit (husky): biome on staged files, tsc, full test suite.
   phrasebook (`phrase.keep`/`phrase.drop`) are events too; the trip's name
   is sealed on its own into `trips.name_enc` (`lib/keys` `sealName`) so the
   trips list can show it without the log. The schema has no plaintext
-  content column left — `lib/rows.ts` is the shape `Market`/`LedgerRow`
-  kept when the tables went. `trips.name` and `phrases` are legacy columns
-  from before sealing: the first organiser phone that opens such a trip with
-  its key puts them on the record (`lib/views` `resealPlan`,
-  `clearLeftovers`) and the plaintext is dropped; `pnpm stats` counts what is
-  left. Never write to them.
+  content column — `lib/rows.ts` is the shape `Market`/`LedgerRow` kept
+  when the tables went. `phrase.keep` carries an optional `keeper`, honoured
+  only from an organiser, because the one pre-sealing phrasebook was put on
+  the record that way; nothing new should set it.
 - **Keys move only through people.** A key reaches a phone through a link
   fragment — invite, rekey (`lib/rekeys`, `/k/[code]`), recovery — opened by
   that phone and put in its keyring (`components/keyring.tsx`, IndexedDB).
@@ -68,9 +66,13 @@ Pre-commit (husky): biome on staged files, tsc, full test suite.
   (`keyring_wraps`, `lib/keys` `prfKeyringKey`): the authenticator derives
   the same secret on every device the passkey syncs to, so a sign-in with
   that passkey restores the keys by itself, and dropping the passkey drops
-  the backup. The server stores keys only wrapped under secrets it has never
-  seen. Never encrypt to a public key the server supplied; never add a path
-  that returns a key to the server. The console (`pnpm recovery:link`)
+  the backup. A rotated key (`lib/data` `bumpEpoch`,
+  `components/rotate-key.tsx`) reaches each seat wrapped to the member key
+  that seat announced *in the log* (`member.hello` `mkPub`, `HelloState`),
+  never to anything the server supplied, and the server turns the epoch only
+  with a grant for every other seat. The server stores keys only wrapped
+  under secrets it has never seen. Never encrypt to a public key the server
+  supplied; never add a path that returns a key to the server. The console (`pnpm recovery:link`)
   restores seats, never keys; `pnpm seed` mints console rekey links because
   it holds the key for the one moment it exists in the clear.
 - The `ledger` is append-only and still the shape every derivation uses —
@@ -164,6 +166,11 @@ Pre-commit (husky): biome on staged files, tsc, full test suite.
   transaction with the row locked.
   `members.email` is nullable because of it — a link-joined member has no
   address at all. New members pick their name and lingo at sign-up.
+- **A seat that goes takes its key with it.** Removal, leaving and account
+  deletion (`dropSeat`) mark the trip `key_stale_since`; nothing can pull a
+  key back from a phone. An organiser rotates from the members page, and the
+  departed member reads what was written until then and nothing after.
+  Never add a removal that skips the mark.
 - Who organises is `memberships.role`, per trip. Whoever creates a trip is its
   first organiser; organisers promote and step down each other (and
   themselves) from a member's page; stepping down the last organiser is

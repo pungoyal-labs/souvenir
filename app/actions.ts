@@ -21,8 +21,8 @@ import {
   acceptTerms,
   addCredential,
   appendEvent,
+  bumpEpoch,
   clearAvatar,
-  clearLeftovers,
   createAccount,
   createTrip,
   DataError,
@@ -34,18 +34,23 @@ import {
   getMember,
   joinTripWithInvite,
   joinWithInvite,
+  type KeyGrant,
+  type KeyGrantInput,
   type KeyHandover,
   keyringWrapsOf,
+  leaveTrip,
   listCredentials,
   markInboxSeen,
   mintInvite,
   mintRecovery,
   mintRekey,
+  myGrant,
   noteCredentialUse,
   publishCard,
   type RecoveryKey,
   recoverWithLink,
   removeCredential,
+  removeMember,
   revokeInvite,
   revokeRecovery,
   revokeRekey,
@@ -56,6 +61,7 @@ import {
   setRole,
   spendRekey,
   type TripUpdate,
+  takeGrant,
   tripFor,
   unpublishCard,
   updateTrip,
@@ -331,15 +337,33 @@ export async function interpretAction(
 
 // ---------- keys ----------
 
-/** An organiser's phone has re-sealed what predates sealing; drop the plaintext. */
-export async function sealLeftoversAction(
+export async function removeMemberAction(tripId: string, memberId: string): Promise<ActionResult> {
+  return mutate((actorId) => removeMember(actorId, tripId, memberId), [routes.members(tripId)]);
+}
+
+export async function leaveTripAction(tripId: string): Promise<ActionResult> {
+  return mutate((memberId) => leaveTrip(memberId, tripId), [routes.trips]);
+}
+
+/** The organiser's phone has wrapped the next key to every seat; the server turns the epoch. */
+export async function bumpEpochAction(
   tripId: string,
-  input: { nameEnc: string | null; phraseIds: string[] },
+  input: { epoch: number; nameEnc: string; grants: KeyGrantInput[] },
 ): Promise<ActionResult> {
   return mutate(
-    (memberId) => clearLeftovers(memberId, tripId, input),
-    [routes.trip(tripId), routes.talk(tripId), routes.trips],
+    (actorId) => bumpEpoch(actorId, tripId, input),
+    [routes.trip(tripId), routes.members(tripId)],
   );
+}
+
+export async function myGrantAction(
+  tripId: string,
+): Promise<ActionResult & { grant?: KeyGrant | null }> {
+  return mutate(async (memberId) => ({ grant: await myGrant(memberId, tripId) }));
+}
+
+export async function takeGrantAction(id: string): Promise<ActionResult> {
+  return mutate((memberId) => takeGrant(memberId, id));
 }
 
 export async function saveKeyringWrapAction(

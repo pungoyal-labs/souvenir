@@ -11,9 +11,9 @@ import { CopyLink } from "@/components/copy-link";
 import { linkWithSecret, newLinkSecret, tripKeyOf, wrapTripKey } from "@/lib/keys";
 import { routes } from "@/lib/routes";
 import { useKeyring } from "./keyring";
-import { hasSecret, stashSecret, useTakeKey } from "./take-key";
+import { hasSecret, useTakeKey } from "./take-key";
 import { useTrip } from "./trip-store";
-import { useAct } from "./use-act";
+import { ActError, useAct } from "./use-act";
 
 export function SendKey({
   forMemberId,
@@ -69,7 +69,7 @@ export function SendKey({
       >
         {pending ? "Minting…" : self ? "Send my other phone the key" : "Send the key"}
       </button>
-      {error && <span className="text-xs font-semibold text-no-deep">{error}</span>}
+      <ActError error={error} />
     </span>
   );
 }
@@ -119,22 +119,5 @@ export function RedeemRekey({ code }: { code: string }) {
     <p className="mt-4 text-sm text-soft" aria-live="polite">
       {message}
     </p>
-  );
-}
-
-/** The sign-in button on a key page: parks the fragment first, so it is there on return. */
-export function SignInForKey({ code, href }: { code: string; href: string }) {
-  const router = useRouter();
-  return (
-    <button
-      type="button"
-      onClick={() => {
-        stashSecret(code);
-        router.push(href);
-      }}
-      className="mt-4 block w-full rounded-md bg-felt py-3 font-semibold text-white hover:bg-felt-deep"
-    >
-      Sign in
-    </button>
   );
 }

@@ -89,9 +89,10 @@ function Keyless() {
  * page will offer you the button once this one has said hello.
  */
 export function KeyStatus({ memberId, name }: { memberId: string; name: string }) {
-  const { state, me, t } = useOpenTrip();
+  const { state, me, t, epoch } = useOpenTrip();
   const self = memberId === me.id;
-  const heard = state.hellos.has(memberId);
+  const hello = state.hellos.get(memberId);
+  const heard = !!hello && hello.epoch === epoch;
   if (heard && !self) return null;
   return (
     <span className="inline-flex flex-wrap items-center gap-2 text-xs text-soft">

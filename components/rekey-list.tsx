@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import type { ActionResult } from "@/app/actions";
 import { revokeRekeyAction } from "@/app/actions";
-import { useAct } from "./use-act";
+import { ActError, useAct } from "./use-act";
 
 /** Shut a live link and refresh the list it sits in. */
 export function ShutLink({
@@ -31,7 +31,7 @@ export function ShutLink({
       >
         {label}
       </button>
-      {error && <span className="text-xs font-semibold text-no-deep">{error}</span>}
+      <ActError error={error} />
     </span>
   );
 }

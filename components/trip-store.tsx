@@ -15,24 +15,22 @@ import {
   useState,
 } from "react";
 import type { ActionResult } from "@/app/actions";
-import { open, seal } from "@/lib/crypto";
+import { open, seal, unwrapFromMember } from "@/lib/crypto";
 import type { EventRow } from "@/lib/db/schema";
 import { decodeEvent, type EventPayload, encodeEvent, type OpenEvent } from "@/lib/events";
-import { openName, sealName } from "@/lib/keys";
+import { type Keyring, memberPublicKey, openName, tripCryptoKey, withTripKey } from "@/lib/keys";
 import { type Lingo, lingoOf } from "@/lib/lingo";
 import { type ReplayConfig, replayTrip, type TripState } from "@/lib/replay";
-import { type Leftovers, type Person, peopleOf, type RosterMember, resealPlan } from "@/lib/views";
-import { useTripKey } from "./keyring";
+import { type Person, peopleOf, type RosterMember } from "@/lib/views";
+import { useKeyring, useTripKey } from "./keyring";
 
 const POLL_MS = 15_000;
 
 export interface TripStoreActions {
   append(tripId: string, envelope: string): Promise<ActionResult & { id?: number; at?: Date }>;
   since(tripId: string, afterId: number): Promise<ActionResult & { rows?: EventRow[] }>;
-  sealLeftovers(
-    tripId: string,
-    input: { nameEnc: string | null; phraseIds: string[] },
-  ): Promise<ActionResult>;
+  grant(tripId: string): Promise<ActionResult & { grant?: { id: string; wrapped: string } | null }>;
+  takeGrant(id: string): Promise<ActionResult>;
 }
 
 export interface TripStoreValue {
@@ -61,11 +59,45 @@ export interface TripStoreValue {
 
 const TripStoreContext = createContext<TripStoreValue | null>(null);
 
+/**
+ * The key for each epoch a row may carry: the current one as given, earlier
+ * ones from what the keyring kept, and the current one again for an epoch it
+ * never had (so the row fails to open and is counted, not skipped).
+ */
+function epochKeys(keyring: Keyring, tripId: string, epoch: number | null, current: CryptoKey) {
+  const cache = new Map<number, Promise<CryptoKey>>();
+  return (e: number): Promise<CryptoKey> => {
+    if (e === epoch) return Promise.resolve(current);
+    let key = cache.get(e);
+    if (!key) {
+      key = tripCryptoKey(keyring, tripId, e).then((k) => k ?? current);
+      cache.set(e, key);
+    }
+    return key;
+  };
+}
+
+async function openRow(row: EventRow, key: CryptoKey): Promise<OpenEvent> {
+  const bytes = await open(
+    key,
+    { tripId: row.tripId, authorId: row.authorId, epoch: row.epoch },
+    row.body,
+  );
+  return {
+    id: row.id,
+    at: new Date(row.at),
+    authorId: row.authorId,
+    epoch: row.epoch,
+    payload: decodeEvent(bytes),
+  };
+}
+
+const reason = (err: unknown) => (err instanceof Error ? err.message : String(err));
+
 export function TripStoreProvider({
   tripId,
   epoch,
   nameEnc,
-  leftovers,
   config,
   me,
   lingo,
@@ -78,8 +110,6 @@ export function TripStoreProvider({
   tripId: string;
   epoch: number | null;
   nameEnc: string | null;
-  /** A name and phrases from before sealing, for an organiser's phone to put on the record. */
-  leftovers: Leftovers | null;
   config: Omit<ReplayConfig, "tripId">;
   me: RosterMember;
   lingo: string;
@@ -90,20 +120,18 @@ export function TripStoreProvider({
   children: React.ReactNode;
 }) {
   const key = useTripKey(tripId, epoch);
+  const keyring = useKeyring();
   const [rows, setRows] = useState<EventRow[]>(initial);
   // Every row tried so far: the event, or null for one that would not open.
   const [opened, setOpened] = useState<Map<number, OpenEvent | null>>(new Map());
   const [seenAt, setSeenAt] = useState<Date | null>(initialSeenAt);
+  const [name, setName] = useState<string | null | undefined>(undefined);
   const rowsRef = useRef(rows);
   rowsRef.current = rows;
-  const [name, setName] = useState<string | null | undefined>(undefined);
 
   useEffect(() => {
     if (key === undefined) return;
-    if (!key || !nameEnc) {
-      setName(leftovers?.name ?? null);
-      return;
-    }
+    if (!key || !nameEnc) return setName(null);
     let cancelled = false;
     openName(key, tripId, nameEnc).then(
       (n) => !cancelled && setName(n),
@@ -112,42 +140,30 @@ export function TripStoreProvider({
     return () => {
       cancelled = true;
     };
-  }, [key, nameEnc, leftovers?.name, tripId]);
+  }, [key, nameEnc, tripId]);
 
   useEffect(() => {
     if (!key) return;
+    const pending = rows.filter((r) => !opened.has(r.id));
+    if (pending.length === 0) return;
     let cancelled = false;
     (async () => {
-      const next = new Map(opened);
-      let changed = false;
-      for (const row of rows) {
-        if (next.has(row.id)) continue;
-        changed = true;
+      const keyFor = epochKeys(keyring.keyring, tripId, epoch, key);
+      const tried = new Map<number, OpenEvent | null>();
+      for (const row of pending) {
         try {
-          const bytes = await open(
-            key,
-            { tripId: row.tripId, authorId: row.authorId, epoch: row.epoch },
-            row.body,
-          );
-          next.set(row.id, {
-            id: row.id,
-            at: new Date(row.at),
-            authorId: row.authorId,
-            epoch: row.epoch,
-            payload: decodeEvent(bytes),
-          });
+          tried.set(row.id, await openRow(row, await keyFor(row.epoch)));
         } catch (err) {
-          next.set(row.id, null);
-          const reason = err instanceof Error ? err.message : String(err);
-          console.warn(`event ${row.id} would not open on this phone: ${reason}`);
+          tried.set(row.id, null);
+          console.warn(`event ${row.id} would not open on this phone: ${reason(err)}`);
         }
       }
-      if (!cancelled && changed) setOpened(next);
+      if (!cancelled) setOpened((current) => new Map([...current, ...tried]));
     })();
     return () => {
       cancelled = true;
     };
-  }, [key, rows, opened]);
+  }, [key, rows, opened, keyring.keyring, tripId, epoch]);
 
   const refresh = useCallback(async () => {
     const last = rowsRef.current[rowsRef.current.length - 1]?.id ?? 0;
@@ -227,52 +243,44 @@ export function TripStoreProvider({
 
   const ready = !!key && rows.every((r) => opened.has(r.id));
   const unreadable = useMemo(() => [...opened.values()].filter((e) => e === null).length, [opened]);
+  // The same test <Sealed> makes: a key that opens nothing is the wrong key.
+  const readable = !!state && ready && (rows.length === 0 || unreadable < rows.length);
 
-  // A phone that can read says so, once — never under a key that opens nothing.
-  const helloed = useRef(false);
+  // A phone that can read says so, once per epoch and with its member key. The
+  // ref is set before the post, so a second run (StrictMode) cannot repeat it.
+  const helloed = useRef<number | null>(null);
   useEffect(() => {
-    if (!state || !ready || helloed.current || state.hellos.has(me.id)) return;
-    if (rows.length > 0 && unreadable === rows.length) return;
-    helloed.current = true;
-    void append({ t: "member.hello" });
-  }, [state, ready, rows.length, unreadable, me.id, append]);
+    if (!readable || !state || epoch === null || helloed.current === epoch) return;
+    const hello = state.hellos.get(me.id);
+    const mkPub = memberPublicKey(keyring.keyring);
+    if (hello && hello.epoch === epoch && (hello.mkPub || !mkPub)) return;
+    helloed.current = epoch;
+    void append({ t: "member.hello", ...(mkPub ? { mkPub } : {}) });
+  }, [readable, state, me.id, append, epoch, keyring.keyring]);
 
-  // What predates sealing — a name, kept phrases — goes on the record from the first organiser's
-  // phone that can read the trip; the console never could. Once, then the plaintext is dropped.
-  const resealed = useRef(false);
+  // The key was rotated and this phone has the one before: the grant wrapped to its member key.
+  const granted = useRef<number | null>(null);
   useEffect(() => {
-    if (!leftovers || !key || !state || !ready || resealed.current) return;
-    if (me.role !== "organiser" || (rows.length > 0 && unreadable === rows.length)) return;
-    resealed.current = true;
+    if (key !== null || epoch === null || keyring.status !== "ready" || granted.current === epoch)
+      return;
+    const mk = keyring.keyring.mk;
+    if (!mk) return;
+    granted.current = epoch;
     (async () => {
-      const plan = resealPlan(leftovers, state);
-      for (const keep of plan.keeps) {
-        const res = await append(keep);
-        if (!res.ok) return console.warn(`leftovers stayed: ${res.error}`);
+      const res = await actions.grant(tripId);
+      if (!res.ok || !res.grant) return;
+      try {
+        const raw = await unwrapFromMember(mk, res.grant.wrapped);
+        await keyring.update((kr) => withTripKey(kr, tripId, epoch, raw));
+        void actions.takeGrant(res.grant.id);
+      } catch (err) {
+        console.warn(`the key grant would not open: ${reason(err)}`);
       }
-      const sealedName =
-        leftovers.name && !nameEnc ? await sealName(key, tripId, leftovers.name) : null;
-      const res = await actions.sealLeftovers(tripId, {
-        nameEnc: sealedName,
-        phraseIds: plan.phraseIds,
-      });
-      if (!res.ok) console.warn(`leftovers stayed: ${res.error}`);
     })();
-  }, [
-    leftovers,
-    key,
-    state,
-    ready,
-    me.role,
-    rows.length,
-    unreadable,
-    append,
-    actions,
-    nameEnc,
-    tripId,
-  ]);
+  }, [key, epoch, keyring, actions, tripId]);
 
   const t = useMemo(() => lingoOf(lingo), [lingo]);
+  const markSeen = useCallback(() => setSeenAt(new Date()), []);
   const value = useMemo<TripStoreValue>(
     () => ({
       tripId,
@@ -290,7 +298,7 @@ export function TripStoreProvider({
       append,
       refresh,
       seenAt,
-      markSeen: () => setSeenAt(new Date()),
+      markSeen,
     }),
     [
       tripId,
@@ -308,6 +316,7 @@ export function TripStoreProvider({
       append,
       refresh,
       seenAt,
+      markSeen,
     ],
   );
 

@@ -10,11 +10,12 @@
 // screen.
 //
 // Settlement math is lib/engine's, untouched. The derived `ledger` is in the
-// shape of today's ledger rows so lib/stats keeps working over it unchanged.
+// shape of the old ledger rows so lib/stats keeps working over it unchanged.
 
 import {
   computePositions,
   exposure,
+  type MarketEvent,
   otherSide,
   type Position,
   refundAll,
@@ -109,6 +110,8 @@ export interface PhraseState {
 
 export interface HelloState {
   at: Date;
+  /** The epoch the hello was sealed under: proof the member held that key. */
+  epoch: number;
   mkPub: JsonWebKey | null;
 }
 
@@ -122,7 +125,7 @@ export interface Rejection {
 export interface TripState {
   organiserIds: Set<string>;
   markets: Map<string, MarketState>;
-  /** Every pie movement, derived, in today's ledger shape and in event order. */
+  /** Every pie movement, derived, in the ledger shape and in event order. */
   ledger: LedgerRow[];
   comments: CommentState[];
   reactions: ReactionState[];
@@ -143,6 +146,12 @@ function refuse(reason: string): never {
   throw new Refused(reason);
 }
 
+interface Ctx {
+  config: ReplayConfig;
+  state: TripState;
+  nextLedgerId: number;
+}
+
 export function replayTrip(config: ReplayConfig, events: readonly OpenEvent[]): TripState {
   const state: TripState = {
     organiserIds: new Set([config.creatorId]),
@@ -157,7 +166,7 @@ export function replayTrip(config: ReplayConfig, events: readonly OpenEvent[]): 
     rejected: [],
     unknown: 0,
   };
-  const ctx = { config, state, nextLedgerId: 1 };
+  const ctx: Ctx = { config, state, nextLedgerId: 1 };
   for (const ev of events) {
     if (ev.payload.t === "unknown") {
       state.unknown += 1;
@@ -166,25 +175,16 @@ export function replayTrip(config: ReplayConfig, events: readonly OpenEvent[]): 
     try {
       apply(ctx, ev, ev.payload);
     } catch (err) {
-      if (err instanceof Refused) {
-        state.rejected.push({
-          id: ev.id,
-          authorId: ev.authorId,
-          type: ev.payload.t,
-          reason: err.message,
-        });
-        continue;
-      }
-      throw err;
+      if (!(err instanceof Refused)) throw err;
+      state.rejected.push({
+        id: ev.id,
+        authorId: ev.authorId,
+        type: ev.payload.t,
+        reason: err.message,
+      });
     }
   }
   return state;
-}
-
-interface Ctx {
-  config: ReplayConfig;
-  state: TripState;
-  nextLedgerId: number;
 }
 
 function apply(ctx: Ctx, ev: OpenEvent, p: Exclude<EventPayload, UnknownEvent>): void {
@@ -213,19 +213,10 @@ function apply(ctx: Ctx, ev: OpenEvent, p: Exclude<EventPayload, UnknownEvent>):
       }
       const pos = market.positions.get(ev.authorId) ?? { yesC: 0, noC: 0 };
       if ((p.side === "yes" ? pos.noC : pos.yesC) > 0) refuse("already on the other side");
-      const maxC = ctx.config.maxStakePies * CENTS;
-      if (exposure(pos) + p.amountC > maxC) refuse("over the exposure cap");
-      market.positions = computePositions([
-        ...positionsAsEvents(market.positions),
-        { memberId: ev.authorId, kind: "bet", side: p.side, amountC: p.amountC },
-      ]);
-      pushLedger(ctx, ev, {
-        marketId: market.id,
-        kind: "bet",
-        side: p.side,
-        amountC: p.amountC,
-        balanceDeltaC: -p.amountC,
-      });
+      if (exposure(pos) + p.amountC > ctx.config.maxStakePies * CENTS) {
+        refuse("over the exposure cap");
+      }
+      move(ctx, ev, market, { kind: "bet", side: p.side, amountC: p.amountC }, -p.amountC);
       return;
     }
     case "switch": {
@@ -234,55 +225,40 @@ function apply(ctx: Ctx, ev: OpenEvent, p: Exclude<EventPayload, UnknownEvent>):
       const stakeC = pos ? exposure(pos) : 0;
       if (!pos || stakeC === 0) refuse("no call to switch");
       const to = otherSide(pos.yesC > 0 ? "yes" : "no");
-      market.positions = computePositions([
-        ...positionsAsEvents(market.positions),
-        { memberId: ev.authorId, kind: "switch", side: to, amountC: stakeC },
-      ]);
-      pushLedger(ctx, ev, {
-        marketId: market.id,
-        kind: "switch",
-        side: to,
-        amountC: stakeC,
-        balanceDeltaC: 0,
-      });
+      move(ctx, ev, market, { kind: "switch", side: to, amountC: stakeC }, 0);
       return;
     }
     case "resolve": {
-      const market = state.markets.get(p.marketId) ?? refuse("no such prediction");
+      const market = marketOf(state, p.marketId);
       if (market.creatorId !== ev.authorId) refuse("only the creator resolves");
       if (market.status !== "open") refuse("already resolved");
-      const note = p.note.trim();
+      let paid: Map<string, number>;
+      let kind: LedgerRow["kind"];
       if (p.outcome === "refunded") {
-        for (const [memberId, amountC] of refundAll(market.positions)) {
-          pushLedger(ctx, ev, {
-            marketId: market.id,
-            memberId,
-            kind: "refund",
-            amountC,
-            balanceDeltaC: amountC,
-          });
-          market.outstanding.set(memberId, amountC);
-        }
+        paid = refundAll(market.positions);
+        kind = "refund";
       } else {
         const result = settle(market.positions, p.outcome);
-        for (const [memberId, amountC] of result.payoutsC) {
-          pushLedger(ctx, ev, {
-            marketId: market.id,
-            memberId,
-            kind: result.autoRefunded ? "refund" : "payout",
-            amountC,
-            balanceDeltaC: amountC,
-          });
-          market.outstanding.set(memberId, amountC);
-        }
+        paid = result.payoutsC;
+        kind = result.autoRefunded ? "refund" : "payout";
+      }
+      for (const [memberId, amountC] of paid) {
+        pushLedger(ctx, ev, {
+          marketId: market.id,
+          memberId,
+          kind,
+          amountC,
+          balanceDeltaC: amountC,
+        });
+        market.outstanding.set(memberId, amountC);
       }
       market.status = p.outcome;
       market.resolvedAt = ev.at;
-      market.resolutionNote = note || null;
+      market.resolutionNote = p.note.trim() || null;
       return;
     }
     case "reopen": {
-      const market = state.markets.get(p.marketId) ?? refuse("no such prediction");
+      const market = marketOf(state, p.marketId);
       if (!state.organiserIds.has(ev.authorId)) refuse("only an organiser reopens");
       if (market.status === "open") refuse("already open");
       for (const [memberId, amountC] of market.outstanding) {
@@ -304,7 +280,7 @@ function apply(ctx: Ctx, ev: OpenEvent, p: Exclude<EventPayload, UnknownEvent>):
     case "comment": {
       if (state.comments.some((c) => c.id === p.id)) refuse("id already taken");
       if (p.marketId !== undefined) {
-        if (!state.markets.has(p.marketId)) refuse("no such prediction");
+        marketOf(state, p.marketId);
       } else if (p.billId === undefined || !liveBill(state, p.billId)) {
         refuse("no such bill");
       }
@@ -320,7 +296,7 @@ function apply(ctx: Ctx, ev: OpenEvent, p: Exclude<EventPayload, UnknownEvent>):
       return;
     }
     case "react": {
-      if (!state.markets.has(p.marketId)) refuse("no such prediction");
+      marketOf(state, p.marketId);
       const i = state.reactions.findIndex(
         (r) => r.marketId === p.marketId && r.memberId === ev.authorId && r.kind === p.kind,
       );
@@ -339,7 +315,7 @@ function apply(ctx: Ctx, ev: OpenEvent, p: Exclude<EventPayload, UnknownEvent>):
       return;
     }
     case "view": {
-      if (!state.markets.has(p.marketId)) refuse("no such prediction");
+      marketOf(state, p.marketId);
       state.views.push({ memberId: ev.authorId, marketId: p.marketId, at: ev.at });
       return;
     }
@@ -404,7 +380,13 @@ function apply(ctx: Ctx, ev: OpenEvent, p: Exclude<EventPayload, UnknownEvent>):
       return;
     }
     case "member.hello": {
-      state.hellos.set(ev.authorId, { at: ev.at, mkPub: p.mkPub ?? null });
+      // A later hello without a key keeps the announced one: a phone may say hello before it has an mk.
+      const before = state.hellos.get(ev.authorId);
+      state.hellos.set(ev.authorId, {
+        at: ev.at,
+        epoch: ev.epoch,
+        mkPub: p.mkPub ?? before?.mkPub ?? null,
+      });
       return;
     }
     case "member.role": {
@@ -426,8 +408,12 @@ function apply(ctx: Ctx, ev: OpenEvent, p: Exclude<EventPayload, UnknownEvent>):
   }
 }
 
+function marketOf(state: TripState, id: string): MarketState {
+  return state.markets.get(id) ?? refuse("no such prediction");
+}
+
 function openMarket(state: TripState, id: string): MarketState {
-  const market = state.markets.get(id) ?? refuse("no such prediction");
+  const market = marketOf(state, id);
   if (market.status !== "open") refuse("prediction is closed");
   return market;
 }
@@ -438,13 +424,28 @@ function liveBill(state: TripState, id: string): boolean {
 }
 
 /** Positions as the bet events that would rebuild them — one per held side. */
-function positionsAsEvents(positions: Map<string, Position>) {
-  const out: Parameters<typeof computePositions>[0] = [];
+function positionsAsEvents(positions: Map<string, Position>): MarketEvent[] {
+  const out: MarketEvent[] = [];
   for (const [memberId, pos] of positions) {
     if (pos.yesC > 0) out.push({ memberId, kind: "bet", side: "yes", amountC: pos.yesC });
     if (pos.noC > 0) out.push({ memberId, kind: "bet", side: "no", amountC: pos.noC });
   }
   return out;
+}
+
+/** The author's pies move on a market: positions recomputed by lib/engine, one ledger row. */
+function move(
+  ctx: Ctx,
+  ev: OpenEvent,
+  market: MarketState,
+  action: { kind: "bet" | "switch"; side: Side; amountC: number },
+  balanceDeltaC: number,
+): void {
+  market.positions = computePositions([
+    ...positionsAsEvents(market.positions),
+    { memberId: ev.authorId, ...action },
+  ]);
+  pushLedger(ctx, ev, { marketId: market.id, ...action, balanceDeltaC });
 }
 
 function pushLedger(

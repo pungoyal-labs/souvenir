@@ -1,14 +1,22 @@
 import { describe, expect, it } from "vitest";
-import { CryptoError, exportKey, newKey, toBase64Url } from "./crypto.ts";
+import {
+  CryptoError,
+  exportKey,
+  newKey,
+  newMemberKey,
+  toBase64Url,
+  unwrapFromMember,
+  wrapToMember,
+} from "./crypto.ts";
 import {
   decodeKeyring,
   emptyKeyring,
   encodeKeyring,
   holdsKey,
   KeyringError,
-  latestEpoch,
   linkSecretOf,
   linkWithSecret,
+  memberPublicKey,
   mergeKeyrings,
   newLinkSecret,
   openKeyring,
@@ -20,14 +28,11 @@ import {
   secretFromFragment,
   tripCryptoKey,
   tripKeyOf,
-  unwrapKeyringFromDevice,
   unwrapPreview,
   unwrapTripKey,
   withLinkSecret,
-  withoutLink,
-  withoutTrip,
+  withMemberKey,
   withTripKey,
-  wrapKeyringForDevice,
   wrapPreview,
   wrapTripKey,
 } from "./keys.ts";
@@ -38,7 +43,6 @@ describe("keyring", () => {
   it("starts empty and holds nothing", () => {
     const kr = emptyKeyring();
     expect(holdsKey(kr, "t1", 0)).toBe(false);
-    expect(latestEpoch(kr, "t1")).toBeNull();
     expect(tripKeyOf(kr, "t1", 0)).toBeNull();
   });
 
@@ -51,20 +55,8 @@ describe("keyring", () => {
     expect(kr0.trips).toEqual({});
     expect(tripKeyOf(kr2, "t1", 0)).toEqual(k0);
     expect(tripKeyOf(kr2, "t1", 1)).toEqual(k1);
-    expect(latestEpoch(kr2, "t1")).toBe(1);
+    expect(holdsKey(kr2, "t1", 1)).toBe(true);
     expect(holdsKey(kr2, "t1", 2)).toBe(false);
-  });
-
-  it("drops a trip whole", async () => {
-    const kr = withTripKey(
-      withTripKey(emptyKeyring(), "t1", 0, await rawKey()),
-      "t2",
-      0,
-      await rawKey(),
-    );
-    const less = withoutTrip(kr, "t1");
-    expect(latestEpoch(less, "t1")).toBeNull();
-    expect(latestEpoch(less, "t2")).toBe(0);
   });
 
   it("refuses bad epochs and short keys", async () => {
@@ -83,7 +75,6 @@ describe("keyring", () => {
     const kr = withLinkSecret(emptyKeyring(), "code-a", s);
     expect(linkSecretOf(kr, "code-a")).toEqual(s);
     expect(linkSecretOf(kr, "code-b")).toBeNull();
-    expect(linkSecretOf(withoutLink(kr, "code-a"), "code-a")).toBeNull();
   });
 
   it("encodes and decodes losslessly", async () => {
@@ -150,14 +141,6 @@ describe("links", () => {
     );
   });
 
-  it("carries a whole keyring to another device", async () => {
-    const s = newLinkSecret();
-    const kr = withTripKey(emptyKeyring(), "t1", 2, await rawKey());
-    const blob = await wrapKeyringForDevice(s, kr);
-    expect(await unwrapKeyringFromDevice(s, blob)).toEqual(kr);
-    await expect(unwrapTripKey(s, "device", blob)).rejects.toThrow(KeyringError);
-  });
-
   it("carries the join preview under the same secret, apart from the key", async () => {
     const s = newLinkSecret();
     const preview = { name: "Chiang Pai", names: ["A", "B"], questions: ["Will it rain?"] };
@@ -180,6 +163,7 @@ describe("merging", () => {
     expect(tripKeyOf(m, "t2", 0)).toEqual(k2);
     expect(linkSecretOf(m, "L1")).toEqual(k);
     expect(m.mk).toEqual({ kty: "EC" });
+    expect(mergeKeyrings(b, { ...a, mk: { kty: "EC", crv: "other" } }).mk).toEqual({ kty: "EC" });
     expect(mergeKeyrings(withTripKey(emptyKeyring(), "t1", 0, k2), a).trips.t1["0"]).toBe(
       a.trips.t1["0"],
     );
@@ -206,5 +190,20 @@ describe("passkey backup", () => {
       openKeyring(await prfKeyringKey(new Uint8Array(32).fill(8)), blob),
     ).rejects.toThrow(CryptoError);
     await expect(prfKeyringKey(new Uint8Array(16))).rejects.toThrow(CryptoError);
+  });
+});
+
+describe("the member key", () => {
+  it("keeps the private half and announces a public half that opens nothing", async () => {
+    const pair = await newMemberKey();
+    const kr = withMemberKey(emptyKeyring(), pair.privateKey);
+    expect(memberPublicKey(emptyKeyring())).toBeNull();
+    const pub = memberPublicKey(kr);
+    expect(pub).not.toBeNull();
+    expect("d" in (pub as object)).toBe(false);
+    const raw = new Uint8Array(32).fill(3);
+    const blob = await wrapToMember(pub as JsonWebKey, raw);
+    expect(await unwrapFromMember(kr.mk as JsonWebKey, blob)).toEqual(raw);
+    expect(parseKeyring(JSON.parse(JSON.stringify(kr))).mk).toEqual(pair.privateKey);
   });
 });

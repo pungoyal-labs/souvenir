@@ -26,10 +26,6 @@ export function TripsList({ trips, sealedName }: { trips: TripRow[]; sealedName:
     (async () => {
       const next: Record<string, string> = {};
       for (const { trip } of trips) {
-        if (trip.name) {
-          next[trip.id] = trip.name;
-          continue;
-        }
         if (!trip.nameEnc || trip.keyEpoch === null) continue;
         const key = await tripCryptoKey(keyring, trip.id, trip.keyEpoch);
         if (!key) continue;

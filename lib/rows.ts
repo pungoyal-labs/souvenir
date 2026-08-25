@@ -34,3 +34,6 @@ export interface LedgerRow {
   balanceDeltaC: number;
   note: string | null;
 }
+
+/** What the record calls a member whose account is gone. */
+export const DEPARTED_NAME = "Departed member";

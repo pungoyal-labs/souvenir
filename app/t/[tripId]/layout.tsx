@@ -1,7 +1,12 @@
-import { appendEventAction, eventsSinceAction, sealLeftoversAction } from "@/app/actions";
+import {
+  appendEventAction,
+  eventsSinceAction,
+  myGrantAction,
+  takeGrantAction,
+} from "@/app/actions";
 import { TripHeader } from "@/components/trip-header";
 import { TripStoreProvider } from "@/components/trip-store";
-import { eventsSince, leftoversOf, membersOf } from "@/lib/data";
+import { eventsSince, membersOf } from "@/lib/data";
 import { requireTrip } from "@/lib/session";
 import { DESTINATIONS, pairFor } from "@/lib/talk";
 import { daysBetween, placeOf, tripCurrencies, tripPhase, tripToday } from "@/lib/trips";
@@ -54,7 +59,6 @@ export default async function TripLayout({
       tripId={tripId}
       epoch={trip.keyEpoch}
       nameEnc={trip.nameEnc}
-      leftovers={membership.role === "organiser" ? await leftoversOf(tripId) : null}
       config={{
         creatorId: trip.createdBy,
         maxStakePies: trip.maxStakePies,
@@ -68,7 +72,8 @@ export default async function TripLayout({
       actions={{
         append: appendEventAction,
         since: eventsSinceAction,
-        sealLeftovers: sealLeftoversAction,
+        grant: myGrantAction,
+        takeGrant: takeGrantAction,
       }}
     >
       <TripHeader

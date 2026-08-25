@@ -58,6 +58,11 @@ The full design is [`docs/private-trips.md`](docs/private-trips.md). In short:
   for any seat) puts it on a second phone or a replacement one; a recovery link
   carries it from the organiser who minted it. The server stores keys only
   wrapped under secrets it has never seen, and no path returns one to it.
+- **Leaving.** A key cannot be taken back from a phone, so a seat that goes
+  (removed, left, deleted) marks the trip for rotation: an organiser's phone
+  makes a new key, wraps it to the member key each seat announced in the log,
+  and the server turns the epoch only when nobody is left out. The departed
+  member keeps what was written until then and reads nothing after.
 - **The backup.** A passkey with the PRF extension derives the same secret on
   every device it syncs to; the keyring is sealed under it in `keyring_wraps`
   and restored, silently, after a sign-in with that passkey. No PRF, no
@@ -67,10 +72,8 @@ The full design is [`docs/private-trips.md`](docs/private-trips.md). In short:
   big it was. The name, the phrasebook and every bill are sealed like the
   rest. A verdict card (`/card/[id]`) is plaintext because a member's phone
   published it on share; anyone on the trip can take it down.
-- **Nothing is left in the clear.** The plaintext prediction and bill tables
-  are gone. A trip named, or phrases kept, before sealing wait in two legacy
-  columns until the first organiser phone that opens the trip with its key
-  puts them on the record and drops them; `pnpm stats` counts what is left.
+- **Nothing is left in the clear.** The plaintext prediction, bill, phrase
+  and name columns are gone; the schema holds ciphertext, shape and roster.
 
 **The tests are the spec.** Each pure module carries its documentation as a
 test file: `lib/engine.test.ts` (settlement, fuzz-tested zero-sum),

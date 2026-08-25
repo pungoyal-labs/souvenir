@@ -6,6 +6,7 @@ import { useState, useTransition } from "react";
 import { shutOwnRecoveryAction } from "@/app/actions";
 import { timeAgo, timeUntil } from "@/lib/format";
 import { routes } from "@/lib/routes";
+import { ActError } from "./use-act";
 
 /**
  * A recovery link is a key to this member's seat in somebody else's hand, and
@@ -54,7 +55,7 @@ export function RecoveryNotice({
               </p>
             </>
           )}
-          {error && <p className="mt-1 text-xs font-semibold text-no-deep">{error}</p>}
+          <ActError error={error} block />
         </div>
         {live && (
           <button

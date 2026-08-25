@@ -1,6 +1,6 @@
 # Private trips — end-to-end encryption, planned properly
 
-Status: decisions settled 2026-08-24; Phase 0 merged (#4); Phase 1 merged (#5); Phases 2 and 4 in review (`private-trips-phase-2-4`). Written against the codebase at `a654787`; §7 records what shipped.
+Status: decisions settled 2026-08-24; Phases 0, 1, 2 and 4 merged (#4, #5, #6) and deployed; the legacy-column drop and Phase 3 are PR #7 (`private-trips-legacy-drop`). Written against the codebase at `a654787`; §7 records what shipped.
 
 ## 0. The promise, stated precisely
 
@@ -455,19 +455,38 @@ What differs from the plan:
   key. `trips.name` and `phrases` stay as legacy columns; the first organiser
   phone that opens such a trip with its key appends the phrases under their
   original keepers (`phrase.keep` gained an organiser-only `keeper`), seals
-  the name, and calls `clearLeftovers`. `pnpm stats` shows `plaintext left`;
-  a follow-up migration drops the two columns once it reads zero.
+  the name, and calls `clearLeftovers`. Migration `0024` (own PR, merged
+  once `pnpm stats` read `plaintext left 0` in production) dropped the two
+  columns and that machinery; `keeper` stays in the codec for the events
+  already on the record.
 
-### Phase 3 — Member keys and rotation (≈1.5 weeks)
+### Phase 3 — Member keys and rotation (PR #7, with the column drop)
 
-- MK in the keyring; `member.hello` carries the public key; `member.key` on
-  new devices.
-- `key_grants`; `bumpEpoch` with the all-seats check; rotation on removal,
-  leaving, deletion; invite revocation on rotation.
-- Members page: keyless members, new-device announcements, alongside
-  recoveries.
-- Exit: a removed member holding a DB copy cannot open anything after their
-  removal.
+Shipped: every keyring gets a P-256 member key on first use (`lib/crypto`
+`newMemberKey`; the private half is `keyring.mk`, backed up with the rest);
+`member.hello` carries the public half and is re-said once per epoch, so a
+hello is proof of holding that epoch's key (`HelloState.epoch`) and the table
+knows who is behind. Seats can now go — *Remove from the trip* for an
+organiser, *Leave the trip* for oneself, and account deletion — and each
+marks the trip `key_stale_since`. The members page then offers organisers
+*Rotate the key*: the phone makes TK[e+1], wraps it to each seat's announced
+member key (`wrapToMember`, ephemeral ECDH + HKDF + AES-GCM), re-seals the
+name, and calls `bumpEpoch`, which the server accepts only with a grant for
+every other seat, turning the epoch, dropping live invites and unused key
+links (they carried TK[e]) in one transaction. A phone behind the epoch picks
+its grant up by itself (`myGrant` → `unwrapFromMember` → keyring), then says
+hello under the new key. Rows from earlier epochs open with the keys the
+keyring kept for them.
+
+What differs from the plan: no `member.key` event — a new device restores
+the same member key from the passkey backup or a key link, so one key per
+member is enough; rotation is a button, not automatic, because it needs a
+phone that holds the key and every seat to have announced a member key
+(the page names who has not); a departure by *leaving* or deletion leaves
+the rotation to an organiser, which the members page prompts.
+
+Exit reached: after a rotation, a removed member holding a database copy
+opens nothing written since; what they could read before, they keep.
 
 ### Phase 4 — Keys that survive, retirement (with Phase 2, one PR)
 

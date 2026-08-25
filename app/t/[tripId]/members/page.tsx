@@ -5,6 +5,7 @@ import { Leaderboard } from "@/components/leaderboard";
 import { ShutRecovery } from "@/components/recovery";
 import { ShutRekey } from "@/components/rekey-list";
 import { RevokeInvite } from "@/components/revoke-invite";
+import { RotateKey } from "@/components/rotate-key";
 import { Sealed } from "@/components/sealed";
 import {
   isOrganiser,
@@ -51,6 +52,7 @@ export default async function MembersPage({ params }: { params: Promise<{ tripId
 
       <Sealed>
         <Leaderboard minResolved={env.RANKED_MIN_RESOLVED} passkeys={[...passkeys]} />
+        <RotateKey since={ctx.trip.keyStaleSince} />
       </Sealed>
 
       {rekeys.length > 0 && (

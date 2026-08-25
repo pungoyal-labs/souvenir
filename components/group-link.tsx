@@ -8,7 +8,7 @@ import { fmtDate } from "@/lib/format";
 import { linkSecretOf, linkWithSecret } from "@/lib/keys";
 import { useMintInvite } from "./invite-links";
 import { useKeyring } from "./keyring";
-import { useAct } from "./use-act";
+import { ActError, useAct } from "./use-act";
 
 /** One open door for the whole group, until it expires or an organiser shuts it. */
 export function GroupLink({
@@ -83,7 +83,7 @@ export function GroupLink({
           </button>
         )}
       </p>
-      {error && <p className="mt-1 text-xs font-semibold text-no-deep">{error}</p>}
+      <ActError error={error} block />
     </div>
   );
 }

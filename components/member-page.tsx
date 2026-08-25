@@ -20,6 +20,7 @@ import { billLabel } from "./bill-label";
 import { OrganiserToggle } from "./founder-toggle";
 import { Pies } from "./pies";
 import { RecoveryPanel } from "./recovery";
+import { SeatControls } from "./seat-controls";
 import { SideChip } from "./side-chip";
 import { useOpenTrip } from "./trip-store";
 import { tone } from "./ui";
@@ -133,6 +134,19 @@ export function MemberPage({
               isMe={isMe}
             />
           </div>
+        </section>
+      )}
+
+      {(isMe || canAdmin) && (
+        <section className="mt-7">
+          <h2 className={heading}>{isMe ? "Leaving" : "The seat"}</h2>
+          <SeatControls
+            tripId={tripId}
+            memberId={member.id}
+            name={member.name}
+            isMe={isMe}
+            canAdmin={canAdmin}
+          />
         </section>
       )}
 

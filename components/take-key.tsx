@@ -4,6 +4,7 @@
 // carries one ends the same way — open the wrap with the fragment's secret and
 // add the key to the keyring. The trip store says hello once the trip opens.
 
+import Link from "next/link";
 import type { LinkPurpose } from "@/lib/crypto";
 import type { KeyHandover } from "@/lib/data";
 import { secretFromFragment, unwrapTripKey, withTripKey } from "@/lib/keys";
@@ -18,9 +19,7 @@ export function stashSecret(code: string): void {
   try {
     const hash = window.location.hash;
     if (hash.length > 1) sessionStorage.setItem(stashKey(code), hash);
-  } catch {
-    // see above
-  }
+  } catch {}
 }
 
 function findSecret(code: string): Uint8Array | null {
@@ -29,13 +28,30 @@ function findSecret(code: string): Uint8Array | null {
   try {
     const stashed = sessionStorage.getItem(stashKey(code));
     if (stashed) return secretFromFragment(stashed);
-  } catch {
-    // see above
-  }
+  } catch {}
   return null;
 }
 
 export const hasSecret = (code: string) => findSecret(code) !== null;
+
+/** A sign-in link on a key-carrying page: parks the fragment first, so it is there on return. */
+export function SignInKeepingSecret({
+  code,
+  href,
+  className,
+  children,
+}: {
+  code: string;
+  href: string;
+  className: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <Link href={href} onClick={() => stashSecret(code)} className={className}>
+      {children}
+    </Link>
+  );
+}
 
 /**
  * Once the seat is settled: take the key the link carries. Resolves to an
@@ -65,9 +81,7 @@ export function useTakeKey() {
     await keyring.update((kr) => withTripKey(kr, tripId, key.epoch, raw));
     try {
       sessionStorage.removeItem(stashKey(code));
-    } catch {
-      // nothing was stashed
-    }
+    } catch {}
     return null;
   };
 }

@@ -1,9 +1,9 @@
 import { RecoverForm } from "@/components/recover-form";
-import { SignedOutCard, SignedOutNotice } from "@/components/signed-out-card";
+import { deadLink, SignedOutCard, SignedOutNotice } from "@/components/signed-out-card";
 import { getSession } from "@/lib/auth";
 import { findRecovery, getMember } from "@/lib/data";
 import { timeUntil } from "@/lib/format";
-import { type RecoveryState, recoveryState } from "@/lib/recovery";
+import { recoveryState } from "@/lib/recovery";
 
 const EYEBROW = "Back to your seat";
 
@@ -23,7 +23,11 @@ export default async function RecoverPage({ params }: { params: Promise<{ code: 
 
   const state = row && recoveryState(row, new Date());
   if (!row || state !== "live") {
-    return <SignedOutNotice eyebrow={EYEBROW}>{deadLink(state || null)}</SignedOutNotice>;
+    return (
+      <SignedOutNotice eyebrow={EYEBROW}>
+        {deadLink(state || null, "recovery link", "They take a moment to mint.")}
+      </SignedOutNotice>
+    );
   }
 
   const [member, mintedBy] = await Promise.all([
@@ -51,10 +55,4 @@ export default async function RecoverPage({ params }: { params: Promise<{ code: 
       <RecoverForm code={code} name={member.name} />
     </SignedOutCard>
   );
-}
-
-function deadLink(state: RecoveryState | null): string {
-  if (state === "used") return "That recovery link has already been used.";
-  if (state === "expired") return "That recovery link has expired — they take a moment to mint.";
-  return "That recovery link isn't valid.";
 }

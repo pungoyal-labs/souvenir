@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { setLingoAction } from "@/app/actions";
 import { LINGO_KEYS, LINGOS } from "@/lib/lingo";
+import { ActError } from "./use-act";
 
 /** Shown only on your own member page: pick the lingo the app speaks to you. */
 export function LingoPicker({ current }: { current: string }) {
@@ -37,7 +38,7 @@ export function LingoPicker({ current }: { current: string }) {
         </select>
       </label>
       <p className="mt-1 text-xs text-soft">How the app talks to you. Only changes your screen.</p>
-      {error && <p className="mt-1 text-xs font-semibold text-no-deep">{error}</p>}
+      <ActError error={error} block />
     </div>
   );
 }

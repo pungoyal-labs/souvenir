@@ -7,6 +7,7 @@ import {
   fromUtf8,
   importKey,
   newKey,
+  newMemberKey,
   newSecret,
   open,
   openBlob,
@@ -15,8 +16,10 @@ import {
   sealBlob,
   toBase64Url,
   unwrapFromLink,
+  unwrapFromMember,
   utf8,
   wrapForLink,
+  wrapToMember,
 } from "./crypto.ts";
 
 const binding = { tripId: "trip-1", authorId: "member-a", epoch: 0 };
@@ -157,12 +160,32 @@ describe("link wraps", () => {
 
   it("another secret does not open it", async () => {
     const raw = await exportKey(await newKey());
-    const blob = await wrapForLink(newSecret(), "device", raw);
-    await expect(unwrapFromLink(newSecret(), "device", blob)).rejects.toThrow(CryptoError);
+    const blob = await wrapForLink(newSecret(), "rekey", raw);
+    await expect(unwrapFromLink(newSecret(), "rekey", blob)).rejects.toThrow(CryptoError);
   });
 
   it("refuses a blob with the wrong shape", async () => {
     await expect(unwrapFromLink(newSecret(), "invite", "v1.abc")).rejects.toThrow(CryptoError);
     await expect(unwrapFromLink(newSecret(), "invite", "v1.a.b.c")).rejects.toThrow(CryptoError);
+  });
+});
+
+describe("member keys", () => {
+  it("wraps to a public key that only the private half opens", async () => {
+    const a = await newMemberKey();
+    const b = await newMemberKey();
+    const raw = new Uint8Array(32).fill(9);
+    const blob = await wrapToMember(a.publicKey, raw);
+    expect(blob.startsWith("v1.")).toBe(true);
+    expect(await unwrapFromMember(a.privateKey, blob)).toEqual(raw);
+    await expect(unwrapFromMember(b.privateKey, blob)).rejects.toThrow(CryptoError);
+    await expect(wrapToMember({ kty: "oct" } as JsonWebKey, raw)).rejects.toThrow(CryptoError);
+    await expect(unwrapFromMember(a.privateKey, "v1.x.y")).rejects.toThrow(CryptoError);
+  });
+
+  it("makes a fresh agreement every time", async () => {
+    const a = await newMemberKey();
+    const raw = new Uint8Array(32).fill(1);
+    expect(await wrapToMember(a.publicKey, raw)).not.toBe(await wrapToMember(a.publicKey, raw));
   });
 });

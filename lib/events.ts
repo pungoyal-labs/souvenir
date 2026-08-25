@@ -1,18 +1,16 @@
 // What a member can do on a sealed trip, as the payload inside an envelope.
 // See docs/private-trips.md §2 and §4.7.
 //
-// One row in `events` is one of these, encrypted. The server sees the trip,
-// the author, the time and the epoch; the type and everything else is in
-// here. Every derivation — positions, balances, the leaderboard, bills, the
-// phrasebook — replays these in server order (lib/replay.ts), so the shapes
-// below are the contract between every phone on the trip, present and future.
-// A reader that meets a type it does not know keeps going: `decodeEvent`
-// returns `unknown`, and replay ignores it, so an old client survives a new
-// feature.
+// One row in `events` is one of these, encrypted. Every derivation replays
+// them in server order (lib/replay.ts), so the shapes below are the contract
+// between every phone on the trip, present and future: a reader that meets a
+// type it does not know gets `unknown` back and keeps going, so an old client
+// survives a new feature.
 //
 // Ids for markets, bills, phrases and comments are minted on the phone:
 // random, and claimed by the first event to use them.
 
+import { fromUtf8, utf8 } from "./crypto.ts";
 import type { Side } from "./engine.ts";
 import type { BillEntryInput, BillKind, Currency, SplitMode } from "./split.ts";
 
@@ -154,18 +152,15 @@ export interface UnknownEvent {
 
 export class EventError extends Error {}
 
-const encoder = new TextEncoder();
-const decoder = new TextDecoder();
-
 export function encodeEvent(payload: EventPayload): Uint8Array {
-  return encoder.encode(JSON.stringify(payload));
+  return utf8(JSON.stringify(payload));
 }
 
 /** Parse and shape-check. Unknown types come back as `unknown`; malformed known types throw. */
 export function decodeEvent(bytes: Uint8Array): EventPayload | UnknownEvent {
   let parsed: unknown;
   try {
-    parsed = JSON.parse(decoder.decode(bytes));
+    parsed = JSON.parse(fromUtf8(bytes));
   } catch {
     throw new EventError("not an event");
   }
@@ -254,20 +249,8 @@ const checks: Record<EventType, Check> = {
   "member.role": (p) => nonEmpty(p.memberId) && (p.role === "organiser" || p.role === "member"),
 };
 
-/** Every type this build knows, for the members page and for tests. */
+/** Every type this build knows. */
 export const EVENT_TYPES = Object.keys(checks) as EventType[];
-
-// --- one row, opened ----------------------------------------------------------
-
-/** What the server stores about an event: everything but the payload. */
-export interface EventRow {
-  id: number;
-  at: Date;
-  tripId: string;
-  authorId: string;
-  epoch: number;
-  body: string;
-}
 
 /** A row after its envelope opened: what replay consumes. */
 export interface OpenEvent {

@@ -16,3 +16,13 @@ export function useAct(fallback = "That didn't work.") {
     });
   return { pending, error, setError, act };
 }
+
+/** The error line under a button. */
+export function ActError({ error, block = false }: { error: string | null; block?: boolean }) {
+  if (!error) return null;
+  return block ? (
+    <p className="mt-1 text-xs font-semibold text-no-deep">{error}</p>
+  ) : (
+    <span className="text-xs font-semibold text-no-deep">{error}</span>
+  );
+}

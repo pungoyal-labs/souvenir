@@ -1,23 +1,16 @@
 "use client";
 
-// The phone in the middle of the table.
+// The phone in the middle of the table: tap your side, say it, tap again. It
+// comes back spoken in the other language and stays on screen big enough to
+// hold out — the speaking fails first, the screen never does.
 //
-// Tap your side, say it, tap again. It comes back spoken in the other language
-// and stays on screen big enough to hold out — the speaking is the part that
-// fails first, and the screen is the part that never does. Then they tap their
-// side and it goes the other way.
-//
-// Listening is the browser's own recogniser, which is the only one there is:
-// it is solid on Android Chrome and absent on some iPhones, and where it is
-// absent the page says so and you type instead. Speaking prefers the device's
-// own voice and falls back to the server's. The conversation is component
-// state — close the tab and it is gone.
-//
-// The one thing that outlives the tab is a phrase somebody deliberately kept:
-// tap the star, give it a name, and it joins their own phrasebook below, ready
-// to be said again on a night nobody feels like explaining themselves twice.
+// Listening is the browser's own recogniser, the only one there is (solid on
+// Android Chrome, absent on some iPhones, where the page says so and you type).
+// Speaking prefers the device's own voice and falls back to the server's. The
+// conversation is component state — close the tab and it is gone. What
+// outlives the tab is a phrase somebody deliberately kept, under a name.
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { interpretAction } from "@/app/actions";
 import {
   keepPayload,
@@ -84,11 +77,9 @@ export function Talk({
   serverSpeaks: boolean;
 }) {
   const { tripId, me, t, state, append } = useOpenTrip();
-  const meId = me.id;
   // Organisers can drop anybody's phrase; everyone else only their own.
   const organiser = me.role === "organiser";
   const kept = phrasesOf(state);
-  const phrasebookHeading = t.phrasebookHeading;
   const [particle, setParticle] = useState<Particle>("khrap");
   const [turns, setTurns] = useState<Turn[]>([]);
   const [listening, setListening] = useState<Side | null>(null);
@@ -126,110 +117,96 @@ export function Talk({
   const latest = turns[turns.length - 1];
 
   /** Reading a live turn: whichever side's language it landed in. */
-  const sideVoice = useCallback(
-    (side: Side): PhraseVoice => {
-      const speaker = speakerOf(pair, side);
-      return { tag: speaker.tag, prefer: speaker.voice, side };
-    },
-    [pair],
-  );
+  const sideVoice = (side: Side): PhraseVoice => {
+    const speaker = speakerOf(pair, side);
+    return { tag: speaker.tag, prefer: speaker.voice, side };
+  };
 
-  const speak = useCallback(
-    async (text: string, target: PhraseVoice) => {
-      const chosen = pickVoice(voices, target.tag, target.prefer);
-      if (chosen) {
-        window.speechSynthesis.cancel();
-        const utterance = new SpeechSynthesisUtterance(text);
-        utterance.lang = chosen.lang;
-        utterance.voice = voices.find((v) => v.name === chosen.name) ?? null;
-        // Full speed is a wall to a listener who expected a tourist.
-        utterance.rate = 0.95;
-        window.speechSynthesis.speak(utterance);
-        return;
-      }
-      // The voice service is told a side and looks the language up itself, so
-      // a phrase kept somewhere this deploy no longer goes has nothing true to
-      // tell it: the device's own voice or nothing at all.
-      if (!serverSpeaks || !target.side) return;
-      const response = await fetch("/api/speak", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ tripId, text, side: target.side }),
-      });
-      if (!response.ok) return;
-      const url = URL.createObjectURL(await response.blob());
-      const audio = new Audio(url);
-      audio.onended = () => URL.revokeObjectURL(url);
-      await audio.play().catch(() => URL.revokeObjectURL(url));
-    },
-    [voices, serverSpeaks, tripId],
-  );
+  const speak = async (text: string, target: PhraseVoice) => {
+    const chosen = pickVoice(voices, target.tag, target.prefer);
+    if (chosen) {
+      window.speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = chosen.lang;
+      utterance.voice = voices.find((v) => v.name === chosen.name) ?? null;
+      // Full speed is a wall to a listener who expected a tourist.
+      utterance.rate = 0.95;
+      window.speechSynthesis.speak(utterance);
+      return;
+    }
+    // The voice service is told a side and looks the language up itself, so a
+    // phrase kept somewhere this deploy no longer goes has nothing true to tell it.
+    if (!serverSpeaks || !target.side) return;
+    const response = await fetch("/api/speak", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ tripId, text, side: target.side }),
+    });
+    if (!response.ok) return;
+    const url = URL.createObjectURL(await response.blob());
+    const audio = new Audio(url);
+    audio.onended = () => URL.revokeObjectURL(url);
+    await audio.play().catch(() => URL.revokeObjectURL(url));
+  };
+
+  const replay = (turn: Turn) => speak(turn.said, sideVoice(otherSide(turn.side)));
 
   /** One utterance all the way through: heard, interpreted, said back. */
-  const put = useCallback(
-    async (heard: string, pressed: Side) => {
-      const utterance = clampUtterance(heard);
-      if (!worthSaying(utterance)) {
-        setError("Nothing came through. Try that again.");
+  const put = async (heard: string, pressed: Side) => {
+    const utterance = clampUtterance(heard);
+    if (!worthSaying(utterance)) {
+      setError("Nothing came through. Try that again.");
+      return;
+    }
+    const from = sideOf(utterance, pressed, pair);
+    const to = otherSide(from);
+    setThinking(true);
+    try {
+      const result = await interpretAction(tripId, utterance, to, particle);
+      if (!result.ok || !result.said) {
+        setError(result.error ?? "That didn't come back.");
         return;
       }
-      const from = sideOf(utterance, pressed, pair);
-      const to = otherSide(from);
-      setThinking(true);
-      try {
-        const result = await interpretAction(tripId, utterance, to, particle);
-        if (!result.ok || !result.said) {
-          setError(result.error ?? "That didn't come back.");
-          return;
-        }
-        const turn: Turn = {
-          id: nextId.current++,
-          side: from,
-          heard: utterance,
-          said: result.said.text,
-          roman: result.said.roman || undefined,
-          literal: result.said.literal || undefined,
-        };
-        setTurns((current) => appendTurn(current, turn));
-        await speak(turn.said, sideVoice(to));
-      } finally {
-        setThinking(false);
-      }
-    },
-    [pair, particle, speak, sideVoice, tripId],
-  );
+      const turn: Turn = {
+        id: nextId.current++,
+        side: from,
+        heard: utterance,
+        said: result.said.text,
+        roman: result.said.roman || undefined,
+        literal: result.said.literal || undefined,
+      };
+      setTurns((current) => appendTurn(current, turn));
+      await speak(turn.said, sideVoice(to));
+    } finally {
+      setThinking(false);
+    }
+  };
 
   /** Keep a turn under a name: sealed on this phone, the slug decided against the book it sees. */
-  const keep = useCallback(
-    async (turn: Turn, name: string) => {
-      setError(null);
-      setKeeping(true);
-      try {
-        const payload = keepPayload(
-          { name, ...turn },
-          pair,
-          kept.map((p) => p.slug),
-        );
-        const result = await append(payload);
-        if (!result.ok) setError(result.error ?? "That didn't save.");
-        else setNaming(null);
-      } catch (err) {
-        setError(err instanceof PhraseError ? err.message : "That didn't save.");
-      } finally {
-        setKeeping(false);
-      }
-    },
-    [append, kept, pair],
-  );
+  const keep = async (turn: Turn, name: string) => {
+    setError(null);
+    setKeeping(true);
+    try {
+      const payload = keepPayload(
+        { name, ...turn },
+        pair,
+        kept.map((p) => p.slug),
+      );
+      const result = await append(payload);
+      if (!result.ok) setError(result.error ?? "That didn't save.");
+      else setNaming(null);
+    } catch (err) {
+      setError(err instanceof PhraseError ? err.message : "That didn't save.");
+    } finally {
+      setKeeping(false);
+    }
+  };
 
-  const forget = useCallback(
-    async (phrase: SavedPhrase) => {
-      if (!confirm(`Forget “${phrase.slug}”?`)) return;
-      const result = await append({ t: "phrase.drop", id: phrase.id });
-      if (!result.ok) setError(result.error ?? "Couldn't forget that one.");
-    },
-    [append],
-  );
+  const forget = async (phrase: SavedPhrase) => {
+    if (!confirm(`Forget “${phrase.slug}”?`)) return;
+    const result = await append({ t: "phrase.drop", id: phrase.id });
+    if (!result.ok) setError(result.error ?? "Couldn't forget that one.");
+  };
 
   const press = (side: Side) => {
     setError(null);
@@ -295,10 +272,21 @@ export function Talk({
     void put(text, "us");
   };
 
+  const keepForm = (turn: Turn, className: string) =>
+    naming?.id === turn.id && (
+      <div className={className}>
+        <KeepForm
+          busy={keeping}
+          onKeep={(name) => keep(turn, name)}
+          onCancel={() => setNaming(null)}
+        />
+      </div>
+    );
+
   /** The phrasebook, which needs no interpreter — only a voice. */
   const phrasebook = kept.length > 0 && (
     <section className="space-y-2">
-      <h2 className="eyebrow">{phrasebookHeading}</h2>
+      <h2 className="eyebrow">{t.phrasebookHeading}</h2>
       <div className="card list">
         {kept.map((phrase) => {
           const voice = voiceFor(phrase, pair);
@@ -311,9 +299,7 @@ export function Talk({
               >
                 <span aria-hidden>🔊</span>
                 <span className="min-w-0 flex-1">
-                  {/* The slug exactly as it is stored — not shouted into caps
-                      like the labels around it, since it is the name the
-                      member holds on to. */}
+                  {/* The slug as stored, not in caps: it is the name the member holds on to. */}
                   <span className="mono block truncate text-[11px] tracking-wider text-gold">
                     {phrase.slug}
                     {/* Kept somewhere this deploy is no longer pointed at. */}
@@ -330,7 +316,7 @@ export function Talk({
                   </span>
                 </span>
               </button>
-              {(organiser || phrase.keptBy === meId) && (
+              {(organiser || phrase.keptBy === me.id) && (
                 <button
                   type="button"
                   onClick={() => forget(phrase)}
@@ -428,18 +414,10 @@ export function Talk({
           <Card
             pair={pair}
             turn={latest}
-            onReplay={() => speak(latest.said, sideVoice(otherSide(latest.side)))}
+            onReplay={() => replay(latest)}
             onKeep={() => setNaming(latest)}
           />
-          {naming?.id === latest.id && (
-            <div className="card p-3">
-              <KeepForm
-                busy={keeping}
-                onKeep={(name) => keep(latest, name)}
-                onCancel={() => setNaming(null)}
-              />
-            </div>
-          )}
+          {keepForm(latest, "card p-3")}
         </div>
       )}
 
@@ -469,7 +447,7 @@ export function Talk({
 
       {turns.length > 1 && (
         <div className="card list">
-          {[...turns]
+          {turns
             .slice(0, -1)
             .reverse()
             .map((turn) => (
@@ -477,7 +455,7 @@ export function Talk({
                 <div className="flex items-center">
                   <button
                     type="button"
-                    onClick={() => speak(turn.said, sideVoice(otherSide(turn.side)))}
+                    onClick={() => replay(turn)}
                     className="flex min-w-0 flex-1 items-center gap-3 px-4 py-3 text-left hover:bg-paper"
                   >
                     <span
@@ -500,15 +478,7 @@ export function Talk({
                     ☆
                   </button>
                 </div>
-                {naming?.id === turn.id && (
-                  <div className="px-4 pb-3">
-                    <KeepForm
-                      busy={keeping}
-                      onKeep={(name) => keep(turn, name)}
-                      onCancel={() => setNaming(null)}
-                    />
-                  </div>
-                )}
+                {keepForm(turn, "px-4 pb-3")}
               </div>
             ))}
         </div>
@@ -552,11 +522,7 @@ function Mic({
   );
 }
 
-/**
- * Naming the thing you are keeping. The slug is shown as it is typed, because
- * it is the name the phrasebook will actually call it — better to see "no-
- * peanuts" now than to go looking for "No peanuts!!" later.
- */
+/** Naming the thing you are keeping; the slug is shown as typed, since that is what the book will call it. */
 function KeepForm({
   busy,
   onKeep,
@@ -598,7 +564,7 @@ function KeepForm({
       >
         Cancel
       </button>
-      <p className="mono w-full text-xs text-soft">{slug ? `Kept as ${slug}` : " "}</p>
+      <p className="mono w-full text-xs text-soft">{slug ? `Kept as ${slug}` : " "}</p>
     </div>
   );
 }

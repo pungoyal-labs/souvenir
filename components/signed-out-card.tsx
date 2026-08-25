@@ -49,3 +49,11 @@ export function SignedOutNotice({
     </SignedOutCard>
   );
 }
+
+/** Why a code did not open: spent, lapsed, or never one. */
+export function deadLink(state: string | null, what = "link", expiredHint = ""): string {
+  if (state === "used") return `That ${what} has already been used.`;
+  if (state === "expired")
+    return `That ${what} has expired.${expiredHint ? ` ${expiredHint}` : ""}`;
+  return `That ${what} isn't valid.`;
+}

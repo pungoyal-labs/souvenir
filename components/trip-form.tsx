@@ -24,6 +24,18 @@ const field =
   "mt-1 w-full rounded-md border border-line bg-surface px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-felt";
 const label = "block text-[11px] font-semibold uppercase tracking-wider text-soft";
 
+export interface TripFormInitial {
+  id: string;
+  name: string;
+  epoch: number | null;
+  destination: string;
+  homeLanguage: string;
+  homeCurrency: string;
+  startsOn: string | null;
+  endsOn: string | null;
+  maxStakePies: number;
+}
+
 /**
  * Open a trip, or change one. Destination, language and home currency are
  * fixed once; editing offers only the name, the dates, and the cap.
@@ -34,17 +46,7 @@ export function TripForm({
 }: {
   /** The signed-in member, who seals the first event on a new trip. */
   creatorId?: string;
-  initial?: {
-    id: string;
-    name: string;
-    epoch: number | null;
-    destination: string;
-    homeLanguage: string;
-    homeCurrency: string;
-    startsOn: string | null;
-    endsOn: string | null;
-    maxStakePies: number;
-  };
+  initial?: TripFormInitial;
 }) {
   const router = useRouter();
   const keyring = useKeyring();

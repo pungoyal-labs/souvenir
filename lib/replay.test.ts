@@ -537,3 +537,16 @@ describe("zero-sum under adversarial logs", () => {
     expect(b.rejected).toEqual(a.rejected);
   });
 });
+
+describe("hellos", () => {
+  it("remembers the latest epoch and never forgets an announced member key", () => {
+    const pub = { kty: "EC", crv: "P-256", x: "a", y: "b" };
+    const events = log([
+      ["a", { t: "member.hello", mkPub: pub }],
+      ["a", { t: "member.hello" }],
+    ]);
+    events[1]!.epoch = 1;
+    const state = replayTrip(config, events);
+    expect(state.hellos.get("a")).toMatchObject({ epoch: 1, mkPub: pub });
+  });
+});

@@ -2,11 +2,9 @@
 
 // The browser half of both passkey ceremonies. Everything that decides
 // anything happens on the server (app/actions.ts → lib/webauthn.ts); this file
-// only shuttles bytes between a server action and the authenticator, which is
-// why it is mostly base64url plumbing.
+// only shuttles bytes between a server action and the authenticator.
 
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
 import type { ActionResult } from "@/app/actions";
 import {
   beginPasskeyRegistrationAction,
@@ -15,23 +13,23 @@ import {
 } from "@/app/actions";
 import { fmtDate, timeAgo } from "@/lib/format";
 import { PRF_SALT } from "@/lib/keys";
-import type { PasskeyRegistrationOptions } from "@/lib/webauthn";
+import type { PasskeyRegistrationOptions, PasskeySignInOptions } from "@/lib/webauthn";
 import { rememberPrf } from "./keyring";
+import { ActError, useAct } from "./use-act";
 
-export function toBase64url(bytes: ArrayBuffer): string {
+function toBase64url(bytes: ArrayBuffer): string {
   let binary = "";
   for (const byte of new Uint8Array(bytes)) binary += String.fromCharCode(byte);
   return btoa(binary).replaceAll("+", "-").replaceAll("/", "_").replaceAll("=", "");
 }
 
-export function fromBase64url(value: string): ArrayBuffer {
+function fromBase64url(value: string): ArrayBuffer {
   const padded = value
     .replaceAll("-", "+")
     .replaceAll("_", "/")
     .padEnd(Math.ceil(value.length / 4) * 4, "=");
   const binary = atob(padded);
-  // Built on an ArrayBuffer we own, so the result is a BufferSource the
-  // credentials API accepts without a cast.
+  // On an ArrayBuffer we own, so the credentials API takes it without a cast.
   const bytes = new Uint8Array(new ArrayBuffer(binary.length));
   for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
   return bytes.buffer;
@@ -39,20 +37,17 @@ export function fromBase64url(value: string): ArrayBuffer {
 
 /**
  * A passkey is bound to the rp id the server derives from AUTH_URL, and the
- * browser refuses outright if the page it is on doesn't match. That refusal is
- * a bare SecurityError, so check it here instead and name both addresses —
- * reaching this app on 127.0.0.1 when AUTH_URL says localhost is the easiest
- * way to hit it, and the least obvious to diagnose.
+ * browser's refusal on a mismatch is a bare SecurityError — so name both
+ * addresses here. Reaching the app on 127.0.0.1 when AUTH_URL says localhost
+ * is the easiest way to hit it.
  */
-export function originMismatch(expected: string): string | null {
+function originMismatch(expected: string): string | null {
   if (window.location.origin === expected) return null;
   return `This page is ${window.location.origin}, but passkeys are set up for ${expected}. Open the app there instead.`;
 }
 
-/** What went wrong, in words a member can act on. */
-export function ceremonyError(err: unknown, verb: string): string {
-  // The browser's own reason is worth keeping: these failures are rare enough
-  // that a name in the console beats a friendly message with nothing behind it.
+/** What went wrong, in words a member can act on; the browser's own reason goes to the console. */
+function ceremonyError(err: unknown, verb: string): string {
   console.error("passkey ceremony failed", err);
   const name = err instanceof DOMException ? err.name : "";
   if (name === "NotAllowedError") {
@@ -60,9 +55,7 @@ export function ceremonyError(err: unknown, verb: string): string {
   }
   if (name === "InvalidStateError") return "This device already has a passkey for Chiang Pai.";
   if (name === "SecurityError") {
-    // Nearly always the rp id: an IP address, or a host that isn't a secure
-    // context. The server checks for both, so reaching here means something
-    // subtler — name it rather than shrugging.
+    // The server already refuses an IP or an insecure host, so this is something subtler: name it.
     return `This site can't offer passkeys from this address (${err instanceof Error ? err.message : name}).`;
   }
   if (name === "NotSupportedError")
@@ -71,19 +64,42 @@ export function ceremonyError(err: unknown, verb: string): string {
 }
 
 // The PRF extension: the authenticator hands back a secret derived from this
-// salt and its own, the same on every device the passkey syncs to. That secret
-// backs the keyring up (components/keyring.tsx). Authenticators without it
-// simply return nothing, and the member's way back stays a key link.
-export function prfExtension(): AuthenticationExtensionsClientInputs {
-  return { prf: { eval: { first: PRF_SALT } } } as AuthenticationExtensionsClientInputs;
-}
+// salt and its own, the same on every device the passkey syncs to; it backs the
+// keyring up (components/keyring.tsx). Authenticators without it return nothing.
+const prfExtension = () =>
+  ({ prf: { eval: { first: PRF_SALT } } }) as AuthenticationExtensionsClientInputs;
 
-export async function rememberPrfOf(credential: PublicKeyCredential): Promise<void> {
-  const results = credential.getClientExtensionResults() as {
-    prf?: { results?: { first?: ArrayBuffer } };
-  };
-  const first = results.prf?.results?.first;
-  if (first) await rememberPrf(credential.id, first);
+type Begun<O> = ActionResult & { options?: O };
+
+/**
+ * Either ceremony, start to finish: ask the server for options, run the
+ * authenticator, keep the PRF result. Adding a passkey, joining, recovering
+ * and signing in differ only in which action begins it and which
+ * `navigator.credentials` call it makes.
+ */
+async function ceremony<O extends { origin: string }>(
+  begin: () => Promise<Begun<O>>,
+  perform: (
+    options: O,
+    extensions: AuthenticationExtensionsClientInputs,
+  ) => Promise<Credential | null>,
+  verb: string,
+  absent: string,
+): Promise<{ credential: PublicKeyCredential } | { error: string }> {
+  if (!window.PublicKeyCredential) return { error: "This browser doesn't support passkeys." };
+  const begun = await begin();
+  if (!begun.ok || !begun.options) return { error: begun.error ?? "Couldn't start. Try again." };
+  const mismatch = originMismatch(begun.options.origin);
+  if (mismatch) return { error: mismatch };
+  let credential: PublicKeyCredential | null;
+  try {
+    credential = (await perform(begun.options, prfExtension())) as PublicKeyCredential | null;
+  } catch (err) {
+    return { error: ceremonyError(err, verb) };
+  }
+  if (!credential) return { error: absent };
+  await rememberPrf(credential);
+  return { credential };
 }
 
 /** The wire shape a finish action expects; see lib/webauthn.ts. */
@@ -93,54 +109,46 @@ export interface RegistrationWire {
   attestationObject: string;
 }
 
-type Begun = ActionResult & { options?: PasskeyRegistrationOptions };
+export interface SignInWire {
+  id: string;
+  clientDataJSON: string;
+  authenticatorData: string;
+  signature: string;
+}
 
-/**
- * The registration ceremony, start to finish: ask the server for options, make
- * the credential, hand back what the server needs to verify it. Adding a
- * passkey and joining by invite differ only in which actions they call, so
- * they differ only in what they pass here.
- */
+/** The registration ceremony; adding a passkey, joining and recovering differ only in `begin`. */
 export async function createCredential(
-  begin: () => Promise<Begun>,
+  begin: () => Promise<Begun<PasskeyRegistrationOptions>>,
   verb: string,
 ): Promise<{ wire: RegistrationWire } | { error: string }> {
-  if (!window.PublicKeyCredential) return { error: "This browser doesn't support passkeys." };
-
-  const begun = await begin();
-  if (!begun.ok || !begun.options) return { error: begun.error ?? "Couldn't start. Try again." };
-  const options = begun.options;
-  const mismatch = originMismatch(options.origin);
-  if (mismatch) return { error: mismatch };
-
-  let credential: PublicKeyCredential | null;
-  try {
-    credential = (await navigator.credentials.create({
-      publicKey: {
-        challenge: fromBase64url(options.challenge),
-        rp: options.rp,
-        user: {
-          id: fromBase64url(options.user.id),
-          name: options.user.name,
-          displayName: options.user.displayName,
+  const made = await ceremony(
+    begin,
+    (options, extensions) =>
+      navigator.credentials.create({
+        publicKey: {
+          challenge: fromBase64url(options.challenge),
+          rp: options.rp,
+          user: {
+            id: fromBase64url(options.user.id),
+            name: options.user.name,
+            displayName: options.user.displayName,
+          },
+          pubKeyCredParams: options.pubKeyCredParams,
+          excludeCredentials: options.excludeCredentials.map((c) => ({
+            type: c.type,
+            id: fromBase64url(c.id),
+          })),
+          authenticatorSelection: options.authenticatorSelection,
+          attestation: options.attestation,
+          timeout: options.timeout,
+          extensions,
         },
-        pubKeyCredParams: options.pubKeyCredParams,
-        excludeCredentials: options.excludeCredentials.map((c) => ({
-          type: c.type,
-          id: fromBase64url(c.id),
-        })),
-        authenticatorSelection: options.authenticatorSelection,
-        attestation: options.attestation,
-        timeout: options.timeout,
-        extensions: prfExtension(),
-      },
-    })) as PublicKeyCredential | null;
-  } catch (err) {
-    return { error: ceremonyError(err, verb) };
-  }
-  if (!credential) return { error: `No passkey was ${verb}.` };
-
-  await rememberPrfOf(credential);
+      }),
+    verb,
+    `No passkey was ${verb}.`,
+  );
+  if ("error" in made) return made;
+  const { credential } = made;
   const response = credential.response as AuthenticatorAttestationResponse;
   return {
     wire: {
@@ -151,12 +159,43 @@ export async function createCredential(
   };
 }
 
-/** Add a passkey to the signed-in member; returns an error message or null. */
-async function enrolPasskey(): Promise<string | null> {
+/** The sign-in ceremony: no credential list, so the browser offers whichever passkey it holds for this site. */
+export async function getCredential(
+  begin: () => Promise<Begun<PasskeySignInOptions>>,
+): Promise<{ wire: SignInWire } | { error: string }> {
+  const got = await ceremony(
+    begin,
+    (options, extensions) =>
+      navigator.credentials.get({
+        publicKey: {
+          challenge: fromBase64url(options.challenge),
+          rpId: options.rpId,
+          userVerification: options.userVerification,
+          timeout: options.timeout,
+          extensions,
+        },
+      }),
+    "signed in",
+    "No passkey was offered.",
+  );
+  if ("error" in got) return got;
+  const { credential } = got;
+  const response = credential.response as AuthenticatorAssertionResponse;
+  return {
+    wire: {
+      id: credential.id,
+      clientDataJSON: toBase64url(response.clientDataJSON),
+      authenticatorData: toBase64url(response.authenticatorData),
+      signature: toBase64url(response.signature),
+    },
+  };
+}
+
+/** Add a passkey to the signed-in member. */
+async function enrolPasskey(): Promise<ActionResult> {
   const made = await createCredential(beginPasskeyRegistrationAction, "added");
-  if ("error" in made) return made.error;
-  const saved = await finishPasskeyRegistrationAction(made.wire);
-  return saved.ok ? null : (saved.error ?? "That didn't work.");
+  if ("error" in made) return { ok: false, error: made.error };
+  return finishPasskeyRegistrationAction(made.wire);
 }
 
 export function AddPasskeyButton({
@@ -167,8 +206,7 @@ export function AddPasskeyButton({
   label?: string;
 }) {
   const router = useRouter();
-  const [pending, startTransition] = useTransition();
-  const [error, setError] = useState<string | null>(null);
+  const { pending, error, act } = useAct();
 
   return (
     <span className="inline-flex flex-col items-start gap-1">
@@ -176,11 +214,10 @@ export function AddPasskeyButton({
         type="button"
         disabled={pending}
         onClick={() =>
-          startTransition(async () => {
-            setError(null);
-            const failure = await enrolPasskey();
-            if (failure) setError(failure);
-            else router.refresh();
+          act(async () => {
+            const res = await enrolPasskey();
+            if (res.ok) router.refresh();
+            return res;
           })
         }
         className={
@@ -190,7 +227,7 @@ export function AddPasskeyButton({
       >
         {pending ? "Waiting for your device…" : label}
       </button>
-      {error && <span className="text-xs font-semibold text-no-deep">{error}</span>}
+      <ActError error={error} />
     </span>
   );
 }
@@ -205,8 +242,7 @@ export interface PasskeySummary {
 /** Shown on your own member page: the keys that can sign in as you. */
 export function PasskeyManager({ passkeys }: { passkeys: PasskeySummary[] }) {
   const router = useRouter();
-  const [pending, startTransition] = useTransition();
-  const [error, setError] = useState<string | null>(null);
+  const { pending, error, act } = useAct();
 
   return (
     <div>
@@ -234,11 +270,10 @@ export function PasskeyManager({ passkeys }: { passkeys: PasskeySummary[] }) {
                 type="button"
                 disabled={pending}
                 onClick={() =>
-                  startTransition(async () => {
-                    setError(null);
+                  act(async () => {
                     const res = await removePasskeyAction(passkey.id);
-                    if (!res.ok) setError(res.error ?? "That didn't work.");
-                    else router.refresh();
+                    if (res.ok) router.refresh();
+                    return res;
                   })
                 }
                 className="rounded-md px-2 py-1 text-xs text-soft hover:underline disabled:opacity-40"

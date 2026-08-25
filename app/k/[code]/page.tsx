@@ -1,7 +1,8 @@
-import { RedeemRekey, SignInForKey } from "@/components/rekey";
-import { SignedOutCard, SignedOutNotice } from "@/components/signed-out-card";
+import { RedeemRekey } from "@/components/rekey";
+import { deadLink, SignedOutCard, SignedOutNotice } from "@/components/signed-out-card";
+import { SignInKeepingSecret } from "@/components/take-key";
 import { findRekey, getMember, getTrip } from "@/lib/data";
-import { type RekeyState, rekeyState } from "@/lib/rekeys";
+import { rekeyState } from "@/lib/rekeys";
 import { routes, signInThen } from "@/lib/routes";
 import { currentMember } from "@/lib/session";
 import { placeOf } from "@/lib/trips";
@@ -15,7 +16,11 @@ export default async function RekeyPage({ params }: { params: Promise<{ code: st
   const [row, me] = await Promise.all([findRekey(code), currentMember()]);
   const state = row && rekeyState(row, new Date());
   if (!row || state !== "live") {
-    return <SignedOutNotice eyebrow={EYEBROW}>{deadLink(state || null)}</SignedOutNotice>;
+    return (
+      <SignedOutNotice eyebrow={EYEBROW}>
+        {deadLink(state || null, "link", "Ask for a fresh one.")}
+      </SignedOutNotice>
+    );
   }
   const [forMember, trip] = await Promise.all([getMember(row.forMemberId), getTrip(row.tripId)]);
   if (!forMember || !trip)
@@ -30,7 +35,13 @@ export default async function RekeyPage({ params }: { params: Promise<{ code: st
           <span className="font-semibold text-ink">{forMember.name}</span>. Sign in as them and it
           opens.
         </p>
-        <SignInForKey code={code} href={signInThen(routes.rekey(code))} />
+        <SignInKeepingSecret
+          code={code}
+          href={signInThen(routes.rekey(code))}
+          className="mt-4 block w-full rounded-md bg-felt py-3 text-center font-semibold text-white hover:bg-felt-deep"
+        >
+          Sign in
+        </SignInKeepingSecret>
       </SignedOutCard>
     );
   }
@@ -49,10 +60,4 @@ export default async function RekeyPage({ params }: { params: Promise<{ code: st
       <RedeemRekey code={code} />
     </SignedOutCard>
   );
-}
-
-function deadLink(state: RekeyState | null): string {
-  if (state === "used") return "That link has already been used.";
-  if (state === "expired") return "That link has expired. Ask for a fresh one.";
-  return "That link isn't valid.";
 }

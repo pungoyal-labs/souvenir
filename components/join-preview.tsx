@@ -9,16 +9,15 @@ export function JoinPreview({ code, sealed }: { code: string; sealed: string | n
   const [preview, setPreview] = useState<{ name: string; questions: string[] } | null>(null);
   useEffect(() => {
     const secret = secretFromFragment(window.location.hash);
-    if (!secret || !sealed) return;
+    if (!secret) return;
     stashSecret(code);
+    if (!sealed) return;
     let cancelled = false;
-    unwrapPreview(secret, sealed)
-      .then((p) => {
-        if (!cancelled) setPreview(p);
-      })
-      .catch(() => {
-        // A preview that will not open is no preview.
-      });
+    // A preview that will not open is no preview.
+    unwrapPreview(secret, sealed).then(
+      (p) => !cancelled && setPreview(p),
+      () => {},
+    );
     return () => {
       cancelled = true;
     };
@@ -40,14 +39,5 @@ export function JoinPreview({ code, sealed }: { code: string; sealed: string | n
         </ul>
       )}
     </>
-  );
-}
-
-/** The "sign in" on the join page: parks the fragment first. */
-export function SignInToJoin({ code, href }: { code: string; href: string }) {
-  return (
-    <a href={href} onClick={() => stashSecret(code)} className="text-felt hover:underline">
-      Sign in
-    </a>
   );
 }

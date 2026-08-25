@@ -3,7 +3,6 @@
 // sealing — `Market` and `LedgerRow` are the schema's own — so lib/stats carries over unchanged.
 
 import { exposure, type Position, type Side } from "./engine.ts";
-import type { PhraseKeep } from "./events.ts";
 import type { SavedPhrase } from "./phrases.ts";
 import { type CandidateMarket, type MarketHistory, recommend } from "./recommend.ts";
 import {
@@ -11,9 +10,10 @@ import {
   type CommentState,
   type MarketState,
   marketRows,
+  netByMember,
   type TripState,
 } from "./replay.ts";
-import type { LedgerRow, Market } from "./rows.ts";
+import { DEPARTED_NAME, type LedgerRow, type Market } from "./rows.ts";
 import {
   type BillKind,
   type Currency,
@@ -47,8 +47,6 @@ export interface RosterMember extends Person {
 }
 
 type People = Map<string, Person>;
-
-export const DEPARTED_NAME = "Departed member";
 
 const departed = (id: string): Person => ({ id, name: DEPARTED_NAME, avatarUpdatedAt: null });
 const who = (people: People, id: string): Person => people.get(id) ?? departed(id);
@@ -97,8 +95,9 @@ function toMarket(m: MarketState, tripId: string): Market {
 
 const settled = (state: TripState) =>
   [...state.markets.values()].filter((m) => m.status !== "open");
-const reactionsOn = (state: TripState, marketId: string) =>
-  state.reactions.filter((r) => r.marketId === marketId);
+/** Who reacted one way to a prediction, oldest first. */
+const reactorIds = (state: TripState, marketId: string, kind: "upvote" | "watch") =>
+  state.reactions.flatMap((r) => (r.marketId === marketId && r.kind === kind ? [r.memberId] : []));
 
 // ---------- one prediction ----------
 
@@ -146,7 +145,6 @@ export function marketView(
   }
   const mine = m.positions.get(viewerId);
   const myStakeC = mine ? exposure(mine) : 0;
-  const reactions = reactionsOn(state, m.id);
   return {
     market: toMarket(m, tripId),
     creator: who(people, m.creatorId),
@@ -155,8 +153,8 @@ export function marketView(
     participants: participantsOf(m.positions, people),
     mySide: mine && myStakeC > 0 ? sideOf(mine) : null,
     myStakeC,
-    upvotes: reactions.filter((r) => r.kind === "upvote").length,
-    watchers: reactions.filter((r) => r.kind === "watch").length,
+    upvotes: reactorIds(state, m.id, "upvote").length,
+    watchers: reactorIds(state, m.id, "watch").length,
     commentCount: state.comments.filter((c) => c.marketId === m.id).length,
   };
 }
@@ -185,27 +183,20 @@ function forYou(
   viewerId: string,
   now: Date,
 ): MarketView[] {
-  const candidates: CandidateMarket[] = open.map((v) => {
-    const reacted = reactionsOn(state, v.market.id);
-    return {
-      id: v.market.id,
-      creatorId: v.market.creatorId,
-      question: v.market.question,
-      createdAt: v.market.createdAt,
-      yesPoolC: v.yesPoolC,
-      noPoolC: v.noPoolC,
-      stakes: v.participants.map((p) => ({
-        memberId: p.member.id,
-        side: p.side,
-        stakeC: p.stakeC,
-      })),
-      actions: marketRows(state, v.market.id)
-        .filter((r) => r.kind === "bet" || r.kind === "switch")
-        .map((r) => ({ memberId: r.memberId, at: r.at })),
-      upvoterIds: reacted.filter((r) => r.kind === "upvote").map((r) => r.memberId),
-      watcherIds: reacted.filter((r) => r.kind === "watch").map((r) => r.memberId),
-    };
-  });
+  const candidates: CandidateMarket[] = open.map((v) => ({
+    id: v.market.id,
+    creatorId: v.market.creatorId,
+    question: v.market.question,
+    createdAt: v.market.createdAt,
+    yesPoolC: v.yesPoolC,
+    noPoolC: v.noPoolC,
+    stakes: v.participants.map((p) => ({ memberId: p.member.id, side: p.side, stakeC: p.stakeC })),
+    actions: marketRows(state, v.market.id)
+      .filter((r) => r.kind === "bet" || r.kind === "switch")
+      .map((r) => ({ memberId: r.memberId, at: r.at })),
+    upvoterIds: reactorIds(state, v.market.id, "upvote"),
+    watcherIds: reactorIds(state, v.market.id, "watch"),
+  }));
   const history: MarketHistory[] = all.map((m) => ({
     id: m.id,
     creatorId: m.creatorId,
@@ -312,13 +303,14 @@ export function leaderboard(
   roster: readonly RosterMember[],
   minResolved: number,
 ): { ranked: MemberStats[]; unranked: MemberStats[] } {
+  const net = netByMember(state);
   const stats = new Map<string, MemberStats>(
     roster.map((m) => [
       m.id,
       {
         member: m,
         role: m.role,
-        netC: netOf(state, m.id),
+        netC: net.get(m.id) ?? 0,
         committedC: 0,
         resolvedCount: 0,
         wins: 0,
@@ -445,12 +437,7 @@ export function reactors(
   marketId: string,
   kind: "upvote" | "watch",
 ): Person[] {
-  return known(
-    people,
-    reactionsOn(state, marketId)
-      .filter((r) => r.kind === kind)
-      .map((r) => r.memberId),
-  );
+  return known(people, reactorIds(state, marketId, kind));
 }
 
 /** Distinct members who have opened this prediction. */
@@ -818,40 +805,4 @@ export function phrasebook(state: TripState): SavedPhrase[] {
       tag: p.tag,
       keptBy: p.memberId,
     }));
-}
-
-/** What a trip still held in the clear from before sealing. */
-export interface Leftovers {
-  name: string | null;
-  phrases: SavedPhrase[];
-}
-
-/**
- * The events an organiser's phone appends to put pre-sealing phrases on the
- * record, each under its original keeper, and every leftover id the server can
- * then drop — those already on the record included.
- */
-export function resealPlan(
-  leftovers: Leftovers,
-  state: TripState,
-): { keeps: PhraseKeep[]; phraseIds: string[] } {
-  const keeps: PhraseKeep[] = [];
-  for (const p of leftovers.phrases) {
-    if (state.phrases.has(p.id)) continue;
-    keeps.push({
-      t: "phrase.keep",
-      id: p.id,
-      slug: p.slug,
-      name: p.slug,
-      side: p.side,
-      heard: p.heard,
-      said: p.said,
-      ...(p.roman ? { roman: p.roman } : {}),
-      ...(p.literal ? { literal: p.literal } : {}),
-      language: p.language,
-      tag: p.tag,
-      keeper: p.keptBy,
-    });
-  }
-  return { keeps, phraseIds: leftovers.phrases.map((p) => p.id) };
 }

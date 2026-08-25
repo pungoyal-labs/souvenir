@@ -2,10 +2,10 @@
 // See docs/private-trips.md §2–§4.
 //
 // The keyring is one JSON object per member holding every trip key they have
-// ever been handed, by trip and by epoch, plus the secrets of links they
-// minted (so the members page can show a link again). It travels as a blob
-// under the member's keyring key — to IndexedDB on the phone, and to the
-// `keyrings` table, which sees only its size.
+// ever been handed, by trip and by epoch, the secrets of links they minted (so
+// the members page can show a link again), and their member key. It travels
+// as a blob under a key the server never sees — to IndexedDB on the phone, and
+// to `keyring_wraps` under each passkey's PRF secret.
 //
 // A link's secret rides in the URL fragment, which the browser never sends.
 // The server stores what the link carries wrapped under that secret, so the
@@ -27,7 +27,7 @@ import {
   wrapForLink,
 } from "./crypto.ts";
 
-export const KEYRING_VERSION = 1;
+const KEYRING_VERSION = 1;
 
 /** Which purpose a keyring blob is sealed for — never the same as any link's. */
 const KEYRING_PURPOSE = "keyring";
@@ -36,13 +36,17 @@ export interface Keyring {
   v: typeof KEYRING_VERSION;
   /** tripId → epoch (as a string key) → raw AES key, base64url. */
   trips: Record<string, Record<string, string>>;
-  /** invite / rekey / device link code → its secret, base64url. */
+  /** invite / rekey link code → its secret, base64url. */
   links: Record<string, string>;
-  /** The member's long-term key, once Phase 3 gives them one. */
+  /** The member's long-term key: the private half. The public half is announced in the log. */
   mk?: JsonWebKey;
 }
 
 export class KeyringError extends Error {}
+
+function check32(bytes: Uint8Array, what: string): void {
+  if (bytes.length !== 32) throw new KeyringError(`${what} is not 256 bits`);
+}
 
 export function emptyKeyring(): Keyring {
   return { v: KEYRING_VERSION, trips: {}, links: {} };
@@ -57,7 +61,8 @@ export function mergeKeyrings(a: Keyring, b: Keyring): Keyring {
     }
   }
   const merged: Keyring = { v: KEYRING_VERSION, trips, links: { ...a.links, ...b.links } };
-  const mk = b.mk ?? a.mk;
+  // The member key already announced in a log is the one to keep: the first, not the newest.
+  const mk = a.mk ?? b.mk;
   if (mk) merged.mk = mk;
   return merged;
 }
@@ -67,7 +72,7 @@ export function mergeKeyrings(a: Keyring, b: Keyring): Keyring {
 /** A copy of the keyring with one more trip key in it. Never mutates. */
 export function withTripKey(kr: Keyring, tripId: string, epoch: number, raw: Uint8Array): Keyring {
   if (!Number.isInteger(epoch) || epoch < 0) throw new KeyringError("bad epoch");
-  if (raw.length !== 32) throw new KeyringError("trip key is not 256 bits");
+  check32(raw, "trip key");
   return {
     ...kr,
     trips: {
@@ -77,21 +82,10 @@ export function withTripKey(kr: Keyring, tripId: string, epoch: number, raw: Uin
   };
 }
 
-export function withoutTrip(kr: Keyring, tripId: string): Keyring {
-  const { [tripId]: _dropped, ...trips } = kr.trips;
-  return { ...kr, trips };
-}
-
 /** The raw key for one epoch of a trip, or null if this keyring never had it. */
 export function tripKeyOf(kr: Keyring, tripId: string, epoch: number): Uint8Array | null {
   const raw = kr.trips[tripId]?.[String(epoch)];
   return raw ? fromBase64Url(raw) : null;
-}
-
-/** The newest epoch this keyring holds for a trip, or null if none. */
-export function latestEpoch(kr: Keyring, tripId: string): number | null {
-  const epochs = Object.keys(kr.trips[tripId] ?? {}).map(Number);
-  return epochs.length ? Math.max(...epochs) : null;
 }
 
 /** True when the keyring can read the trip at the epoch the server says it is on. */
@@ -108,13 +102,8 @@ export async function tripCryptoKey(kr: Keyring, tripId: string, epoch: number) 
 // --- link secrets -------------------------------------------------------------
 
 export function withLinkSecret(kr: Keyring, code: string, secret: Uint8Array): Keyring {
-  if (secret.length !== 32) throw new KeyringError("link secret is not 256 bits");
+  check32(secret, "link secret");
   return { ...kr, links: { ...kr.links, [code]: toBase64Url(secret) } };
-}
-
-export function withoutLink(kr: Keyring, code: string): Keyring {
-  const { [code]: _dropped, ...links } = kr.links;
-  return { ...kr, links };
 }
 
 export function linkSecretOf(kr: Keyring, code: string): Uint8Array | null {
@@ -124,37 +113,28 @@ export function linkSecretOf(kr: Keyring, code: string): Uint8Array | null {
 
 // --- the blob -----------------------------------------------------------------
 
+const isRecord = (v: unknown): v is Record<string, unknown> =>
+  typeof v === "object" && v !== null && !Array.isArray(v);
+const isStringMap = (v: unknown): v is Record<string, string> =>
+  isRecord(v) && Object.values(v).every((x) => typeof x === "string");
+const isTrips = (v: unknown): v is Keyring["trips"] =>
+  isRecord(v) && Object.values(v).every(isStringMap);
+const isStringList = (v: unknown): v is string[] =>
+  Array.isArray(v) && v.every((x) => typeof x === "string");
+
 /** Validate a parsed keyring: shape only, so a bad blob fails loudly, not later. */
 export function parseKeyring(value: unknown): Keyring {
-  if (typeof value !== "object" || value === null) throw new KeyringError("not a keyring");
-  const kr = value as Record<string, unknown>;
-  if (kr.v !== KEYRING_VERSION) throw new KeyringError("unknown keyring version");
-  if (!isStringMapOfMaps(kr.trips)) throw new KeyringError("bad trips");
-  if (!isStringMap(kr.links)) throw new KeyringError("bad links");
-  const out: Keyring = { v: KEYRING_VERSION, trips: kr.trips, links: kr.links };
-  if (kr.mk !== undefined) {
-    if (typeof kr.mk !== "object" || kr.mk === null) throw new KeyringError("bad mk");
-    out.mk = kr.mk as JsonWebKey;
+  if (!isRecord(value)) throw new KeyringError("not a keyring");
+  if (value.v !== KEYRING_VERSION) throw new KeyringError("unknown keyring version");
+  const { trips, links, mk } = value;
+  if (!isTrips(trips)) throw new KeyringError("bad trips");
+  if (!isStringMap(links)) throw new KeyringError("bad links");
+  const out: Keyring = { v: KEYRING_VERSION, trips, links };
+  if (mk !== undefined) {
+    if (!isRecord(mk)) throw new KeyringError("bad mk");
+    out.mk = mk as JsonWebKey;
   }
   return out;
-}
-
-function isStringMap(v: unknown): v is Record<string, string> {
-  return (
-    typeof v === "object" &&
-    v !== null &&
-    !Array.isArray(v) &&
-    Object.values(v).every((x) => typeof x === "string")
-  );
-}
-
-function isStringMapOfMaps(v: unknown): v is Record<string, Record<string, string>> {
-  return (
-    typeof v === "object" &&
-    v !== null &&
-    !Array.isArray(v) &&
-    Object.values(v).every((inner) => isStringMap(inner))
-  );
 }
 
 export function encodeKeyring(kr: Keyring): Uint8Array {
@@ -171,7 +151,7 @@ export function decodeKeyring(bytes: Uint8Array): Keyring {
   return parseKeyring(parsed);
 }
 
-/** The keyring under the keyring key: what goes to IndexedDB and to `keyrings`. */
+/** The keyring under a keyring key: what goes to IndexedDB and to `keyring_wraps`. */
 export function sealKeyring(kk: CryptoKey, kr: Keyring): Promise<string> {
   return sealBlob(kk, KEYRING_PURPOSE, encodeKeyring(kr));
 }
@@ -182,21 +162,20 @@ export async function openKeyring(kk: CryptoKey, blob: string): Promise<Keyring>
 
 // --- links --------------------------------------------------------------------
 
-/** What a link's fragment holds: a fresh secret, encoded for a URL. */
+/** What a link's fragment holds: a fresh secret. */
 export function newLinkSecret(): Uint8Array {
   return newSecret();
 }
 
 /** `https://…/join/CODE` → `https://…/join/CODE#<secret>`. */
 export function linkWithSecret(url: string, secret: Uint8Array): string {
-  if (secret.length !== 32) throw new KeyringError("link secret is not 256 bits");
+  check32(secret, "link secret");
   return `${url}#${toBase64Url(secret)}`;
 }
 
 /**
- * The secret out of `location.hash` (with or without its `#`), or null when
- * the link arrived bare — copied without its fragment, or minted before this
- * existed. Null is a keyless seat, not an error.
+ * The secret out of `location.hash` (with or without its `#`), or null when the link arrived
+ * bare — copied without its fragment. Null is a keyless seat, not an error.
  */
 export function secretFromFragment(hash: string): Uint8Array | null {
   const text = hash.startsWith("#") ? hash.slice(1) : hash;
@@ -212,23 +191,14 @@ export function secretFromFragment(hash: string): Uint8Array | null {
 
 /** A trip key, wrapped for a link of one kind. The column value. */
 export async function wrapTripKey(secret: Uint8Array, purpose: LinkPurpose, raw: Uint8Array) {
-  if (raw.length !== 32) throw new KeyringError("trip key is not 256 bits");
+  check32(raw, "trip key");
   return wrapForLink(secret, purpose, raw);
 }
 
 export async function unwrapTripKey(secret: Uint8Array, purpose: LinkPurpose, blob: string) {
   const raw = await unwrapFromLink(secret, purpose, blob);
-  if (raw.length !== 32) throw new KeyringError("trip key is not 256 bits");
+  check32(raw, "trip key");
   return raw;
-}
-
-/** A whole keyring, wrapped for a device link: how a member's other phone gets everything. */
-export function wrapKeyringForDevice(secret: Uint8Array, kr: Keyring): Promise<string> {
-  return wrapForLink(secret, "device", encodeKeyring(kr));
-}
-
-export async function unwrapKeyringFromDevice(secret: Uint8Array, blob: string) {
-  return decodeKeyring(await unwrapFromLink(secret, "device", blob));
 }
 
 /** The join page's peek at the table, wrapped for the link that carries it. */
@@ -243,17 +213,16 @@ export function wrapPreview(secret: Uint8Array, preview: InvitePreview): Promise
 }
 
 export async function unwrapPreview(secret: Uint8Array, blob: string): Promise<InvitePreview> {
-  const parsed: unknown = JSON.parse(fromUtf8(await unwrapFromLink(secret, "preview", blob)));
-  if (typeof parsed !== "object" || parsed === null) throw new KeyringError("bad preview");
-  const p = parsed as Record<string, unknown>;
-  if (typeof p.name !== "string" || !isStringList(p.names) || !isStringList(p.questions)) {
+  const p: unknown = JSON.parse(fromUtf8(await unwrapFromLink(secret, "preview", blob)));
+  if (
+    !isRecord(p) ||
+    typeof p.name !== "string" ||
+    !isStringList(p.names) ||
+    !isStringList(p.questions)
+  ) {
     throw new KeyringError("bad preview");
   }
   return { name: p.name, names: p.names, questions: p.questions };
-}
-
-function isStringList(v: unknown): v is string[] {
-  return Array.isArray(v) && v.every((x) => typeof x === "string");
 }
 
 // --- the trip's name ------------------------------------------------------------
@@ -275,4 +244,17 @@ export const PRF_SALT = utf8("chiang-pai keyring v1");
 /** The key a passkey's PRF output opens this member's keyring backup with. */
 export function prfKeyringKey(prf: Uint8Array): Promise<CryptoKey> {
   return deriveKey(prf, "keyring:prf");
+}
+
+// --- the member key ------------------------------------------------------------
+
+export function withMemberKey(kr: Keyring, privateKey: JsonWebKey): Keyring {
+  return { ...kr, mk: privateKey };
+}
+
+/** The public half of the keyring's member key, as `member.hello` announces it; null without one. */
+export function memberPublicKey(kr: Keyring): JsonWebKey | null {
+  if (!kr.mk) return null;
+  const { d: _d, ...pub } = kr.mk;
+  return { ...pub, key_ops: [] };
 }

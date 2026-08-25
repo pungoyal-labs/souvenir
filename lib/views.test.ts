@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
 import type { EventPayload, OpenEvent } from "./events.ts";
 import { type ReplayConfig, replayTrip } from "./replay.ts";
+import { DEPARTED_NAME } from "./rows.ts";
 import {
   billComments,
   billError,
   billsOverview,
   commentError,
-  DEPARTED_NAME,
   draftError,
   inbox,
   leaderboard,
@@ -23,7 +23,6 @@ import {
   type RosterMember,
   reactors,
   recentActivity,
-  resealPlan,
   seenBy,
   shouldRecordView,
   tripRecap,
@@ -420,44 +419,5 @@ describe("phrasebook", () => {
     expect(book.map((p) => p.id)).toEqual(["p3", "p1"]);
     expect(book[1]).toMatchObject({ keptBy: "a", roman: "sawasdee", language: "Thai" });
     expect("literal" in book[1]).toBe(false);
-  });
-});
-
-describe("resealPlan", () => {
-  it("keeps every phrase not yet on the record under its keeper, and names every id to drop", () => {
-    const p = (id: string) => ({
-      id,
-      slug: id,
-      side: "us" as const,
-      heard: "hi",
-      said: "สวัสดี",
-      language: "Thai",
-      tag: "th-TH",
-      keptBy: "b",
-    });
-    const state = replayTrip(
-      config,
-      log([["a", { ...p("p1"), t: "phrase.keep", name: "p1", keeper: "b" }]]),
-    );
-    const plan = resealPlan(
-      { name: "Pai", phrases: [p("p1"), { ...p("p2"), roman: "sa" }] },
-      state,
-    );
-    expect(plan.keeps).toEqual([
-      {
-        t: "phrase.keep",
-        id: "p2",
-        slug: "p2",
-        name: "p2",
-        side: "us",
-        heard: "hi",
-        said: "สวัสดี",
-        roman: "sa",
-        language: "Thai",
-        tag: "th-TH",
-        keeper: "b",
-      },
-    ]);
-    expect(plan.phraseIds).toEqual(["p1", "p2"]);
   });
 });

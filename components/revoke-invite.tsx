@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { revokeInviteAction } from "@/app/actions";
+import { ActError } from "./use-act";
 
 /** Kill a link that hasn't been used — a misdirected invite shouldn't linger a week. */
 export function RevokeInvite({ code }: { code: string }) {
@@ -27,7 +28,7 @@ export function RevokeInvite({ code }: { code: string }) {
       >
         Revoke
       </button>
-      {error && <span className="text-xs font-semibold text-no-deep">{error}</span>}
+      <ActError error={error} />
     </span>
   );
 }

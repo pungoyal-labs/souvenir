@@ -16,13 +16,13 @@ import {
   events,
   type InviteRow,
   invites,
+  keyGrants,
   keyringWraps,
   type Member,
   type MembershipRole,
   type MembershipRow,
   members,
   memberships,
-  phrases,
   type RecoveryRow,
   type RekeyRow,
   recoveries,
@@ -33,7 +33,6 @@ import {
 import { normalizeEmail } from "./email.ts";
 import { expiresAtFrom, inviteState, newInviteCode } from "./invites.ts";
 import { logger } from "./logger.ts";
-import type { SavedPhrase } from "./phrases.ts";
 import {
   newRecoveryCode,
   recoveryExpiresAt,
@@ -47,11 +46,9 @@ import {
   rekeyExpiresAt,
   rekeyState,
 } from "./rekeys.ts";
+import { DEPARTED_NAME } from "./rows.ts";
 import { TripError, type TripInput, tripConfig } from "./trips.ts";
-import type { Leftovers } from "./views.ts";
 import type { VerifiedRegistration } from "./webauthn.ts";
-
-export type { SavedPhrase };
 
 /** User-facing failures (closed market, not on the trip, …). */
 export class DataError extends Error {}
@@ -59,14 +56,20 @@ export class DataError extends Error {}
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
 const STALE_KEY = "This phone's key is out of date. Reload and try again.";
+const GARBLED_KEY = "That key didn't come through right. Reload and try again.";
+const LAST_ORGANISER = "Someone has to be able to invite. Make another member an organiser first.";
 
-/** A wrap is opaque here, but it has a shape, and a size that is not a payload. */
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
+/** A sealed blob is opaque here, but it has a shape (`v1` and `parts` base64url pieces) and a size that is not a payload. */
+function checkBlob(blob: string, parts: number, maxBytes: number, message: string): void {
+  const shape = new RegExp(`^v1(\\.[A-Za-z0-9_-]+){${parts}}$`);
+  if (blob.length > maxBytes || !shape.test(blob)) throw new DataError(message);
+}
+
+/** A key or a name under a link's secret or the trip key: `v1.<iv>.<ct>`. */
 function checkWrapped(blob: string): void {
-  if (!/^v1\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(blob) || blob.length > 8192) {
-    throw new DataError("That key didn't come through right. Reload and try again.");
-  }
+  checkBlob(blob, 2, 8192, GARBLED_KEY);
 }
 
 function checkEpoch(trip: { keyEpoch: number | null }, epoch: number): void {
@@ -159,13 +162,13 @@ export async function createTrip(
   input: TripInput & { id: string; nameEnc: string },
 ): Promise<Trip> {
   const config = configOf(input);
-  if (!UUID.test(input.id)) throw new DataError("That didn't come through right. Try again.");
-  checkWrapped(input.nameEnc);
-  const id = input.id;
+  const { id, nameEnc } = input;
+  if (!UUID.test(id)) throw new DataError("That didn't come through right. Try again.");
+  checkWrapped(nameEnc);
   const trip = await db.transaction(async (tx) => {
     const [created] = await tx
       .insert(trips)
-      .values({ id, createdBy: creatorId, keyEpoch: 0, nameEnc: input.nameEnc, ...config })
+      .values({ id, createdBy: creatorId, keyEpoch: 0, nameEnc, ...config })
       .returning();
     await tx.insert(memberships).values({ tripId: id, memberId: creatorId, role: "organiser" });
     return created;
@@ -195,12 +198,7 @@ export async function updateTrip(
   if (input.nameEnc) checkWrapped(input.nameEnc);
   const [updated] = await db
     .update(trips)
-    .set({
-      startsOn,
-      endsOn,
-      maxStakePies,
-      ...(input.nameEnc ? { nameEnc: input.nameEnc, name: null } : {}),
-    })
+    .set({ startsOn, endsOn, maxStakePies, ...(input.nameEnc ? { nameEnc: input.nameEnc } : {}) })
     .where(eq(trips.id, tripId))
     .returning();
   logger.info({ tripId, actorId }, "trip updated");
@@ -229,9 +227,25 @@ async function membersById(tripId: string): Promise<Map<string, Member>> {
 }
 
 /**
- * Never down to no organiser: nobody could then invite or recover. Rows are locked for the
- * check, so two people demoting each other at once cannot both pass it.
+ * Never down to no organiser: nobody could then invite or recover. The organiser rows are locked
+ * for the check, so two people stepping each other down at once cannot both pass it.
  */
+async function requireAnotherOrganiser(
+  tx: Tx,
+  tripId: string,
+  memberId: string,
+  message = LAST_ORGANISER,
+): Promise<void> {
+  const organisers = await tx
+    .select({ memberId: memberships.memberId })
+    .from(memberships)
+    .where(and(eq(memberships.tripId, tripId), eq(memberships.role, "organiser")))
+    .for("update");
+  if (organisers.length <= 1 && organisers.some((o) => o.memberId === memberId)) {
+    throw new DataError(message);
+  }
+}
+
 export async function setRole(
   actorId: string,
   tripId: string,
@@ -240,20 +254,7 @@ export async function setRole(
 ): Promise<void> {
   await requireOrganiser(tripId, actorId);
   await db.transaction(async (tx) => {
-    const organisers = await tx
-      .select({ memberId: memberships.memberId })
-      .from(memberships)
-      .where(and(eq(memberships.tripId, tripId), eq(memberships.role, "organiser")))
-      .for("update");
-    if (
-      role === "member" &&
-      organisers.length <= 1 &&
-      organisers.some((o) => o.memberId === memberId)
-    ) {
-      throw new DataError(
-        "Someone has to be able to invite. Make another member an organiser first.",
-      );
-    }
+    if (role === "member") await requireAnotherOrganiser(tx, tripId, memberId);
     const updated = await tx
       .update(memberships)
       .set({ role })
@@ -262,6 +263,135 @@ export async function setRole(
     if (updated.length === 0) throw new DataError("No such member on this trip.");
     logger.warn({ actorId, tripId, memberId, role }, "role changed");
   });
+}
+
+/**
+ * A seat goes: the member's live key links with it, and the trip's key is due a rotation. The
+ * last organiser may only go when nobody is left behind.
+ */
+async function dropSeat(
+  tx: Tx,
+  tripId: string,
+  memberId: string,
+  lastOrganiserMessage = LAST_ORGANISER,
+): Promise<void> {
+  const [others] = await tx
+    .select({ n: sql<number>`count(*)::int` })
+    .from(memberships)
+    .where(and(eq(memberships.tripId, tripId), ne(memberships.memberId, memberId)));
+  if (others.n > 0) await requireAnotherOrganiser(tx, tripId, memberId, lastOrganiserMessage);
+  const gone = await tx
+    .delete(memberships)
+    .where(and(eq(memberships.tripId, tripId), eq(memberships.memberId, memberId)))
+    .returning({ memberId: memberships.memberId });
+  if (gone.length === 0) throw new DataError("No such member on this trip.");
+  await tx.delete(rekeys).where(and(eq(rekeys.tripId, tripId), eq(rekeys.forMemberId, memberId)));
+  await tx
+    .delete(recoveries)
+    .where(and(eq(recoveries.tripId, tripId), eq(recoveries.memberId, memberId)));
+  await tx
+    .update(trips)
+    .set({ keyStaleSince: sql`coalesce(${trips.keyStaleSince}, now())` })
+    .where(eq(trips.id, tripId));
+}
+
+export async function removeMember(actorId: string, tripId: string, memberId: string) {
+  await requireOrganiser(tripId, actorId);
+  if (actorId === memberId) throw new DataError("Leave the trip instead.");
+  await db.transaction((tx) => dropSeat(tx, tripId, memberId));
+  logger.warn({ actorId, tripId, memberId }, "member removed");
+}
+
+export async function leaveTrip(memberId: string, tripId: string): Promise<void> {
+  await requireMembership(tripId, memberId);
+  await db.transaction((tx) => dropSeat(tx, tripId, memberId));
+  logger.warn({ tripId, memberId }, "member left");
+}
+
+// ---------- key rotation ----------
+// The organiser's phone makes TK[e+1], wraps it to every seat's member key, and hands the lot
+// over in one call; the server accepts only a complete set for the next epoch. Live invites and
+// key links carried TK[e] and go with it.
+
+export interface KeyGrantInput {
+  memberId: string;
+  wrapped: string;
+}
+
+export async function bumpEpoch(
+  actorId: string,
+  tripId: string,
+  input: { epoch: number; nameEnc: string; grants: KeyGrantInput[] },
+): Promise<void> {
+  await requireOrganiser(tripId, actorId);
+  checkWrapped(input.nameEnc);
+  for (const g of input.grants) checkBlob(g.wrapped, 3, 8192, GARBLED_KEY);
+  await db.transaction(async (tx) => {
+    const [trip] = await tx.select().from(trips).where(eq(trips.id, tripId)).for("update");
+    if (!trip || trip.keyEpoch === null || input.epoch !== trip.keyEpoch + 1) {
+      throw new DataError(STALE_KEY);
+    }
+    const seats = await tx
+      .select({ memberId: memberships.memberId })
+      .from(memberships)
+      .where(eq(memberships.tripId, tripId));
+    const granted = new Set(input.grants.map((g) => g.memberId));
+    const missing = seats.filter((s) => s.memberId !== actorId && !granted.has(s.memberId));
+    if (missing.length > 0)
+      throw new DataError("Somebody on the trip would be left without a key.");
+    const seatIds = new Set(seats.map((s) => s.memberId));
+    await tx.insert(keyGrants).values(
+      input.grants
+        .filter((g) => seatIds.has(g.memberId))
+        .map((g) => ({
+          id: randomUUID(),
+          tripId,
+          epoch: input.epoch,
+          toMemberId: g.memberId,
+          fromMemberId: actorId,
+          wrapped: g.wrapped,
+        })),
+    );
+    await tx
+      .update(trips)
+      .set({ keyEpoch: input.epoch, nameEnc: input.nameEnc, keyStaleSince: null })
+      .where(eq(trips.id, tripId));
+    await tx.delete(invites).where(eq(invites.tripId, tripId));
+    await tx.delete(rekeys).where(and(eq(rekeys.tripId, tripId), isNull(rekeys.usedAt)));
+  });
+  logger.warn({ actorId, tripId, epoch: input.epoch, grants: input.grants.length }, "key rotated");
+}
+
+export interface KeyGrant {
+  id: string;
+  epoch: number;
+  wrapped: string;
+}
+
+/** The newest grant for this member on this trip, for the trip's current epoch. */
+export async function myGrant(memberId: string, tripId: string): Promise<KeyGrant | null> {
+  const { trip } = await requireMembership(tripId, memberId);
+  if (trip.keyEpoch === null) return null;
+  const [row] = await db
+    .select({ id: keyGrants.id, epoch: keyGrants.epoch, wrapped: keyGrants.wrapped })
+    .from(keyGrants)
+    .where(
+      and(
+        eq(keyGrants.tripId, tripId),
+        eq(keyGrants.toMemberId, memberId),
+        eq(keyGrants.epoch, trip.keyEpoch),
+      ),
+    )
+    .orderBy(desc(keyGrants.at))
+    .limit(1);
+  return row ?? null;
+}
+
+export async function takeGrant(memberId: string, id: string): Promise<void> {
+  await db
+    .update(keyGrants)
+    .set({ takenAt: new Date() })
+    .where(and(eq(keyGrants.id, id), eq(keyGrants.toMemberId, memberId)));
 }
 
 // ---------- accounts ----------
@@ -378,44 +508,34 @@ export async function setName(memberId: string, raw: string): Promise<void> {
 
 /**
  * The row stays — the ledger is append-only and a payout to a departed member is still a payout —
- * but everything that identified them goes in one transaction. Vacating every seat at once means
- * the setRole rule applies to each trip they organise, with the rows locked for the count.
+ * but everything that identified them goes in one transaction, every seat vacated as a removal
+ * would be, so no trip is left without an organiser or with a key they still hold.
  */
 export async function deleteAccount(memberId: string): Promise<void> {
   await db.transaction(async (tx) => {
     const seats = await tx
-      .select()
+      .select({ tripId: memberships.tripId })
       .from(memberships)
       .where(eq(memberships.memberId, memberId))
       .for("update");
-    const organised = seats.filter((s) => s.role === "organiser").map((s) => s.tripId);
-    if (organised.length > 0) {
-      const others = await tx
-        .select({ tripId: memberships.tripId, role: memberships.role })
-        .from(memberships)
-        .where(and(inArray(memberships.tripId, organised), ne(memberships.memberId, memberId)))
-        .for("update");
-      const stranded = organised.some((tripId) => {
-        const rest = others.filter((o) => o.tripId === tripId);
-        return rest.length > 0 && rest.every((o) => o.role !== "organiser");
-      });
-      if (stranded) {
-        throw new DataError(
-          "You're the only organiser of a trip that still has members. Make someone else an organiser first.",
-        );
-      }
+    for (const { tripId } of seats) {
+      await dropSeat(
+        tx,
+        tripId,
+        memberId,
+        "You're the only organiser of a trip that still has members. Make someone else an organiser first.",
+      );
     }
     await tx.delete(credentials).where(eq(credentials.memberId, memberId));
     await tx.delete(avatars).where(eq(avatars.memberId, memberId));
-    await tx.delete(phrases).where(eq(phrases.memberId, memberId));
     await tx.delete(keyringWraps).where(eq(keyringWraps.memberId, memberId));
+    // Console-minted recovery links name no trip, so no seat took them.
     await tx.delete(recoveries).where(eq(recoveries.memberId, memberId));
     await tx.delete(rekeys).where(eq(rekeys.forMemberId, memberId));
-    await tx.delete(memberships).where(eq(memberships.memberId, memberId));
     await tx
       .update(members)
       .set({
-        name: "Departed member",
+        name: DEPARTED_NAME,
         email: null,
         image: null,
         lingo: "english",
@@ -806,16 +926,21 @@ async function createRecovery(
   return code;
 }
 
-/** An organiser of a shared trip; the real check — who is asking — is theirs, out of band. */
+/**
+ * An organiser of a shared trip — of the trip whose key the link carries, when it carries one;
+ * the real check, who is asking, is theirs, out of band.
+ */
 export async function mintRecovery(
   actorId: string,
   memberId: string,
   key: RecoveryKey | null,
 ): Promise<string> {
-  if (!(await organisesWith(actorId, memberId))) {
+  if (key) {
+    await requireOrganiser(key.tripId, actorId);
+    await requireMembership(key.tripId, memberId);
+  } else if (!(await organisesWith(actorId, memberId))) {
     throw new DataError("Only an organiser of a trip they're on can mint a recovery link.");
   }
-  if (key) await requireMembership(key.tripId, memberId);
   return createRecovery(memberId, actorId, key);
 }
 
@@ -1206,65 +1331,6 @@ export async function publishedCards(tripId: string): Promise<Set<string>> {
   return new Set(rows.map((r) => r.marketId));
 }
 
-// ---------- what sealing left behind ----------
-// A trip named, and phrases kept, before either was sealed. The console holds no key, so the first
-// organiser's phone that opens the trip with one re-seals them as events and then clears them here.
-
-export type { Leftovers };
-
-export async function leftoversOf(tripId: string): Promise<Leftovers | null> {
-  const trip = await getTrip(tripId);
-  if (!trip) return null;
-  const rows = await db
-    .select()
-    .from(phrases)
-    .where(eq(phrases.tripId, tripId))
-    .orderBy(asc(phrases.createdAt), asc(phrases.id));
-  if (trip.name === null && rows.length === 0) return null;
-  return {
-    name: trip.name,
-    phrases: rows.map((row) => ({
-      id: row.id,
-      slug: row.slug,
-      side: row.side,
-      heard: row.heard,
-      said: row.said,
-      roman: row.roman ?? undefined,
-      literal: row.literal ?? undefined,
-      language: row.language,
-      tag: row.tag,
-      keptBy: row.memberId,
-    })),
-  };
-}
-
-/** Organisers only: the phone has put these on the sealed record, so the plaintext can go. */
-export async function clearLeftovers(
-  actorId: string,
-  tripId: string,
-  input: { nameEnc: string | null; phraseIds: string[] },
-): Promise<void> {
-  await requireOrganiser(tripId, actorId);
-  if (input.nameEnc) checkWrapped(input.nameEnc);
-  await db.transaction(async (tx) => {
-    if (input.nameEnc) {
-      await tx
-        .update(trips)
-        .set({ nameEnc: input.nameEnc, name: null })
-        .where(eq(trips.id, tripId));
-    }
-    if (input.phraseIds.length > 0) {
-      await tx
-        .delete(phrases)
-        .where(and(eq(phrases.tripId, tripId), inArray(phrases.id, input.phraseIds)));
-    }
-  });
-  logger.warn(
-    { tripId, actorId, name: input.nameEnc !== null, phrases: input.phraseIds.length },
-    "leftovers sealed",
-  );
-}
-
 // ---------- keyring backups ----------
 // The keyring under a key only that passkey's PRF can derive; one per credential.
 
@@ -1280,9 +1346,7 @@ export async function saveKeyringWrap(
     .from(credentials)
     .where(eq(credentials.id, credentialId));
   if (!cred || cred.memberId !== memberId) throw new DataError("That passkey isn't yours.");
-  if (!/^v1\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(blob) || blob.length > MAX_KEYRING_BYTES) {
-    throw new DataError("That backup didn't come through right.");
-  }
+  checkBlob(blob, 2, MAX_KEYRING_BYTES, "That backup didn't come through right.");
   await db
     .insert(keyringWraps)
     .values({ credentialId, memberId, blob })
@@ -1315,8 +1379,6 @@ export interface PlatformStats {
   invited: number;
   /** Sealed: the server can count what happened, not what it was. */
   eventsSealed: number;
-  /** Names and phrases still readable from before sealing, waiting for an organiser's phone. */
-  plaintextLeft: number;
 }
 
 export async function platformStats(): Promise<PlatformStats> {
@@ -1337,8 +1399,6 @@ export async function platformStats(): Promise<PlatformStats> {
   const founders = await db.selectDistinct({ memberId: trips.createdBy }).from(trips);
   const founderSet = new Set(founders.map((f) => f.memberId));
   const [ev] = await db.select({ n: count }).from(events);
-  const [named] = await db.select({ n: count }).from(trips).where(isNotNull(trips.name));
-  const [p] = await db.select({ n: count }).from(phrases);
   return {
     members: m.n,
     trips: t.n,
@@ -1349,6 +1409,5 @@ export async function platformStats(): Promise<PlatformStats> {
     invitedThenFounded: invitedRows.filter((r) => founderSet.has(r.memberId)).length,
     invited: invitedRows.length,
     eventsSealed: ev.n,
-    plaintextLeft: named.n + p.n,
   };
 }

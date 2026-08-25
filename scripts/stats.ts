@@ -10,7 +10,6 @@ async function main() {
   console.log(`mean roster        ${s.meanRoster.toFixed(1)}`);
   console.log(`invited → founded  ${s.invitedThenFounded} / ${s.invited}  (${rate}%)`);
   console.log(`sealed events      ${s.eventsSealed}`);
-  console.log(`plaintext left     ${s.plaintextLeft}  (names and phrases from before sealing)`);
   process.exit(0);
 }
 

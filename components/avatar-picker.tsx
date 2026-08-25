@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useRef, useState, useTransition } from "react";
 import { clearAvatarAction, setAvatarAction } from "@/app/actions";
+import { ActError } from "./use-act";
 
 const SIDE = 256;
 
@@ -103,7 +104,7 @@ export function AvatarPicker({ hasCustom }: { hasCustom: boolean }) {
           </button>
         )}
       </div>
-      {error && <p className="mt-1 text-xs font-semibold text-no-deep">{error}</p>}
+      <ActError error={error} block />
     </div>
   );
 }

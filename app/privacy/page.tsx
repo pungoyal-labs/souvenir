@@ -31,6 +31,9 @@ export default function PrivacyPage() {
         There is no reset on our side, on purpose. A passkey that supports it also keeps a backup of
         your keys, sealed under a secret only that passkey can produce: sign in with it on a new
         phone and the keys come back by themselves — we store the sealed copy and cannot open it.
+        When somebody leaves a trip, an organiser rotates its key: everyone still on it gets the new
+        one, sealed to a key their own phone announced, and the person who left keeps what was
+        written until then and can read nothing after.
       </Section>
 
       <Section title="What we can see">
