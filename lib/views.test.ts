@@ -26,6 +26,7 @@ import {
   seenBy,
   shouldRecordView,
   tripRecap,
+  tripSettlement,
 } from "./views.ts";
 
 const config: ReplayConfig = {
@@ -293,6 +294,77 @@ describe("split bills", () => {
     ],
     onDate: "2026-12-15",
   };
+  const cab: EventPayload = {
+    t: "bill.rev",
+    billId: "b3",
+    kind: "expense",
+    description: "Airport cab",
+    currency: "inr",
+    split: "equal",
+    entries: [
+      { memberId: "b", paidC: 0, participant: true },
+      { memberId: "c", paidC: 120000, participant: true },
+    ],
+    onDate: "2026-12-10",
+  };
+  const rate = { from: "thb" as const, to: "inr" as const, rate: 2.6, asOf: "2026-12-16" };
+
+  it("settles the whole trip in the home currency, at the rate plus the charge", () => {
+    const state = replayTrip(
+      config,
+      log([
+        ["a", dinner],
+        ["c", cab],
+      ]),
+    );
+    const people = peopleOf(roster, state);
+    const settlement = tripSettlement(state, people, "inr", rate);
+    expect(settlement?.nets.map((n) => [n.member.id, n.homeC, n.foreignC, n.netC])).toEqual([
+      // ฿600 at 2.6 plus 5% = ₹1,638; the cab is ₹600 a head.
+      ["a", 0, 60000, 163800],
+      ["c", 60000, -30000, -21900],
+      ["b", -60000, -30000, -141900],
+    ]);
+    expect(settlement?.plan.map((t) => [t.from.id, t.to.id, t.amountC])).toEqual([
+      ["b", "a", 141900],
+      ["c", "a", 21900],
+    ]);
+  });
+
+  it("a payment at home clears what was spent there", () => {
+    const paidHome: EventPayload = {
+      ...paidBack,
+      billId: "b4",
+      currency: "inr",
+      entries: [
+        { memberId: "b", paidC: 81900, participant: false },
+        { memberId: "a", paidC: 0, participant: true, owedC: 81900 },
+      ],
+    };
+    const state = replayTrip(
+      config,
+      log([
+        ["a", dinner],
+        ["b", paidHome],
+      ]),
+    );
+    const people = peopleOf(roster, state);
+    const settlement = tripSettlement(state, people, "inr", rate);
+    expect(settlement?.nets.map((n) => [n.member.id, n.netC])).toEqual([
+      ["a", 81900],
+      ["b", 0],
+      ["c", -81900],
+    ]);
+    expect(settlement?.plan.map((t) => [t.from.id, t.to.id, t.amountC])).toEqual([
+      ["c", "a", 81900],
+    ]);
+  });
+
+  it("has no answer for a rate that doesn't fit the trip", () => {
+    const state = replayTrip(config, log([["a", dinner]]));
+    const people = peopleOf(roster, state);
+    expect(tripSettlement(state, people, "inr", { ...rate, from: "usd" })).toBeNull();
+  });
 
   it("replays bills into balances and a settle-up plan", () => {
     const state = replayTrip(config, log([["a", dinner]]));

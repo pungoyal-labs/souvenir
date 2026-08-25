@@ -2,8 +2,15 @@
 
 import { useState } from "react";
 import { fmtDate, timeAgo } from "@/lib/format";
-import { CURRENCY_SYMBOL, type Currency, fmtMoney, parseAmount } from "@/lib/split";
-import { type BillView, billComments, billsOverview, type Person } from "@/lib/views";
+import { FX_SURCHARGE_BPS, type FxRate, fmtRate } from "@/lib/fx";
+import { CURRENCY_INFO, CURRENCY_SYMBOL, type Currency, fmtMoney, parseAmount } from "@/lib/split";
+import {
+  type BillView,
+  billComments,
+  billsOverview,
+  type Person,
+  tripSettlement,
+} from "@/lib/views";
 import { Avatar } from "./avatar";
 import { BillForm } from "./bill-form";
 import { billLabel, firstName, todayLocal } from "./bill-label";
@@ -13,15 +20,21 @@ import { EmptyState, tone } from "./ui";
 import { useAct } from "./use-act";
 
 /**
- * The /bills page below the heading: who's up and down per currency, the
- * shortest way to settle it, and every bill on the record. Real money, never
- * the pie ledger — and sealed: every bill is a `bill.rev` event replayed here.
+ * The /bills page below the heading: who's up and down, the shortest way to
+ * settle it, and every bill on the record. Real money, never the pie ledger —
+ * and sealed: every bill is a `bill.rev` event replayed here. With a rate for
+ * the day the whole trip is settled in the home currency, foreign spending
+ * read at that rate plus the forex charge (lib/fx); without one, each
+ * currency settles on its own.
  */
 export function Bills({
   currencies,
+  rate = null,
 }: {
   /** The trip's one or two currencies, the default first. */
   currencies: readonly Currency[];
+  /** Today's foreign → home rate, or null when there is none to be had. */
+  rate?: FxRate | null;
 }) {
   const { me, lingo, t, roster: members, people, state, append } = useOpenTrip();
   const meId = me.id;
@@ -31,6 +44,10 @@ export function Bills({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [openId, setOpenId] = useState<string | null>(null);
   const { bills, balances } = billsOverview(state, people);
+  const settlement =
+    rate && currencies.includes(rate.from) && currencies.includes(rate.to)
+      ? tripSettlement(state, people, rate.to, rate)
+      : null;
   const comments = billComments(state, people);
   const who = (m: Person, you = "You") => (m.id === meId ? you : firstName(m));
 
@@ -80,10 +97,80 @@ export function Bills({
     byDate.set(bill.onDate, list);
   }
 
+  /** The plan's line for one transfer, with the button that records it. */
+  const transferRow = (
+    transfer: { fromId: string; toId: string; from: Person; to: Person; amountC: number },
+    currency: Currency,
+  ) => (
+    <li key={`${transfer.fromId}-${transfer.toId}`} className="flex items-center gap-2 text-sm">
+      <span className="truncate">
+        <span className="font-semibold">{who(transfer.from)}</span> → {who(transfer.to, "you")}
+      </span>
+      <span className="mono font-bold">{fmtMoney(currency, transfer.amountC)}</span>
+      <button
+        type="button"
+        disabled={pending}
+        onClick={() => recordTransfer(transfer.from, transfer.to, currency, transfer.amountC)}
+        className="ml-auto rounded-md border border-line px-2 py-1 text-xs font-semibold hover:bg-paper disabled:opacity-40"
+      >
+        Record payment
+      </button>
+    </li>
+  );
+
   return (
     <div className="mt-5 grid gap-5">
+      {settlement && bills.length > 0 && (
+        <section className="card p-4">
+          <h2 className="display text-lg font-bold uppercase tracking-wide text-soft">
+            {CURRENCY_SYMBOL[settlement.home]} {settlement.home.toUpperCase()} · the whole trip
+          </h2>
+          {settlement.nets.length === 0 ? (
+            <p className="mt-2 text-sm text-soft">{t.allSquare}</p>
+          ) : (
+            <ul className="mt-2 grid gap-1.5">
+              {settlement.nets.map((n) => (
+                <li key={n.member.id} className="text-sm">
+                  <div className="flex items-center gap-2">
+                    <Avatar member={n.member} size={22} />
+                    <span className="truncate">{n.member.id === meId ? "You" : n.member.name}</span>
+                    <span className={`mono ml-auto font-bold ${tone(n.netC)}`}>
+                      {fmtMoney(settlement.home, n.netC, { sign: true })}
+                    </span>
+                  </div>
+                  {n.foreignC !== 0 && (
+                    <p className="mono pl-[30px] text-xs text-soft">
+                      {n.homeC !== 0 &&
+                        `${fmtMoney(settlement.home, n.homeC, { sign: true })} at home · `}
+                      {fmtMoney(settlement.rate.from, n.foreignC, { sign: true })} there ≈{" "}
+                      {fmtMoney(settlement.home, n.foreignHomeC, { sign: true })}
+                    </p>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+          {settlement.plan.length > 0 && (
+            <div className="mt-3 border-t border-line pt-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-soft">Settle up</p>
+              <ul className="mt-1.5 grid gap-1.5">
+                {settlement.plan.map((transfer) => transferRow(transfer, settlement.home))}
+              </ul>
+            </div>
+          )}
+          <p className="mt-3 text-xs text-soft">
+            {fmtRate(settlement.rate)} on {fmtDate(settlement.rate.asOf)}, plus a{" "}
+            {FX_SURCHARGE_BPS / 100}% forex charge on everything spent in{" "}
+            {CURRENCY_INFO[settlement.rate.from].name}. Paying in{" "}
+            {CURRENCY_INFO[settlement.rate.from].name} instead? Record it below and the balance
+            follows.
+          </p>
+        </section>
+      )}
+
       {balances.map(
         (b) =>
+          !settlement &&
           (b.nets.length > 0 || bills.some((x) => x.currency === b.currency)) && (
             <section key={b.currency} className="card p-4">
               <h2 className="display text-lg font-bold uppercase tracking-wide text-soft">
@@ -109,35 +196,7 @@ export function Bills({
                       Settle up
                     </p>
                     <ul className="mt-1.5 grid gap-1.5">
-                      {b.plan.map((transfer) => (
-                        <li
-                          key={`${transfer.fromId}-${transfer.toId}`}
-                          className="flex items-center gap-2 text-sm"
-                        >
-                          <span className="truncate">
-                            <span className="font-semibold">{who(transfer.from)}</span> →{" "}
-                            {who(transfer.to, "you")}
-                          </span>
-                          <span className="mono font-bold">
-                            {fmtMoney(b.currency, transfer.amountC)}
-                          </span>
-                          <button
-                            type="button"
-                            disabled={pending}
-                            onClick={() =>
-                              recordTransfer(
-                                transfer.from,
-                                transfer.to,
-                                b.currency,
-                                transfer.amountC,
-                              )
-                            }
-                            className="ml-auto rounded-md border border-line px-2 py-1 text-xs font-semibold hover:bg-paper disabled:opacity-40"
-                          >
-                            Record payment
-                          </button>
-                        </li>
-                      ))}
+                      {b.plan.map((transfer) => transferRow(transfer, b.currency))}
                     </ul>
                   </div>
                 </>

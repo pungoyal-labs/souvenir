@@ -89,6 +89,17 @@ const envSchema = z.object({
   SPEECH_FLAVOR: z.enum(["openai", "minimax"]).default("openai"),
   /** MiniMax only, and only where the account still requires it on the query. */
   SPEECH_GROUP_ID: z.string().optional(),
+
+  /**
+   * Where the day's exchange rate comes from, for settling a two-currency trip
+   * in the home currency (lib/rates.ts). Any host serving currency-api's
+   * shape (`/v1/currencies/{code}.min.json`). Unreachable, the bills page
+   * settles each currency on its own.
+   */
+  FX_BASE_URL: z
+    .url()
+    .default("https://latest.currency-api.pages.dev")
+    .transform((u) => u.replace(/\/+$/, "")),
 });
 
 export const env = envSchema.parse(process.env);

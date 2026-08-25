@@ -3,6 +3,7 @@
 // sealing — `Market` and `LedgerRow` are the schema's own — so lib/stats carries over unchanged.
 
 import { exposure, type Position, type Side } from "./engine.ts";
+import { type CombinedNet, combinedNets, combinedPlan, type FxRate } from "./fx.ts";
 import type { SavedPhrase } from "./phrases.ts";
 import { type CandidateMarket, type MarketHistory, recommend } from "./recommend.ts";
 import {
@@ -674,6 +675,48 @@ export function billsOverview(
       })),
     }));
   return { bills, balances };
+}
+
+/**
+ * The whole trip settled in the home currency: every member's balance across
+ * both currencies, the foreign side read at the day's rate plus the forex
+ * charge (lib/fx), and one plan that clears it. Null when the bills hold a
+ * currency the rate doesn't cover, in which case each currency settles alone.
+ */
+export interface TripSettlement {
+  home: Currency;
+  rate: FxRate;
+  /** Every member with a balance in either currency, biggest creditor first. */
+  nets: (CombinedNet & { member: Person })[];
+  plan: (Transfer & { from: Person; to: Person })[];
+}
+
+export function tripSettlement(
+  state: TripState,
+  people: People,
+  home: Currency,
+  rate: FxRate,
+): TripSettlement | null {
+  const byCurrency = nets(liveBills(state, people).map(forNets));
+  let combined: Map<string, CombinedNet>;
+  try {
+    combined = combinedNets(byCurrency, home, rate);
+  } catch {
+    return null;
+  }
+  return {
+    home,
+    rate,
+    nets: [...combined]
+      .filter(([, c]) => c.netC !== 0 || c.homeC !== 0 || c.foreignC !== 0)
+      .map(([memberId, c]) => ({ ...c, member: who(people, memberId) }))
+      .sort((a, b) => b.netC - a.netC || a.member.name.localeCompare(b.member.name)),
+    plan: combinedPlan(combined).map((t) => ({
+      ...t,
+      from: who(people, t.fromId),
+      to: who(people, t.toId),
+    })),
+  };
 }
 
 export interface MemberSplitView {

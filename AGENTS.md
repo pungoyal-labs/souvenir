@@ -106,7 +106,14 @@ Pre-commit (husky): biome on staged files, tsc, full test suite.
   a "loser pays ₹500" field, or a rupee amount on a market would cross it.
   Bills are the one place real money is named, and they are a ledger of what
   members say, never a rail — and a sealed one: the server cannot read an
-  amount either. UI vocabulary is *prediction / call / resolve /
+  amount either. A two-currency trip is settled in the home currency: the
+  phone reads the foreign nets at the day's rate plus a 5% forex charge
+  (`lib/fx`, `FX_SURCHARGE_BPS`) and plans one set of home-currency
+  transfers (`lib/views` `tripSettlement`). The rate is public data the
+  server fetches (`lib/rates.ts`, `FX_BASE_URL`, cached an hour) and hands
+  the page; the request names the two currencies and nothing else. Without a
+  rate the page falls back to settling each currency on its own — never
+  guess one. UI vocabulary is *prediction / call / resolve /
   pool / pie / points*; never *bet, wager, stake (as money), odds, payout,
   cash*. Code keeps `market/stake/settle*/amountC`. Don't half-rename either.
 - Inbox and the For-you rail are derived on the phone from the replayed trip

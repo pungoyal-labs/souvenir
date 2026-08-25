@@ -148,6 +148,7 @@ list. Highlights:
 | `DB_PORT` / `APP_PORT` / `APP_BIND` / `PORT` | Database and HTTP ports |
 | `LLM_BASE_URL` / `LLM_API_KEY` / `LLM_MODEL` | Optional draft-polish and Thai interpreting endpoint (hidden when unset) |
 | `SPEECH_BASE_URL` / `SPEECH_API_KEY` / `SPEECH_FLAVOR` | Optional voice for phones with none: OpenAI-compatible `/audio/speech`, or `minimax` |
+| `FX_BASE_URL` | Where the day's exchange rate comes from, for settling the whole trip in the home currency (currency-api shape; defaults to the public mirror) |
 
 Anyone can open an account (a passkey from the front page, or Google) and a
 trip. Trips are invite-only: organisers mint a single-use or group invite
