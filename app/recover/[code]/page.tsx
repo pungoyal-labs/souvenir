@@ -3,7 +3,7 @@ import { deadLink, SignedOutCard, SignedOutNotice } from "@/components/signed-ou
 import { getSession } from "@/lib/auth";
 import { findRecovery, getMember } from "@/lib/data";
 import { timeUntil } from "@/lib/format";
-import { recoveryState } from "@/lib/recovery";
+import { linkState } from "@/lib/links";
 
 const EYEBROW = "Back to your seat";
 
@@ -21,7 +21,7 @@ export default async function RecoverPage({ params }: { params: Promise<{ code: 
     );
   }
 
-  const state = row && recoveryState(row, new Date());
+  const state = row && linkState(row, new Date());
   if (!row || state !== "live") {
     return (
       <SignedOutNotice eyebrow={EYEBROW}>

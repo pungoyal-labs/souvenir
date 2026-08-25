@@ -12,6 +12,7 @@ import {
   type MarketState,
   marketRows,
   netByMember,
+  rowsByMarket,
   type TripState,
 } from "./replay.ts";
 import { DEPARTED_NAME, type LedgerRow, type Market } from "./rows.ts";
@@ -184,6 +185,7 @@ function forYou(
   viewerId: string,
   now: Date,
 ): MarketView[] {
+  const byMarket = rowsByMarket(state);
   const candidates: CandidateMarket[] = open.map((v) => ({
     id: v.market.id,
     creatorId: v.market.creatorId,
@@ -192,7 +194,7 @@ function forYou(
     yesPoolC: v.yesPoolC,
     noPoolC: v.noPoolC,
     stakes: v.participants.map((p) => ({ memberId: p.member.id, side: p.side, stakeC: p.stakeC })),
-    actions: marketRows(state, v.market.id)
+    actions: (byMarket.get(v.market.id) ?? [])
       .filter((r) => r.kind === "bet" || r.kind === "switch")
       .map((r) => ({ memberId: r.memberId, at: r.at })),
     upvoterIds: reactorIds(state, v.market.id, "upvote"),
@@ -273,10 +275,11 @@ export function netOf(state: TripState, memberId: string): number {
 
 /** One member's outcome in every resolved prediction they took part in, newest first. */
 export function memberResults(state: TripState, tripId: string, memberId: string): MarketResult[] {
+  const byMarket = rowsByMarket(state);
   return settled(state)
     .sort(byResolved)
     .flatMap((m) => {
-      const outcome = marketOutcomes(marketRows(state, m.id)).get(memberId);
+      const outcome = marketOutcomes(byMarket.get(m.id) ?? []).get(memberId);
       return outcome ? [toResult(toMarket(m, tripId), outcome)] : [];
     });
 }
@@ -325,8 +328,9 @@ export function leaderboard(
       },
     ]),
   );
+  const byMarket = rowsByMarket(state);
   for (const m of state.markets.values()) {
-    for (const [memberId, outcome] of marketOutcomes(marketRows(state, m.id))) {
+    for (const [memberId, outcome] of marketOutcomes(byMarket.get(m.id) ?? [])) {
       const s = stats.get(memberId);
       if (!s) continue;
       if (m.status === "open") {
@@ -378,10 +382,11 @@ export function tripRecap(
   minResolved: number,
 ): TripRecap {
   const { ranked, unranked } = leaderboard(state, roster, minResolved);
+  const byMarket = rowsByMarket(state);
   const perMarket = settled(state).map((m) => ({
     market: m,
     status: m.status,
-    outcomes: marketOutcomes(marketRows(state, m.id)),
+    outcomes: marketOutcomes(byMarket.get(m.id) ?? []),
   }));
   const results = perMarket.flatMap(({ market, outcomes }) =>
     [...outcomes].map(([memberId, o]) => ({
@@ -507,6 +512,7 @@ export function inbox(
   }
 
   const items: InboxItem[] = [];
+  const byMarket = rowsByMarket(state);
   for (const m of state.markets.values()) {
     const market = toMarket(m, tripId);
     const creator = who(people, m.creatorId);
@@ -520,7 +526,8 @@ export function inbox(
       });
     }
     if (!mine.has(m.id)) continue;
-    for (const row of marketRows(state, m.id)) {
+    const rows = byMarket.get(m.id) ?? [];
+    for (const row of rows) {
       if (row.memberId === memberId || (row.kind !== "bet" && row.kind !== "switch")) continue;
       items.push({
         kind: "activity",
@@ -532,7 +539,7 @@ export function inbox(
       });
     }
     if (m.status !== "open" && m.resolvedAt && m.creatorId !== memberId) {
-      const outcome = marketOutcomes(marketRows(state, m.id)).get(memberId);
+      const outcome = marketOutcomes(rows).get(memberId);
       items.push({
         kind: "resolved",
         at: m.resolvedAt,

@@ -1,12 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
 import { shutOwnRecoveryAction } from "@/app/actions";
 import { timeAgo, timeUntil } from "@/lib/format";
 import { routes } from "@/lib/routes";
-import { ActError } from "./use-act";
+import { ActError, useRefreshingAct } from "./use-act";
 
 /**
  * A recovery link is a key to this member's seat in somebody else's hand, and
@@ -25,9 +23,7 @@ export function RecoveryNotice({
   /** When a link to this seat was last walked through, within the notice window. */
   usedAt: Date | null;
 }) {
-  const router = useRouter();
-  const [pending, start] = useTransition();
-  const [error, setError] = useState<string | null>(null);
+  const { pending, error, act } = useRefreshingAct();
 
   return (
     <div className="mx-auto mt-4 max-w-5xl px-4">
@@ -61,14 +57,7 @@ export function RecoveryNotice({
           <button
             type="button"
             disabled={pending}
-            onClick={() =>
-              start(async () => {
-                setError(null);
-                const res = await shutOwnRecoveryAction(live.code);
-                if (!res.ok) setError(res.error ?? "That didn't work.");
-                else router.refresh();
-              })
-            }
+            onClick={() => act(() => shutOwnRecoveryAction(live.code))}
             className="rounded-md bg-no px-4 py-2 text-sm font-semibold text-white hover:bg-no-press disabled:opacity-60"
           >
             Shut it

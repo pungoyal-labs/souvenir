@@ -2,7 +2,7 @@ import { RedeemRekey } from "@/components/rekey";
 import { deadLink, SignedOutCard, SignedOutNotice } from "@/components/signed-out-card";
 import { SignInKeepingSecret } from "@/components/take-key";
 import { findRekey, getMember, getTrip } from "@/lib/data";
-import { rekeyState } from "@/lib/rekeys";
+import { linkState } from "@/lib/links";
 import { routes, signInThen } from "@/lib/routes";
 import { currentMember } from "@/lib/session";
 import { placeOf } from "@/lib/trips";
@@ -14,7 +14,7 @@ const EYEBROW = "Your key";
 export default async function RekeyPage({ params }: { params: Promise<{ code: string }> }) {
   const { code } = await params;
   const [row, me] = await Promise.all([findRekey(code), currentMember()]);
-  const state = row && rekeyState(row, new Date());
+  const state = row && linkState(row, new Date());
   if (!row || state !== "live") {
     return (
       <SignedOutNotice eyebrow={EYEBROW}>

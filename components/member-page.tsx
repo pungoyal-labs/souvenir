@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { fmtDate, timeAgo } from "@/lib/format";
-import type { Lingo } from "@/lib/lingo";
 import { fmtPct, fmtPies } from "@/lib/pies";
 import { routes } from "@/lib/routes";
 import { fmtMoney } from "@/lib/split";
@@ -289,7 +288,7 @@ export function MemberPage({
                     <span className="block text-xs text-soft sm:hidden">
                       {timeAgo(item.row.at)}
                     </span>
-                    {describe(item.row.kind, item.row.side, t)}
+                    {describe(item.row.kind, item.row.side)}
                     {item.market && (
                       <>
                         {" — "}
@@ -322,10 +321,8 @@ export function MemberPage({
   );
 }
 
-function describe(kind: string, side: string | null, t: Lingo): string {
+function describe(kind: string, side: string | null): string {
   switch (kind) {
-    case "grant":
-      return t.joinedLedger;
     case "bet":
       return `Backed ${side?.toUpperCase()}`;
     case "switch":

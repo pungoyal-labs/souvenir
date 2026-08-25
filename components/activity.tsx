@@ -1,12 +1,12 @@
 import Link from "next/link";
 import { timeAgo } from "@/lib/format";
-import { type Lingo, lingoOf } from "@/lib/lingo";
+import { lingoOf } from "@/lib/lingo";
 import { piesText } from "@/lib/pies";
 import { routes } from "@/lib/routes";
 import type { ActivityItem } from "@/lib/views";
 import { Avatar } from "./avatar";
 
-function phrase(item: ActivityItem, t: Lingo): string {
+function phrase(item: ActivityItem): string {
   const amount = piesText(item.row.amountC);
   switch (item.row.kind) {
     case "bet":
@@ -19,8 +19,6 @@ function phrase(item: ActivityItem, t: Lingo): string {
       return `was refunded ${amount}`;
     case "reversal":
       return `handed ${amount} back when the call reopened`;
-    case "grant":
-      return t.joinedFeed;
   }
 }
 
@@ -43,7 +41,7 @@ export function ActivityFeed({
         <li key={item.row.id} className="flex items-start gap-2 text-sm">
           <Avatar member={item.member} size={22} />
           <span className="min-w-0">
-            <span className="font-semibold">{item.member.name}</span> {phrase(item, t)}
+            <span className="font-semibold">{item.member.name}</span> {phrase(item)}
             {showMarket && item.market && (
               <>
                 {" — "}

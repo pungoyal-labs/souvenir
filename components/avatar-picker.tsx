@@ -1,9 +1,8 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-import { useRef, useState, useTransition } from "react";
+import { useRef } from "react";
 import { clearAvatarAction, setAvatarAction } from "@/app/actions";
-import { ActError } from "./use-act";
+import { ActError, useRefreshingAct } from "./use-act";
 
 const SIDE = 256;
 
@@ -41,34 +40,20 @@ async function downscale(file: File): Promise<Blob> {
 
 /** Shown only on your own member page: upload a picture that replaces the monogram. */
 export function AvatarPicker({ hasCustom }: { hasCustom: boolean }) {
-  const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
-  const [pending, startTransition] = useTransition();
-  const [error, setError] = useState<string | null>(null);
+  const { pending, error, act } = useRefreshingAct();
 
   const upload = (file: File) =>
-    startTransition(async () => {
-      setError(null);
+    act(async () => {
       let blob: Blob;
       try {
         blob = await downscale(file);
       } catch {
-        setError("Couldn't read that image. Try a JPEG or PNG.");
-        return;
+        return { ok: false, error: "Couldn't read that image. Try a JPEG or PNG." };
       }
       const formData = new FormData();
       formData.append("avatar", blob, "avatar.jpg");
-      const res = await setAvatarAction(formData);
-      if (!res.ok) setError(res.error ?? "That didn't work.");
-      else router.refresh();
-    });
-
-  const remove = () =>
-    startTransition(async () => {
-      setError(null);
-      const res = await clearAvatarAction();
-      if (!res.ok) setError(res.error ?? "That didn't work.");
-      else router.refresh();
+      return setAvatarAction(formData);
     });
 
   return (
@@ -97,7 +82,7 @@ export function AvatarPicker({ hasCustom }: { hasCustom: boolean }) {
           <button
             type="button"
             disabled={pending}
-            onClick={remove}
+            onClick={() => act(clearAvatarAction)}
             className="rounded-md px-2 py-1 text-xs text-soft hover:underline disabled:opacity-40"
           >
             Use my initials

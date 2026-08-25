@@ -17,8 +17,6 @@ export interface Lingo {
   activityHeading: string;
   activitySoFarHeading: string;
   activityEmpty: string;
-  joinedFeed: string;
-  joinedLedger: string;
   openEmptyTitle: string;
   openEmptySub: string;
   resolvedEmpty: string;

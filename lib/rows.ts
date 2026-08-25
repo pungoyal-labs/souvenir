@@ -16,7 +16,7 @@ export interface Market {
   resolutionNote: string | null;
 }
 
-export type LedgerKind = "grant" | "bet" | "switch" | "payout" | "refund" | "reversal";
+export type LedgerKind = "bet" | "switch" | "payout" | "refund" | "reversal";
 
 /**
  * One pie movement. `amountC` is the size, `balanceDeltaC` its sign for the

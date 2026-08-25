@@ -51,7 +51,7 @@ export function toBase64Url(bytes: Uint8Array): string {
   return btoa(bin).replaceAll("+", "-").replaceAll("/", "_").replace(/=+$/, "");
 }
 
-export function fromBase64Url(text: string): Uint8Array {
+export function fromBase64Url(text: string): Uint8Array<ArrayBuffer> {
   if (!/^[A-Za-z0-9_-]*$/.test(text)) throw new CryptoError("not base64url");
   const b64 = text.replaceAll("-", "+").replaceAll("_", "/");
   const padded = b64 + "=".repeat((4 - (b64.length % 4)) % 4);

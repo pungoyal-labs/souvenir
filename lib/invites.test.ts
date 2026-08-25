@@ -1,30 +1,13 @@
 import { describe, expect, it } from "vitest";
 import {
   expiresAtFrom,
-  GROUP_INVITE_TTL_MS,
   INVITE_TTL_MS,
   inviteState,
   inviteUrl,
-  newInviteCode,
   partitionInvites,
 } from "./invites.ts";
 
 const NOW = new Date("2026-08-19T12:00:00Z");
-
-describe("newInviteCode", () => {
-  it("is URL-safe, so it can be the last segment of a link", () => {
-    expect(newInviteCode()).toMatch(/^[A-Za-z0-9_-]+$/);
-  });
-
-  it("carries 128 bits — long enough that guessing is not a threat model", () => {
-    expect(newInviteCode()).toHaveLength(22); // 16 bytes, base64url, unpadded
-  });
-
-  it("never repeats", () => {
-    const codes = new Set(Array.from({ length: 200 }, () => newInviteCode()));
-    expect(codes.size).toBe(200);
-  });
-});
 
 describe("inviteState", () => {
   const live = { expiresAt: new Date("2026-08-26T12:00:00Z"), useCount: 0, isOpen: false };
@@ -62,12 +45,9 @@ describe("inviteState", () => {
 });
 
 describe("expiresAtFrom", () => {
-  it("gives a personal invite a week", () => {
+  it("gives every invite a week — the link carries the key", () => {
     expect(expiresAtFrom(NOW).getTime() - NOW.getTime()).toBe(INVITE_TTL_MS);
-  });
-
-  it("gives a group link a month, since it sits in a chat", () => {
-    expect(expiresAtFrom(NOW, true).getTime() - NOW.getTime()).toBe(GROUP_INVITE_TTL_MS);
+    expect(INVITE_TTL_MS).toBe(7 * 24 * 60 * 60 * 1000);
   });
 });
 

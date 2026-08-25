@@ -1,15 +1,15 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState } from "react";
 import { deleteAccountAction, setNameAction } from "@/app/actions";
+import { ActError, useAct } from "./use-act";
 
 /** Rename, and the door out. Both plain: these are notices, not flavour. */
 export function AccountForms({ name: initialName }: { name: string }) {
   const [name, setName] = useState(initialName);
   const [confirm, setConfirm] = useState("");
-  const [pending, start] = useTransition();
   const [note, setNote] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const { pending, error, act } = useAct();
 
   return (
     <>
@@ -29,15 +29,13 @@ export function AccountForms({ name: initialName }: { name: string }) {
           <button
             type="button"
             disabled={pending || name.trim() === initialName || name.trim().length < 2}
-            onClick={() =>
-              start(async () => {
-                setError(null);
-                setNote(null);
-                const r = await setNameAction(name);
-                if (!r.ok) setError(r.error ?? "That didn't work.");
-                else setNote("Renamed.");
-              })
-            }
+            onClick={() => {
+              setNote(null);
+              act(
+                () => setNameAction(name),
+                () => setNote("Renamed."),
+              );
+            }}
             className="rounded-md border border-line px-3 py-2 text-sm font-semibold hover:bg-surface disabled:opacity-40"
           >
             Rename
@@ -67,19 +65,13 @@ export function AccountForms({ name: initialName }: { name: string }) {
           <button
             type="button"
             disabled={pending || confirm !== "DELETE"}
-            onClick={() =>
-              start(async () => {
-                setError(null);
-                const r = await deleteAccountAction(confirm);
-                if (r && !r.ok) setError(r.error ?? "That didn't work.");
-              })
-            }
+            onClick={() => act(() => deleteAccountAction(confirm))}
             className="rounded-md bg-no px-3 py-2 text-sm font-semibold text-white hover:bg-no-deep disabled:opacity-40"
           >
             Delete my account
           </button>
         </div>
-        {error && <p className="mt-2 text-sm font-semibold text-no-deep">{error}</p>}
+        <ActError error={error} block />
       </section>
     </>
   );

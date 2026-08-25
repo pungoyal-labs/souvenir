@@ -1,29 +1,18 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
 import { revokeInviteAction } from "@/app/actions";
-import { ActError } from "./use-act";
+import { ActError, useRefreshingAct } from "./use-act";
 
 /** Kill a link that hasn't been used — a misdirected invite shouldn't linger a week. */
 export function RevokeInvite({ code }: { code: string }) {
-  const router = useRouter();
-  const [pending, startTransition] = useTransition();
-  const [error, setError] = useState<string | null>(null);
+  const { pending, error, act } = useRefreshingAct();
 
   return (
     <span className="inline-flex shrink-0 items-center gap-1">
       <button
         type="button"
         disabled={pending}
-        onClick={() =>
-          startTransition(async () => {
-            setError(null);
-            const res = await revokeInviteAction(code);
-            if (!res.ok) setError(res.error ?? "That didn't work.");
-            else router.refresh();
-          })
-        }
+        onClick={() => act(() => revokeInviteAction(code))}
         className="rounded-md px-2 py-1 text-xs text-soft hover:underline disabled:opacity-40"
       >
         Revoke

@@ -489,3 +489,15 @@ export function netByMember(state: TripState): Map<string, number> {
 export function marketRows(state: TripState, marketId: string): LedgerRow[] {
   return state.ledger.filter((r) => r.marketId === marketId);
 }
+
+/** Every market's rows in one pass, for the views that walk the whole board. */
+export function rowsByMarket(state: TripState): Map<string, LedgerRow[]> {
+  const by = new Map<string, LedgerRow[]>();
+  for (const row of state.ledger) {
+    if (row.marketId === null) continue;
+    const rows = by.get(row.marketId);
+    if (rows) rows.push(row);
+    else by.set(row.marketId, [row]);
+  }
+  return by;
+}

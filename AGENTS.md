@@ -10,8 +10,9 @@ server actions, Postgres via Drizzle, dependency-free passkeys + Google OAuth
 beside it: `lib/engine` (settlement), `lib/stats` (outcomes/roll-ups),
 `lib/recommend` (For-you ranking), `lib/pies` (money math), `lib/email`
 (canonicalization), `lib/webauthn` + `lib/cbor` (passkey verification),
-`lib/avatar` (monograms), `lib/invites` (invite codes), `lib/recovery`
-(recovery links), `lib/talk` (the language pair, turn-taking, voice choice),
+`lib/avatar` (monograms), `lib/links` (the one link primitive: code, state,
+expiry), `lib/invites` / `lib/recovery` / `lib/rekeys` (what each kind of link
+adds to it), `lib/talk` (the language pair, turn-taking, voice choice),
 `lib/phrases` (kept phrases: slugs and which voice says one again),
 `lib/trips` (what a trip is: its two currencies, its phase, its rules),
 `lib/starters` (the first predictions a trip offers),
@@ -47,7 +48,11 @@ Pre-commit (husky): biome on staged files, tsc, full test suite.
   reactions and views are envelopes in `events` — sealed on the phone under
   the trip's key (`lib/crypto`), ordered by the server, and never readable by
   it. The server checks the seat, the epoch, the size and the shape
-  (`appendEvent`), and nothing else. The rules of the game — cap, one side,
+  (`appendEvent`), and nothing else — under the trip row's lock, which is
+  what makes `events.seq` both the trip's order and its commit order, so a
+  phone polling "after seq N" never misses a row. Every phone runs the rules
+  over its own log before posting (`sealEvent` in `trip-store`), so a refusal
+  reaches the person tapping; the server cannot give one. The rules of the game — cap, one side,
   creator resolves, organiser reopens, zero-sum — are `lib/replay.ts`, run on
   every phone over the whole log (`components/trip-store.tsx`), and the pages
   are derived from that state by `lib/views.ts`. Never add a server-side
@@ -87,7 +92,8 @@ Pre-commit (husky): biome on staged files, tsc, full test suite.
 - Pies are integer centi-pies end to end; format only at the edge (`lib/pies.ts`).
 - Infinite bank: no grant, net can go negative; the per-prediction exposure
   cap (`trips.max_stake_pies`) is the only brake — never gate the call UI on
-  balance.
+  balance. The cap is applied to the whole log on replay, so it cannot be
+  lowered once the trip has an event (`updateTrip`); raising is fine.
 - **A trip is the tenant and the season.** `trips` holds the name, the
   destination, the home language, the two currencies, the dates, and the cap;
   `memberships` holds who is on it and with which role. Markets, ledger rows,
@@ -186,9 +192,12 @@ Pre-commit (husky): biome on staged files, tsc, full test suite.
   key back from a phone. An organiser rotates from the members page, and the
   departed member reads what was written until then and nothing after.
   Never add a removal that skips the mark.
-- Who organises is `memberships.role`, per trip. Whoever creates a trip is its
-  first organiser; organisers promote and step down each other (and
-  themselves) from a member's page; stepping down the last organiser is
+- Who organises is `memberships.role`, per trip, *and* a `member.role` event
+  in the log — the row gates invites and recovery on the server, the event
+  gates reopening and rotation on every phone, and `setRole` lands both in
+  one transaction from an envelope the organiser's phone sealed. Whoever
+  creates a trip is its first organiser; organisers promote and step down
+  each other (and themselves) from a member's page; stepping down the last organiser is
   refused, since nobody could then invite or recover. There is no global
   admin and no `FOUNDING_MEMBERS` — anyone can make an account and a trip.
 - Losing every passkey is recovered by an organiser-minted *recovery* link

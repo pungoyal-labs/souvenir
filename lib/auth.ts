@@ -73,6 +73,26 @@ function seal(claims: Record<string, unknown>, maxAgeSeconds: number): string {
   return `${body}.${hmac(body)}`;
 }
 
+/** Set a signed cookie carrying `claims` for `maxAgeSeconds`. */
+async function setSigned(
+  name: string,
+  claims: Record<string, unknown>,
+  maxAgeSeconds: number,
+): Promise<void> {
+  (await cookies()).set(name, seal(claims, maxAgeSeconds), {
+    ...cookieDefaults,
+    maxAge: maxAgeSeconds,
+  });
+}
+
+/** Read a signed cookie's claims and delete it: single use, whatever the caller makes of it. */
+async function takeSigned(name: string): Promise<Record<string, unknown> | null> {
+  const jar = await cookies();
+  const claims = unseal(jar.get(name)?.value);
+  jar.delete(name);
+  return claims;
+}
+
 function unseal(token: string | undefined): Record<string, unknown> | null {
   if (!token) return null;
   const split = token.lastIndexOf(".");
@@ -103,10 +123,7 @@ export async function getSession(): Promise<Session | null> {
 
 /** Only callable from a server action or route handler (it writes a cookie). */
 export async function createSession(memberId: string): Promise<void> {
-  (await cookies()).set(SESSION_COOKIE, seal({ memberId }, SESSION_MAX_AGE_S), {
-    ...cookieDefaults,
-    maxAge: SESSION_MAX_AGE_S,
-  });
+  await setSigned(SESSION_COOKIE, { memberId }, SESSION_MAX_AGE_S);
 }
 
 export async function destroySession(): Promise<void> {
@@ -122,18 +139,16 @@ export async function destroySession(): Promise<void> {
 const CONSENT_COOKIE = "chiang_pai_consent";
 
 export async function noteSignInIntent(intent: { agreed: boolean; next: string }): Promise<void> {
-  (await cookies()).set(
+  await setSigned(
     CONSENT_COOKIE,
-    seal({ agreed: intent.agreed, next: safeNext(intent.next) }, HANDSHAKE_MAX_AGE_S),
-    { ...cookieDefaults, maxAge: HANDSHAKE_MAX_AGE_S },
+    { agreed: intent.agreed, next: safeNext(intent.next) },
+    HANDSHAKE_MAX_AGE_S,
   );
 }
 
 /** Whether the sign-in that just completed was started with the box ticked, and where to go. */
 export async function takeSignInIntent(): Promise<{ agreed: boolean; next: string }> {
-  const jar = await cookies();
-  const claims = unseal(jar.get(CONSENT_COOKIE)?.value);
-  jar.delete(CONSENT_COOKIE);
+  const claims = await takeSigned(CONSENT_COOKIE);
   return {
     agreed: claims?.agreed === true,
     next: safeNext(typeof claims?.next === "string" ? claims.next : "/"),
@@ -167,10 +182,7 @@ export async function startGoogleSignIn(): Promise<string> {
   const verifier = randomBytes(32).toString("base64url");
   const challenge = createHash("sha256").update(verifier).digest("base64url");
 
-  (await cookies()).set(HANDSHAKE_COOKIE, seal({ state, nonce, verifier }, HANDSHAKE_MAX_AGE_S), {
-    ...cookieDefaults,
-    maxAge: HANDSHAKE_MAX_AGE_S,
-  });
+  await setSigned(HANDSHAKE_COOKIE, { state, nonce, verifier }, HANDSHAKE_MAX_AGE_S);
 
   const url = new URL(AUTHORIZE_ENDPOINT);
   url.searchParams.set("client_id", env.AUTH_GOOGLE_ID);
@@ -190,9 +202,7 @@ export async function startGoogleSignIn(): Promise<string> {
  * /signin rather than reporting which step failed.
  */
 export async function completeGoogleSignIn(params: URLSearchParams): Promise<GoogleProfile | null> {
-  const jar = await cookies();
-  const handshake = unseal(jar.get(HANDSHAKE_COOKIE)?.value);
-  jar.delete(HANDSHAKE_COOKIE); // single use, whatever happens below
+  const handshake = await takeSigned(HANDSHAKE_COOKIE); // single use, whatever happens below
 
   const clientId = env.AUTH_GOOGLE_ID;
   const clientSecret = env.AUTH_GOOGLE_SECRET;
@@ -349,10 +359,7 @@ export async function startPasskeyChallenge(
   link?: LinkClaims,
 ): Promise<string> {
   const challenge = randomBytes(32).toString("base64url");
-  (await cookies()).set(PASSKEY_COOKIE, seal({ ...link, challenge, purpose }, PASSKEY_MAX_AGE_S), {
-    ...cookieDefaults,
-    maxAge: PASSKEY_MAX_AGE_S,
-  });
+  await setSigned(PASSKEY_COOKIE, { ...link, challenge, purpose }, PASSKEY_MAX_AGE_S);
   return challenge;
 }
 
@@ -360,9 +367,7 @@ export async function startPasskeyChallenge(
 export async function takePasskeyChallenge(
   purpose: PasskeyPurpose,
 ): Promise<PasskeyChallenge | null> {
-  const jar = await cookies();
-  const claims = unseal(jar.get(PASSKEY_COOKIE)?.value);
-  jar.delete(PASSKEY_COOKIE);
+  const claims = await takeSigned(PASSKEY_COOKIE);
   if (!claims || claims.purpose !== purpose) return null;
   if (typeof claims.challenge !== "string") return null;
   const { memberId, code } = claims;

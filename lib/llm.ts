@@ -14,6 +14,62 @@ import type { Particle } from "./talk.ts";
 
 export const llmEnabled = Boolean(env.LLM_BASE_URL && env.LLM_API_KEY);
 
+/** Somebody is waiting on a phone; a model that has not answered by now is not going to. */
+const TIMEOUT_MS = 30_000;
+
+/**
+ * One request, one JSON object back. Both prompts ask for bare JSON and both
+ * get fences or preamble now and then, so the outer object is cut out here.
+ */
+async function askForJson(
+  what: string,
+  system: string,
+  user: string,
+  maxTokens: number,
+  context: Record<string, unknown> = {},
+): Promise<Record<string, unknown>> {
+  if (!llmEnabled) throw new Error(`${what}: LLM is not configured`);
+  const client = new Anthropic({
+    apiKey: env.LLM_API_KEY,
+    baseURL: env.LLM_BASE_URL,
+    timeout: TIMEOUT_MS,
+    maxRetries: 1,
+  });
+  const startedAt = Date.now();
+  const response = await client.messages.create({
+    model: env.LLM_MODEL,
+    max_tokens: maxTokens,
+    system,
+    messages: [{ role: "user", content: user }],
+  });
+  logger.info(
+    { model: env.LLM_MODEL, ms: Date.now() - startedAt, usage: response.usage, ...context },
+    what,
+  );
+  const text = response.content
+    .filter((block): block is Anthropic.TextBlock => block.type === "text")
+    .map((block) => block.text)
+    .join("");
+  const start = text.indexOf("{");
+  const end = text.lastIndexOf("}");
+  if (start === -1 || end <= start) {
+    throw new Error("The model returned something that isn't JSON. Try again.");
+  }
+  const parsed: unknown = JSON.parse(text.slice(start, end + 1));
+  if (typeof parsed !== "object" || parsed === null) {
+    throw new Error("The model returned something that isn't JSON. Try again.");
+  }
+  return parsed as Record<string, unknown>;
+}
+
+/** A string field, trimmed and capped; empty when absent. */
+function field(obj: Record<string, unknown>, key: string, max: number): string {
+  const value = obj[key];
+  return typeof value === "string" ? value.trim().slice(0, max) : "";
+}
+
+// --- Polishing a draft ---------------------------------------------------
+
 export interface MarketDraft {
   question: string;
   criteria: string;
@@ -23,7 +79,7 @@ export interface PolishedDraft extends MarketDraft {
   rationale: string;
 }
 
-const systemPrompt = (
+const polishSystem = (
   register: string,
 ) => `You edit draft predictions for a private, zero-sum prediction game among friends. Every prediction is a single binary question that will later be resolved YES or NO by its creator.
 
@@ -43,13 +99,6 @@ export async function polishMarketDraft(
   feedback?: string,
   register = "plain English",
 ): Promise<PolishedDraft> {
-  if (!llmEnabled) throw new Error("LLM polish is not configured");
-
-  const client = new Anthropic({
-    apiKey: env.LLM_API_KEY,
-    baseURL: env.LLM_BASE_URL,
-  });
-
   const userParts = [
     `Draft question: ${draft.question || "(none yet)"}`,
     `Draft resolution criteria: ${draft.criteria || "(none yet)"}`,
@@ -57,48 +106,21 @@ export async function polishMarketDraft(
   if (feedback?.trim()) {
     userParts.push(`Creator's notes on the previous suggestion: ${feedback.trim()}`);
   }
-
-  const startedAt = Date.now();
-  const response = await client.messages.create({
-    model: env.LLM_MODEL,
-    max_tokens: 2000,
-    system: systemPrompt(register),
-    messages: [{ role: "user", content: userParts.join("\n\n") }],
-  });
-  logger.info(
-    { model: env.LLM_MODEL, ms: Date.now() - startedAt, usage: response.usage },
+  const obj = await askForJson(
     "market draft polished",
+    polishSystem(register),
+    userParts.join("\n\n"),
+    2000,
   );
-
-  const text = response.content
-    .filter((block): block is Anthropic.TextBlock => block.type === "text")
-    .map((block) => block.text)
-    .join("");
-
-  return parsePolished(text, draft);
-}
-
-function parsePolished(text: string, fallback: MarketDraft): PolishedDraft {
-  // Models sometimes wrap JSON in fences or preamble; extract the outer object.
-  const start = text.indexOf("{");
-  const end = text.lastIndexOf("}");
-  if (start === -1 || end <= start) {
-    throw new Error("The model returned something that isn't JSON. Try again.");
-  }
-  const parsed: unknown = JSON.parse(text.slice(start, end + 1));
-  const obj = parsed as Record<string, unknown>;
-  const question = typeof obj.question === "string" ? obj.question.trim() : "";
-  const criteria = typeof obj.criteria === "string" ? obj.criteria.trim() : "";
+  const question = field(obj, "question", 200);
+  const criteria = field(obj, "criteria", 2000);
   if (!question || !criteria) {
     throw new Error("The model's suggestion was incomplete. Try again.");
   }
   return {
-    question: question.slice(0, 200),
-    criteria: criteria.slice(0, 2000),
-    rationale:
-      typeof obj.rationale === "string" && obj.rationale.trim()
-        ? obj.rationale.trim()
-        : `Tightened from: “${fallback.question}”`,
+    question,
+    criteria,
+    rationale: field(obj, "rationale", 1000) || `Tightened from: “${draft.question}”`,
   };
 }
 
@@ -187,52 +209,22 @@ Respond with ONLY a JSON object, no markdown fences:
 
 /** Interpret one utterance, in whichever direction the pair is pointed. */
 export async function interpret(req: InterpretRequest): Promise<Interpretation> {
-  if (!llmEnabled) throw new Error("Interpreting is not configured");
-
-  const client = new Anthropic({
-    apiKey: env.LLM_API_KEY,
-    baseURL: env.LLM_BASE_URL,
-  });
-
-  const startedAt = Date.now();
-  const response = await client.messages.create({
-    model: env.LLM_MODEL,
-    // A spoken sentence and its gloss. Anything longer is the model rambling.
-    max_tokens: 700,
-    system: interpretSystem(req),
-    messages: [{ role: "user", content: `Target language: ${req.to}\n\nUtterance: ${req.text}` }],
-  });
-  logger.info(
-    { model: env.LLM_MODEL, to: req.to, ms: Date.now() - startedAt, usage: response.usage },
+  const obj = await askForJson(
     "utterance interpreted",
+    interpretSystem(req),
+    `Target language: ${req.to}\n\nUtterance: ${req.text}`,
+    // A spoken sentence and its gloss. Anything longer is the model rambling.
+    700,
+    { to: req.to },
   );
-
-  const body = response.content
-    .filter((block): block is Anthropic.TextBlock => block.type === "text")
-    .map((block) => block.text)
-    .join("");
-
-  return parseInterpretation(body, req.romanise);
-}
-
-function parseInterpretation(body: string, romanise: boolean): Interpretation {
-  const start = body.indexOf("{");
-  const end = body.lastIndexOf("}");
-  if (start === -1 || end <= start) {
-    throw new Error("The interpreter didn't answer in a way this app could read.");
-  }
-  const parsed = JSON.parse(body.slice(start, end + 1)) as Record<string, unknown>;
-  const str = (key: string) =>
-    typeof parsed[key] === "string" ? (parsed[key] as string).trim() : "";
-  const text = str("text");
+  const text = field(obj, "text", 600);
   if (!text) throw new Error("The interpreter came back with nothing to say.");
-  const note = str("note");
   return {
-    text: text.slice(0, 600),
+    text,
     // A romanisation of Latin text is the text again; drop it rather than
     // print every line twice.
-    roman: romanise ? str("roman").slice(0, 600) : "",
-    literal: str("literal").slice(0, 600),
-    note: note || undefined,
+    roman: req.romanise ? field(obj, "roman", 600) : "",
+    literal: field(obj, "literal", 600),
+    note: field(obj, "note", 600) || undefined,
   };
 }

@@ -11,29 +11,15 @@ import {
   finishPasskeyRegistrationAction,
   removePasskeyAction,
 } from "@/app/actions";
+import { fromBase64Url, toBase64Url } from "@/lib/crypto";
 import { fmtDate, timeAgo } from "@/lib/format";
 import { PRF_SALT } from "@/lib/keys";
 import type { PasskeyRegistrationOptions, PasskeySignInOptions } from "@/lib/webauthn";
 import { rememberPrf } from "./keyring";
 import { ActError, useAct } from "./use-act";
 
-function toBase64url(bytes: ArrayBuffer): string {
-  let binary = "";
-  for (const byte of new Uint8Array(bytes)) binary += String.fromCharCode(byte);
-  return btoa(binary).replaceAll("+", "-").replaceAll("/", "_").replaceAll("=", "");
-}
-
-function fromBase64url(value: string): ArrayBuffer {
-  const padded = value
-    .replaceAll("-", "+")
-    .replaceAll("_", "/")
-    .padEnd(Math.ceil(value.length / 4) * 4, "=");
-  const binary = atob(padded);
-  // On an ArrayBuffer we own, so the credentials API takes it without a cast.
-  const bytes = new Uint8Array(new ArrayBuffer(binary.length));
-  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-  return bytes.buffer;
-}
+const toBase64url = (bytes: ArrayBuffer) => toBase64Url(new Uint8Array(bytes));
+const fromBase64url = (value: string): BufferSource => fromBase64Url(value);
 
 /**
  * A passkey is bound to the rp id the server derives from AUTH_URL, and the

@@ -1,9 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useTransition } from "react";
 import { acceptTermsAction } from "@/app/actions";
 import { routes } from "@/lib/routes";
+import { ActError, useAct } from "./use-act";
 
 /**
  * For members who predate the gate: once, on every page, until they tick it.
@@ -11,8 +11,7 @@ import { routes } from "@/lib/routes";
  * only records the moment they agreed.
  */
 export function TermsNudge() {
-  const [pending, start] = useTransition();
-  const [error, setError] = useState<string | null>(null);
+  const { pending, error, act } = useAct("Try again.");
   return (
     <div className="mx-auto mt-4 max-w-5xl px-4">
       <div className="card flex flex-wrap items-center gap-x-4 gap-y-3 border-gold/40 bg-gold/10 px-4 py-3">
@@ -30,17 +29,12 @@ export function TermsNudge() {
             </Link>
             , then confirm you're 18 or over.
           </p>
-          {error && <p className="mt-1 text-xs text-no-deep">{error}</p>}
+          <ActError error={error} block />
         </div>
         <button
           type="button"
           disabled={pending}
-          onClick={() =>
-            start(async () => {
-              const r = await acceptTermsAction();
-              if (!r.ok) setError(r.error ?? "Try again.");
-            })
-          }
+          onClick={() => act(acceptTermsAction)}
           className="rounded-md bg-felt px-4 py-2 text-sm font-semibold text-white hover:bg-felt-deep disabled:opacity-60"
         >
           I'm 18+ and I agree

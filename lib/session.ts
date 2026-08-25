@@ -1,22 +1,25 @@
 import { redirect } from "next/navigation";
+import { cache } from "react";
 import { getSession } from "./auth.ts";
 import { getMember, type TripContext, tripFor } from "./data.ts";
 import type { Member } from "./db/schema.ts";
 
-/** For pages: the signed-in member, or a redirect to /signin. */
-export async function requireMember(): Promise<Member> {
-  const session = await getSession();
-  if (!session) redirect("/signin");
-  const member = await getMember(session.memberId);
-  if (!member) redirect("/signin");
-  return member;
-}
+// A request renders the root layout, the trip layout and the page, and each asks who is signed
+// in and whether they have a seat; `cache` makes that one query per request, not three.
 
 /** The signed-in member, or null — for pages that have a signed-out face. */
-export async function currentMember(): Promise<Member | null> {
+export const currentMember = cache(async (): Promise<Member | null> => {
   const session = await getSession();
-  if (!session) return null;
-  return getMember(session.memberId);
+  return session ? getMember(session.memberId) : null;
+});
+
+const seatOf = cache(tripFor);
+
+/** For pages: the signed-in member, or a redirect to /signin. */
+export async function requireMember(): Promise<Member> {
+  const member = await currentMember();
+  if (!member) redirect("/signin");
+  return member;
 }
 
 /**
@@ -26,7 +29,7 @@ export async function currentMember(): Promise<Member | null> {
  */
 export async function requireTrip(tripId: string): Promise<TripContext & { me: Member }> {
   const me = await requireMember();
-  const ctx = await tripFor(me.id, tripId);
+  const ctx = await seatOf(me.id, tripId);
   if (!ctx) redirect("/trips");
   return { me, ...ctx };
 }
