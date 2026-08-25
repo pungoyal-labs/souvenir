@@ -12,35 +12,49 @@ export default function PrivacyPage() {
     <article className="mx-auto max-w-2xl">
       <p className="eyebrow">Privacy</p>
       <h1 className="display text-4xl font-extrabold uppercase tracking-wide">
-        We cannot read your trip
+        Your trip is yours
       </h1>
       <p className="text-sm text-soft">Last updated 25 August 2026.</p>
+
+      <Section title="In one paragraph">
+        Everything your group writes on a trip — calls, comments, verdicts, bills, the name, the
+        phrasebook — is locked on your phone before it is sent, with a key that only the people on
+        the trip have. We store the locked copies, keep them in order and count them. We cannot read
+        them, and neither can anyone who copies our database, restores a backup of it, or asks us
+        for it. Below is how that works in plain words, what we <em>can</em> see, and how to check
+        us.
+      </Section>
 
       <Section title="Who is responsible">
         The app is operated by an individual in India, who is the data fiduciary (DPDP Act, 2023)
         and data controller (GDPR) for it. For anything on this page, write to <Contact />.
       </Section>
 
-      <Section title="The promise, precisely">
-        A trip is readable only on the phones of the people on it. Every prediction, call, verdict,
-        comment, reaction, page view, bill and amount is encrypted on your phone before it is sent,
-        under a key the server never holds. What we store is the sealed record: we can order it and
-        count it, we cannot read it — and neither can anyone with a copy of our database, a backup,
-        or a legal demand for one.
-      </Section>
-
-      <Section title="Where the key lives">
-        The trip's key is made on the phone that opens the trip. It reaches every other member
-        inside the invite link — in the part of the address after <code>#</code>, which a browser
-        never sends to any server — and is kept on that phone. A member who changes phones or loses
-        one gets the key again from somebody on the trip, over a short-lived link; an organiser can
-        confirm who is asking, but cannot hand out a key they do not hold, and we cannot either.
-        There is no reset on our side, on purpose. A passkey that supports it also keeps a backup of
-        your keys, sealed under a secret only that passkey can produce: sign in with it on a new
-        phone and the keys come back by themselves — we store the sealed copy and cannot open it.
-        When somebody leaves a trip, an organiser rotates its key: everyone still on it gets the new
-        one, sealed to a key their own phone announced, and the person who left keeps what was
-        written until then and can read nothing after.
+      <Section title="Your keys, in plain words">
+        <ul className="list-disc space-y-1 pl-5">
+          <li>
+            <b>The trip's key is made on the phone that opens the trip</b> and reaches your friends
+            inside the invite link — in the part of the address after <code>#</code>, which browsers
+            never send to any server. That is why the link should go to the group and nobody else.
+          </li>
+          <li>
+            <b>New phone, or lost one?</b> Anyone on the trip sends you the key again in one tap
+            from the table page; the link works only for you, signed in as you, for half an hour. If
+            your passkey supports it (iCloud Keychain and Google Password Manager do; most password
+            managers not yet), it also keeps a sealed backup of your keys, so signing in on a new
+            device brings them back by itself. We store that backup and cannot open it.
+          </li>
+          <li>
+            <b>Lost every passkey?</b> An organiser can give you your seat back with a recovery
+            link, after checking it is really you; the key then comes the ordinary way. Nobody at
+            our end can do either — there is no reset button here, on purpose.
+          </li>
+          <li>
+            <b>Somebody leaves?</b> The organiser turns the key. Everyone still on the trip gets the
+            new one, sealed to a key their own phone announced; the person who left keeps what was
+            written until then and reads nothing after.
+          </li>
+        </ul>
       </Section>
 
       <Section title="What we can see">
@@ -87,15 +101,15 @@ export default function PrivacyPage() {
         advertising cookies, and use only the cookies the app needs to sign you in.
       </Section>
 
-      <Section title="The honest caveat, and how to check">
-        The server serves the code that runs on your phone and handles the key. A dishonest release
-        could ship code that leaks it; no web app escapes this. What we do about it: every build is
-        made by an automated pipeline from one commit, carries that commit's name — this page was
-        served by {build ? "build " : "a local build"}
-        {build && <span className="mono">{build.short}</span>} (also in the footer) — and is signed
-        with a provenance attestation that ties the image to the commit. Any member can ask to see
-        the code they are running: write to <Contact /> naming the build, and you get the source for
-        that commit and the attestation to check it against the image.
+      <Section title="How to check us">
+        The one thing you do have to trust is the code we send to your phone, since that is what
+        handles the key. So we make it checkable: every build comes from one commit through an
+        automated pipeline, carries that commit's name — this page was served by{" "}
+        {build ? "build " : "a local build"}
+        {build && <span className="mono">{build.short}</span>} (it is in the footer too) — and is
+        signed with an attestation that ties the running image to the commit. Want to see it? Write
+        to <Contact /> naming the build, and we send you the source for that commit and the
+        attestation to check it against.
       </Section>
 
       <Section title="Who can see it">
