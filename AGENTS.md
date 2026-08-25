@@ -45,7 +45,7 @@ Pre-commit (husky): biome on staged files, tsc, full test suite.
 ## Rules
 
 - **A trip is sealed.** Its predictions, calls, verdicts, table talk,
-  reactions and views are envelopes in `events` — sealed on the phone under
+  reactions are envelopes in `events` — sealed on the phone under
   the trip's key (`lib/crypto`), ordered by the server, and never readable by
   it. The server checks the seat, the epoch, the size and the shape
   (`appendEvent`), and nothing else — under the trip row's lock, which is
@@ -97,7 +97,7 @@ Pre-commit (husky): biome on staged files, tsc, full test suite.
 - **A trip is the tenant and the season.** `trips` holds the name, the
   destination, the home language, the two currencies, the dates, and the cap;
   `memberships` holds who is on it and with which role. Markets, ledger rows,
-  bills, invites, and phrases all carry `trip_id`; reactions, views, and
+  bills, invites, and phrases all carry `trip_id`; reactions and
   comments reach the trip through their market or bill. Every read in
   `lib/data.ts` takes a `tripId` or finds one through an id, and every write
   checks the caller's membership there — not in the UI, which anyone can
@@ -124,8 +124,9 @@ Pre-commit (husky): biome on staged files, tsc, full test suite.
   cash*. Code keeps `market/stake/settle*/amountC`. Don't half-rename either.
 - Inbox and the For-you rail are derived on the phone from the replayed trip
   (`lib/views` `inbox`/`listMarkets`). Stored state is only
-  `memberships.inbox_seen_at`; views are `view` events appended by a client
-  effect in `components/market-page.tsx` so link prefetches never count.
+  `memberships.inbox_seen_at`; which predictions a phone has opened is that
+  phone's business (`components/seen.ts`, localStorage), noted by a client
+  effect so link prefetches never count, and never an event.
 - The group and the leaderboard are one page (`/t/[id]/members`): a single
   ranked table, calibrating members under a divider row, with the invite and
   recovery machinery below it. Its only stats source is `leaderboard(tripId)`,
@@ -266,15 +267,16 @@ Pre-commit (husky): biome on staged files, tsc, full test suite.
   one the `Speaker` asks for, below the language and never instead of it. On
   the server, MiniMax voices are cross-lingual, so each side gets its own
   (`SPEECH_VOICE_US` / `SPEECH_VOICE_THEM`, plus pitch and speed for the local
-  side); the openai flavor keeps one voice for both, having no way to tell them
-  apart. Check a voice id against `POST /v1/get_voice` before setting it.
+  side). Check a voice id against `POST /v1/get_voice` before setting it.
   Listening is the browser's own recogniser and nothing else: it is the only
   one there is, solid on Android Chrome and missing on some iPhones, and where
   it is missing the page says so and offers typing. Never add a server
   transcription path without a vendor that actually has one — the last one was
   configured against MiniMax, which has no ASR, and it would have failed in
   front of somebody. Speaking prefers the device's own voice and falls back to
-  `SPEECH_BASE_URL`.
+  `SPEECH_BASE_URL`, which is MiniMax's `/v1/t2a_v2` and nothing else; a
+  deploy with no `SPEECH_*` set has only the device's voice, and the page
+  says so where a phone has none.
   Thai politeness needs the speaker's gender and this schema refuses to hold
   it, so ครับ/ค่ะ is a toggle on the page, shown only where the destination
   language has particles at all.

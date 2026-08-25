@@ -21,7 +21,7 @@ export function RotateKey({ since }: { since: Date | null }) {
   const keyring = useKeyring();
   const { tripId, epoch, me, name, roster, state } = useOpenTrip();
   const { pending, error, act } = useAct();
-  if (!since || !state.organiserIds.has(me.id) || epoch === null) return null;
+  if (!since || !state.organiserIds.has(me.id)) return null;
   const others = roster.filter((m) => m.id !== me.id);
   const withoutKey = others.filter((m) => !state.hellos.get(m.id)?.mkPub);
 

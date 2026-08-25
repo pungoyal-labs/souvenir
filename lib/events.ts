@@ -66,11 +66,6 @@ export interface React {
   on: boolean;
 }
 
-export interface View {
-  t: "view";
-  marketId: string;
-}
-
 export interface BillRevision {
   t: "bill.rev";
   billId: string;
@@ -132,7 +127,6 @@ export type EventPayload =
   | Reopen
   | Comment
   | React
-  | View
   | BillRevision
   | PhraseKeep
   | PhraseDrop
@@ -221,7 +215,6 @@ const checks: Record<EventType, Check> = {
     optStr(p.billId) &&
     (nonEmpty(p.marketId) ? p.billId === undefined : nonEmpty(p.billId)),
   react: (p) => nonEmpty(p.marketId) && (p.kind === "upvote" || p.kind === "watch") && bool(p.on),
-  view: (p) => nonEmpty(p.marketId),
   "bill.rev": (p) =>
     nonEmpty(p.billId) &&
     (p.kind === "expense" || p.kind === "settlement") &&

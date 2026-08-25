@@ -27,7 +27,7 @@ const label = "block text-[11px] font-semibold uppercase tracking-wider text-sof
 export interface TripFormInitial {
   id: string;
   name: string;
-  epoch: number | null;
+  epoch: number;
   destination: string;
   homeLanguage: string;
   homeCurrency: string;
@@ -50,7 +50,7 @@ export function TripForm({
 }) {
   const router = useRouter();
   const keyring = useKeyring();
-  const held = useTripKey(initial?.id ?? "", initial?.epoch ?? null);
+  const held = useTripKey(initial?.id ?? "", initial?.epoch ?? 0);
   const { pending, error, act } = useAct();
   const [name, setName] = useState(initial?.name ?? "");
   const [destination, setDestination] = useState(initial?.destination ?? "TH");

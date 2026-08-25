@@ -68,12 +68,6 @@ export interface ReactionState {
   at: Date;
 }
 
-export interface ViewState {
-  memberId: string;
-  marketId: string;
-  at: Date;
-}
-
 export interface BillRevisionState {
   editorId: string;
   at: Date;
@@ -129,7 +123,6 @@ export interface TripState {
   ledger: LedgerRow[];
   comments: CommentState[];
   reactions: ReactionState[];
-  views: ViewState[];
   bills: Map<string, BillState>;
   phrases: Map<string, PhraseState>;
   hellos: Map<string, HelloState>;
@@ -159,7 +152,6 @@ export function replayTrip(config: ReplayConfig, events: readonly OpenEvent[]): 
     ledger: [],
     comments: [],
     reactions: [],
-    views: [],
     bills: new Map(),
     phrases: new Map(),
     hellos: new Map(),
@@ -312,11 +304,6 @@ function apply(ctx: Ctx, ev: OpenEvent, p: Exclude<EventPayload, UnknownEvent>):
         if (i < 0) refuse("already off");
         state.reactions.splice(i, 1);
       }
-      return;
-    }
-    case "view": {
-      marketOf(state, p.marketId);
-      state.views.push({ memberId: ev.authorId, marketId: p.marketId, at: ev.at });
       return;
     }
     case "bill.rev": {

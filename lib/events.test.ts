@@ -16,7 +16,6 @@ const samples: EventPayload[] = [
   { t: "reopen", marketId: "m1" },
   { t: "comment", id: "c1", marketId: "m1", body: "@b no chance", mentions: ["b"] },
   { t: "react", marketId: "m1", kind: "watch", on: true },
-  { t: "view", marketId: "m1" },
   {
     t: "bill.rev",
     billId: "b1",

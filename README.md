@@ -147,7 +147,7 @@ list. Highlights:
 | `CONTACT_EMAIL` | Shown on `/privacy`: grievances, and verification requests |
 | `DB_PORT` / `APP_PORT` / `APP_BIND` / `PORT` | Database and HTTP ports |
 | `LLM_BASE_URL` / `LLM_API_KEY` / `LLM_MODEL` | Optional draft-polish and Thai interpreting endpoint (hidden when unset) |
-| `SPEECH_BASE_URL` / `SPEECH_API_KEY` / `SPEECH_FLAVOR` | Optional voice for phones with none: OpenAI-compatible `/audio/speech`, or `minimax` |
+| `SPEECH_BASE_URL` / `SPEECH_API_KEY` | Optional voice for phones with none: MiniMax `/v1/t2a_v2` (hidden when unset) |
 | `FX_BASE_URL` | Where the day's exchange rate comes from, for settling the whole trip in the home currency (currency-api shape; defaults to the public mirror) |
 
 Anyone can open an account (a passkey from the front page, or Google) and a

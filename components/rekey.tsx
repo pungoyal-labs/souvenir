@@ -32,7 +32,6 @@ export function SendKey({
 
   const mint = () =>
     act(async () => {
-      if (epoch === null) return;
       const raw = tripKeyOf(keyring, tripId, epoch);
       if (!raw) return { ok: false, error: "This phone has no key to send." };
       const secret = newLinkSecret();

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
 import { piesText } from "@/lib/pies";
 import { routes } from "@/lib/routes";
 import { type StarterContext, starters } from "@/lib/starters";
@@ -9,6 +10,7 @@ import { listMarkets, memberResults, netOf, recentActivity } from "@/lib/views";
 import { ActivityFeed } from "./activity";
 import { MarketCard } from "./market-card";
 import { Pies } from "./pies";
+import { seenMarkets } from "./seen";
 import { Starters } from "./starters";
 import { useOpenTrip } from "./trip-store";
 import { EmptyState } from "./ui";
@@ -21,7 +23,8 @@ export function TripHome({
   starterTrip: Omit<StarterContext, "members" | "viewerId" | "name">;
 }) {
   const { tripId, me, lingo, t, roster, people, state, name } = useOpenTrip();
-  const { open, resolved, forYou } = listMarkets(state, tripId, people, me.id, new Date());
+  const [seen] = useState(() => seenMarkets(tripId));
+  const { open, resolved, forYou } = listMarkets(state, tripId, people, me.id, new Date(), seen);
   const netC = netOf(state, me.id);
   const results = memberResults(state, tripId, me.id);
   const activity = recentActivity(state, tripId, people, 10);

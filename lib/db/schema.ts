@@ -83,7 +83,7 @@ export const trips = pgTable("trips", {
    * Which trip-key epoch new events must be sealed under (docs/private-trips.md).
    * Every trip is created at 0; the column is nullable only by history.
    */
-  keyEpoch: integer("key_epoch"),
+  keyEpoch: integer("key_epoch").notNull().default(0),
   /** The name, sealed under the trip key (lib/keys `sealName`). */
   nameEnc: text("name_enc"),
   /** Set when a seat went (removal, leaving, deletion) and the key has not been rotated since. */

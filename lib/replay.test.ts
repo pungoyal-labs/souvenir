@@ -293,19 +293,6 @@ describe("table talk", () => {
     expect(state.reactions).toEqual([]);
     expect(reasons(state)).toEqual(["already on", "already off", "no such prediction"]);
   });
-
-  it("records views on real predictions only", () => {
-    const state = replayTrip(
-      config,
-      log([
-        ["a", create("m")],
-        ["b", { t: "view", marketId: "m" }],
-        ["b", { t: "view", marketId: "ghost" }],
-      ]),
-    );
-    expect(state.views).toHaveLength(1);
-    expect(reasons(state)).toEqual(["no such prediction"]);
-  });
 });
 
 describe("bills", () => {

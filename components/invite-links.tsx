@@ -18,7 +18,7 @@ export function useMintInvite() {
     label: string,
     opts?: { isOpen?: boolean },
   ): Promise<{ ok: true; url: string } | { ok: false; error: string }> => {
-    if (epoch === null || !state) return { ok: false, error: "This trip isn't sealed yet." };
+    if (!state) return { ok: false, error: "This phone can't read the trip yet." };
     const raw = tripKeyOf(keyring.keyring, tripId, epoch);
     if (!raw) return { ok: false, error: "This phone has no key to put in a link." };
     const secret = newLinkSecret();

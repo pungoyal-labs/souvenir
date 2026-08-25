@@ -24,6 +24,7 @@ import { type Lingo, lingoOf } from "@/lib/lingo";
 import { type ReplayConfig, replayTrip, type TripState } from "@/lib/replay";
 import { type Person, peopleOf, type RosterMember } from "@/lib/views";
 import { useKeyring, useTripKey } from "./keyring";
+import { loadRows, saveRows } from "./log-cache";
 
 const POLL_MS = 15_000;
 
@@ -36,7 +37,7 @@ export interface TripStoreActions {
 
 export interface TripStoreValue {
   tripId: string;
-  epoch: number | null;
+  epoch: number;
   /** The trip's name: `undefined` while the key is loading, `null` when this phone cannot read it. */
   name: string | null | undefined;
   me: RosterMember;
@@ -73,7 +74,7 @@ const TripStoreContext = createContext<TripStoreValue | null>(null);
  * ones from what the keyring kept, and the current one again for an epoch it
  * never had (so the row fails to open and is counted, not skipped).
  */
-function epochKeys(keyring: Keyring, tripId: string, epoch: number | null, current: CryptoKey) {
+function epochKeys(keyring: Keyring, tripId: string, epoch: number, current: CryptoKey) {
   const cache = new Map<number, Promise<CryptoKey>>();
   return (e: number): Promise<CryptoKey> => {
     if (e === epoch) return Promise.resolve(current);
@@ -121,32 +122,45 @@ export function TripStoreProvider({
   me,
   lingo,
   roster,
-  initial,
   seenAt: initialSeenAt,
   actions,
   children,
 }: {
   tripId: string;
-  epoch: number | null;
+  epoch: number;
   nameEnc: string | null;
   config: Omit<ReplayConfig, "tripId">;
   me: RosterMember;
   lingo: string;
   roster: RosterMember[];
-  initial: EventRow[];
   seenAt: Date | null;
   actions: TripStoreActions;
   children: React.ReactNode;
 }) {
   const key = useTripKey(tripId, epoch);
   const keyring = useKeyring();
-  const [rows, setRows] = useState<EventRow[]>(initial);
+  const [rows, setRows] = useState<EventRow[]>([]);
+  // The phone's copy of the log has been read, and the server has been asked once for the rest.
+  const [cached, setCached] = useState(false);
+  const [synced, setSynced] = useState(false);
   // Every row tried so far: the event, or null for one that would not open.
   const [opened, setOpened] = useState<Map<number, OpenEvent | null>>(new Map());
   const [seenAt, setSeenAt] = useState<Date | null>(initialSeenAt);
   const [name, setName] = useState<string | null | undefined>(undefined);
   const rowsRef = useRef(rows);
   rowsRef.current = rows;
+
+  useEffect(() => {
+    let cancelled = false;
+    loadRows(tripId).then((kept) => {
+      if (cancelled) return;
+      setRows((current) => addRows(current, kept));
+      setCached(true);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [tripId]);
 
   useEffect(() => {
     if (key === undefined) return;
@@ -187,14 +201,17 @@ export function TripStoreProvider({
   const refresh = useCallback(async () => {
     const last = rowsRef.current[rowsRef.current.length - 1]?.seq ?? 0;
     const res = await actions.since(tripId, last);
+    setSynced(true);
     const fresh = res.rows;
     if (!res.ok || !fresh?.length) return;
     setRows((current) => addRows(current, fresh));
+    void saveRows(fresh);
   }, [actions, tripId]);
 
-  // Poll while the tab is visible; catch up the moment it becomes visible again.
+  // Poll while the tab is visible, once the phone's own copy is in; catch up the moment it
+  // becomes visible again.
   useEffect(() => {
-    if (!key) return;
+    if (!key || !cached) return;
     let timer: ReturnType<typeof setInterval> | null = null;
     const stop = () => {
       if (timer) clearInterval(timer);
@@ -211,7 +228,7 @@ export function TripStoreProvider({
       stop();
       document.removeEventListener("visibilitychange", onVisibility);
     };
-  }, [key, refresh]);
+  }, [key, cached, refresh]);
 
   // Rows in the trip's order; the store keeps `rows` sorted by seq.
   const events = useMemo(
@@ -226,9 +243,7 @@ export function TripStoreProvider({
 
   const sealEvent = useCallback(
     async (payload: EventPayload) => {
-      if (!key || epoch === null) {
-        return { ok: false as const, error: "This phone has no key for the trip." };
-      }
+      if (!key) return { ok: false as const, error: "This phone has no key for the trip." };
       // A dry run over the log as this phone has it: what every other phone will say to it.
       const trial: OpenEvent = {
         id: Number.MAX_SAFE_INTEGER,
@@ -261,10 +276,11 @@ export function TripStoreProvider({
         at: new Date(res.at),
         tripId,
         authorId: me.id,
-        epoch: epoch as number,
+        epoch,
         body: sealed.envelope,
       };
       setRows((current) => addRows(current, [row]));
+      void saveRows([row]);
       void refresh();
       return { ok: true };
     },
@@ -276,7 +292,7 @@ export function TripStoreProvider({
     [roster, state],
   );
 
-  const ready = !!key && rows.every((r) => opened.has(r.id));
+  const ready = !!key && synced && rows.every((r) => opened.has(r.id));
   const unreadable = useMemo(() => [...opened.values()].filter((e) => e === null).length, [opened]);
   // The same test <Sealed> makes: a key that opens nothing is the wrong key.
   const readable = !!state && ready && (rows.length === 0 || unreadable < rows.length);
@@ -285,7 +301,7 @@ export function TripStoreProvider({
   // ref is set before the post, so a second run (StrictMode) cannot repeat it.
   const helloed = useRef<number | null>(null);
   useEffect(() => {
-    if (!readable || !state || epoch === null || helloed.current === epoch) return;
+    if (!readable || !state || helloed.current === epoch) return;
     const hello = state.hellos.get(me.id);
     const mkPub = memberPublicKey(keyring.keyring);
     // Skip only when the record already carries this phone's member key: a fresh one (recovery,
@@ -299,8 +315,7 @@ export function TripStoreProvider({
   // The key was rotated and this phone has the one before: the grant wrapped to its member key.
   const granted = useRef<number | null>(null);
   useEffect(() => {
-    if (key !== null || epoch === null || keyring.status !== "ready" || granted.current === epoch)
-      return;
+    if (key !== null || keyring.status !== "ready" || granted.current === epoch) return;
     const mk = keyring.keyring.mk;
     if (!mk) return;
     granted.current = epoch;

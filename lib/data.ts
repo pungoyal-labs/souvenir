@@ -68,8 +68,8 @@ function checkWrapped(blob: string): void {
   checkBlob(blob, 2, 8192, GARBLED_KEY);
 }
 
-function checkEpoch(trip: { keyEpoch: number | null }, epoch: number): void {
-  if (trip.keyEpoch === null || epoch !== trip.keyEpoch) throw new DataError(STALE_KEY);
+function checkEpoch(trip: { keyEpoch: number }, epoch: number): void {
+  if (epoch !== trip.keyEpoch) throw new DataError(STALE_KEY);
 }
 
 // ---------- trips ----------
@@ -336,9 +336,7 @@ export async function bumpEpoch(
   for (const g of input.grants) checkBlob(g.wrapped, 3, 8192, GARBLED_KEY);
   await db.transaction(async (tx) => {
     const [trip] = await tx.select().from(trips).where(eq(trips.id, tripId)).for("update");
-    if (!trip || trip.keyEpoch === null || input.epoch !== trip.keyEpoch + 1) {
-      throw new DataError(STALE_KEY);
-    }
+    if (!trip || input.epoch !== trip.keyEpoch + 1) throw new DataError(STALE_KEY);
     const seats = await tx
       .select({ memberId: memberships.memberId })
       .from(memberships)
@@ -379,7 +377,6 @@ export interface KeyGrant {
 /** The newest grant for this member on this trip, for the trip's current epoch. */
 export async function myGrant(memberId: string, tripId: string): Promise<KeyGrant | null> {
   const { trip } = await requireMembership(tripId, memberId);
-  if (trip.keyEpoch === null) return null;
   const [row] = await db
     .select({ id: keyGrants.id, epoch: keyGrants.epoch, wrapped: keyGrants.wrapped })
     .from(keyGrants)
@@ -1075,7 +1072,7 @@ async function insertEvent(
     .from(trips)
     .where(eq(trips.id, tripId))
     .for("update");
-  if (!trip || trip.keyEpoch === null) throw new DataError("This trip isn't sealed yet.");
+  if (!trip) throw new DataError("That trip is gone.");
   checkEpoch(trip, header.epoch);
   const [row] = await tx
     .insert(events)

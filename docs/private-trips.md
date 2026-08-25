@@ -115,7 +115,7 @@ signatures needed.
 
 ```
 { t: "market.create" | "call" | "switch" | "resolve" | "reopen"
-   | "comment" | "react" | "view"
+   | "comment" | "react"
    | "bill.rev" | "bill.settle"
    | "phrase.keep" | "phrase.drop"
    | "member.hello" | "member.key" | "member.role" | "trip.rename",

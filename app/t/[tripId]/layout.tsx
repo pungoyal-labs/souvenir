@@ -6,7 +6,7 @@ import {
 } from "@/app/actions";
 import { TripHeader } from "@/components/trip-header";
 import { TripStoreProvider } from "@/components/trip-store";
-import { eventsSince, membersOf } from "@/lib/data";
+import { membersOf } from "@/lib/data";
 import { requireTrip } from "@/lib/session";
 import { DESTINATIONS, pairFor } from "@/lib/talk";
 import { daysBetween, placeOf, tripCurrencies, tripPhase, tripToday } from "@/lib/trips";
@@ -22,9 +22,10 @@ const seat = ({ id, name, avatarUpdatedAt, joinedAt, role }: RosterMember): Rost
 });
 
 /**
- * The sealed log is fetched here, once, into the store every page under
- * /t/[tripId] reads; layouts persist across navigation, so moving between
- * the trip's pages does not fetch it again.
+ * The store every page under /t/[tripId] reads. The sealed log itself is not
+ * shipped here: the phone keeps its rows between visits (components/log-cache)
+ * and fetches only what landed since, so a re-render of this layout costs one
+ * small poll, not the whole log.
  */
 export default async function TripLayout({
   children,
@@ -35,10 +36,7 @@ export default async function TripLayout({
 }) {
   const { tripId } = await params;
   const { me, trip, membership } = await requireTrip(tripId);
-  const [roster, initial] = await Promise.all([
-    membersOf(tripId),
-    trip.keyEpoch === null ? [] : eventsSince(me.id, tripId, 0),
-  ]);
+  const roster = await membersOf(tripId);
   const pair = pairFor(trip);
   const today = tripToday(trip);
   const phase = tripPhase(trip, today);
@@ -67,7 +65,6 @@ export default async function TripLayout({
       me={seat({ ...me, role: membership.role })}
       lingo={me.lingo}
       roster={roster.map(seat)}
-      initial={initial}
       seenAt={membership.inboxSeenAt}
       actions={{
         append: appendEventAction,

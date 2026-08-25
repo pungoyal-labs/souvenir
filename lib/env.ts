@@ -60,11 +60,9 @@ const envSchema = z.object({
   // it can.
   SPEECH_BASE_URL: z.string().optional(),
   SPEECH_API_KEY: z.string().optional(),
-  SPEECH_TTS_MODEL: z.string().default("tts-1"),
-  /** The `openai` flavor's one voice; it has no notion of who is speaking. */
-  SPEECH_TTS_VOICE: z.string().default("alloy"),
+  SPEECH_TTS_MODEL: z.string().default("speech-2.6-turbo"),
   /**
-   * The `minimax` flavor's voice per side, which it can have because its
+   * MiniMax's voice per side, which it can have because its
    * voices are cross-lingual: `language_boost` says which language the words
    * are in and the voice reads them in its own accent. So the group's own side
    * is read by an Indian woman rather than an American one, and the local side
@@ -80,14 +78,7 @@ const envSchema = z.object({
    */
   SPEECH_VOICE_THEM_PITCH: z.coerce.number().min(-12).max(12).default(-5),
   SPEECH_VOICE_THEM_SPEED: z.coerce.number().min(0.5).max(2).default(0.9),
-  /**
-   * Which shape the voice endpoint speaks. "openai" is `/audio/speech`
-   * returning audio bytes; "minimax" is `/v1/t2a_v2` returning hex audio in
-   * JSON — worth its own branch because the same key already drives
-   * LLM_BASE_URL, so the group pays one vendor rather than two.
-   */
-  SPEECH_FLAVOR: z.enum(["openai", "minimax"]).default("openai"),
-  /** MiniMax only, and only where the account still requires it on the query. */
+  /** Only where the account still requires it on the query. */
   SPEECH_GROUP_ID: z.string().optional(),
 
   /**

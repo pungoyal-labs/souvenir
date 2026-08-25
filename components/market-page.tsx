@@ -1,19 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef } from "react";
+import { useEffect } from "react";
 import { fmtDate, timeAgo } from "@/lib/format";
 import { toCents } from "@/lib/pies";
 import { routes } from "@/lib/routes";
-import {
-  marketActivity,
-  marketCard,
-  marketComments,
-  marketView,
-  reactors,
-  seenBy,
-  shouldRecordView,
-} from "@/lib/views";
+import { marketActivity, marketCard, marketComments, marketView, reactors } from "@/lib/views";
 import { ActivityFeed } from "./activity";
 import { Avatar } from "./avatar";
 import { BetPanel } from "./bet-panel";
@@ -23,6 +15,7 @@ import { PoolBar } from "./pool-bar";
 import { ReactionBar } from "./reaction-bar";
 import { ReopenPanel } from "./reopen-panel";
 import { ResolvePanel } from "./resolve-panel";
+import { markMarketSeen } from "./seen";
 import { ShareCard } from "./share-card";
 import { SideChip, StatusChip } from "./side-chip";
 import { useOpenTrip } from "./trip-store";
@@ -42,17 +35,11 @@ export function MarketPage({
   const { tripId, me, lingo, t, people, state, append } = useOpenTrip();
   const m = state.markets.get(marketId);
 
-  // A view is a client effect so a link prefetch never counts; once per visit, not per replay.
+  // Noted on this phone in an effect, so a link prefetch never counts.
   const opened = !!m;
-  const viewed = useRef<string | null>(null);
-  // biome-ignore lint/correctness/useExhaustiveDependencies: once per opened prediction, not per replay
   useEffect(() => {
-    if (!opened || viewed.current === marketId) return;
-    viewed.current = marketId;
-    if (shouldRecordView(state, me.id, marketId, new Date())) {
-      void append({ t: "view", marketId });
-    }
-  }, [marketId, opened]);
+    if (opened) markMarketSeen(tripId, marketId);
+  }, [opened, tripId, marketId]);
 
   if (!m) {
     return (
@@ -68,14 +55,12 @@ export function MarketPage({
   const view = marketView(state, tripId, people, m, me.id);
   const { market, creator } = view;
   const { activity, settlements } = marketActivity(state, tripId, people, marketId);
-  const seen = seenBy(state, marketId);
   const isOpen = market.status === "open";
   const totalPoolC = view.yesPoolC + view.noPoolC;
   const pulse = [
     view.participants.length > 0 &&
       `${view.participants.length} backer${view.participants.length === 1 ? "" : "s"}`,
     activity.length > 0 && `${activity.length} call${activity.length === 1 ? "" : "s"}`,
-    seen > 0 && `seen by ${seen}`,
   ].filter(Boolean);
 
   return (

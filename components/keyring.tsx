@@ -298,18 +298,13 @@ export function useKeyring(): KeyringContextValue {
  * `null` when this phone does not hold it (show *Get the key*), a CryptoKey
  * when it does.
  */
-export function useTripKey(tripId: string, epoch: number | null): CryptoKey | null | undefined {
+export function useTripKey(tripId: string, epoch: number): CryptoKey | null | undefined {
   const { status, keyring } = useKeyring();
   // Tagged with what it was looked up for: after a rotation the epoch prop moves a render before
   // the lookup lands, and the old key must not be handed out under the new epoch's name.
-  const [found, setFound] = useState<{
-    tripId: string;
-    epoch: number | null;
-    key: CryptoKey | null;
-  }>();
+  const [found, setFound] = useState<{ tripId: string; epoch: number; key: CryptoKey | null }>();
   useEffect(() => {
     if (status === "loading") return setFound(undefined);
-    if (epoch === null) return setFound({ tripId, epoch, key: null });
     let cancelled = false;
     tripCryptoKey(keyring, tripId, epoch).then(
       (key) => !cancelled && setFound({ tripId, epoch, key }),

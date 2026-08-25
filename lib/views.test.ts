@@ -23,8 +23,6 @@ import {
   type RosterMember,
   reactors,
   recentActivity,
-  seenBy,
-  shouldRecordView,
   tripRecap,
   tripSettlement,
 } from "./views.ts";
@@ -90,7 +88,6 @@ const season = log([
   ["a", call("m3", "yes", 1)],
   ["b", { t: "react", marketId: "m3", kind: "watch", on: true }],
   ["a", { t: "comment", id: "c1", marketId: "m3", body: "@B come on", mentions: ["b"] }],
-  ["b", { t: "view", marketId: "m3" }],
 ]);
 
 describe("markets", () => {
@@ -199,14 +196,6 @@ describe("table talk", () => {
     expect(comments).toHaveLength(1);
     expect(comments[0]?.mentions.map((p) => p.id)).toEqual(["b"]);
     expect(reactors(state, people, "m3", "watch").map((p) => p.id)).toEqual(["b"]);
-    expect(seenBy(state, "m3")).toBe(1);
-  });
-
-  it("throttles views to one every five minutes", () => {
-    const state = replayTrip(config, season);
-    expect(shouldRecordView(state, "b", "m3", at(12))).toBe(false);
-    expect(shouldRecordView(state, "b", "m3", at(18))).toBe(true);
-    expect(shouldRecordView(state, "a", "m3", at(12))).toBe(true);
   });
 
   it("refuses empty or long drafts and comments", () => {

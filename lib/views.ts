@@ -162,12 +162,14 @@ export function marketView(
 }
 
 /** Open and resolved predictions, and the For-you rail for the viewer. */
+/** `seen` is which predictions this phone has opened — kept on the phone, never in the log. */
 export function listMarkets(
   state: TripState,
   tripId: string,
   people: People,
   viewerId: string,
   now: Date,
+  seen: ReadonlySet<string> = new Set(),
 ): { open: MarketView[]; resolved: MarketView[]; forYou: MarketView[] } {
   const all = [...state.markets.values()].sort((a, b) => newestFirst(a.createdAt, b.createdAt));
   const views = all.map((m) => marketView(state, tripId, people, m, viewerId));
@@ -175,7 +177,7 @@ export function listMarkets(
   const resolved = views
     .filter((v) => v.market.status !== "open")
     .sort((a, b) => byResolved(a.market, b.market));
-  return { open, resolved, forYou: forYou(state, open, all, viewerId, now) };
+  return { open, resolved, forYou: forYou(state, open, all, viewerId, now, seen) };
 }
 
 function forYou(
@@ -184,6 +186,7 @@ function forYou(
   all: MarketState[],
   viewerId: string,
   now: Date,
+  seen: ReadonlySet<string>,
 ): MarketView[] {
   const byMarket = rowsByMarket(state);
   const candidates: CandidateMarket[] = open.map((v) => ({
@@ -207,8 +210,7 @@ function forYou(
     participantIds: [...m.positions].filter(([, pos]) => exposure(pos) > 0).map(([id]) => id),
   }));
   const viewById = new Map(open.map((v) => [v.market.id, v]));
-  const viewed = new Set(state.views.filter((v) => v.memberId === viewerId).map((v) => v.marketId));
-  return recommend({ viewerId, now, candidates, history, viewedMarketIds: viewed }).map(
+  return recommend({ viewerId, now, candidates, history, viewedMarketIds: seen }).map(
     (rec) => viewById.get(rec.marketId)!,
   );
 }
@@ -444,22 +446,6 @@ export function reactors(
   kind: "upvote" | "watch",
 ): Person[] {
   return known(people, reactorIds(state, marketId, kind));
-}
-
-/** Distinct members who have opened this prediction. */
-export function seenBy(state: TripState, marketId: string): number {
-  return new Set(state.views.filter((v) => v.marketId === marketId).map((v) => v.memberId)).size;
-}
-
-/** A refresh spree counts once every five minutes. */
-export function shouldRecordView(
-  state: TripState,
-  memberId: string,
-  marketId: string,
-  now: Date,
-): boolean {
-  const last = state.views.findLast((v) => v.memberId === memberId && v.marketId === marketId);
-  return !last || now.getTime() - last.at.getTime() >= 5 * 60_000;
 }
 
 // ---------- inbox ----------
