@@ -1,6 +1,6 @@
 # Private trips — end-to-end encryption, planned properly
 
-Status: decisions settled 2026-08-24; Phases 0, 1, 2 and 4 merged (#4, #5, #6) and deployed; the legacy-column drop and Phase 3 are PR #7 (`private-trips-legacy-drop`). Written against the codebase at `a654787`; §7 records what shipped.
+Status: decisions settled 2026-08-24; Phases 0, 1, 2 and 4 merged (#4, #5, #6) and deployed; Phase 3 and the column drop merged (#7); Phase 5 (verification on request) is `private-trips-phase-5`. Written against the codebase at `a654787`; §7 records what shipped.
 
 ## 0. The promise, stated precisely
 
@@ -26,11 +26,13 @@ duration of the request, exactly as today, and are still never stored.
 
 **The web caveat.** The server serves the code that holds the keys. A
 malicious deploy could ship a client that leaks them. No web app escapes this;
-what we can do is make a bad deploy detectable (Phase 5: reproducible build,
-the image digest published on `/privacy`, the client source public) and make
-sure no server-side path can ever *ask* a client for a key. The honest line for
-`/privacy`: *"We cannot read your trip. We could, in principle, ship you code
-that could — which is why the code is public and every release is signed."*
+what we can do is make a bad deploy detectable (Phase 5: an attested build
+that names its commit, and the source handed to any member who asks) and
+make sure no server-side path can ever *ask* a client for a key. The honest
+line for `/privacy`: *"We cannot read your trip. We could, in principle, ship
+you code that could — which is why every build names its commit, is signed,
+and any member can ask to see it."* Decided 2026-08-25: verification is on
+request, not public, so the repository may be private.
 
 ## 1. Principles
 
@@ -511,15 +513,22 @@ destructive: `pg_dump` before deploying it.** `0023` adds `keyring_wraps`.
 Exit reached: no plaintext content column exists except the two legacy
 columns above, which carry only what predates sealing and empty themselves.
 
-### Phase 5 — Verifiable client (≈1 week, optional but the centrepiece needs it)
+### Phase 5 — Verifiable on request (PR `private-trips-phase-5`)
 
-- Reproducible image build; digest published on `/privacy` and in the
-  footer; release tags signed.
-- Repository public. Nothing about the server or the data changes; it is
-  the only honest answer to the web caveat in §0.
-- Per-trip hash chain: each event carries the hash of the last one its author
-  saw; forks and gaps show on the members page. Tamper-*evident* ordering on
-  top of tamper-*proof* content.
+Shipped: CI builds the image with `GIT_SHA` baked in, the Next build id set
+to the commit, `SOURCE_DATE_EPOCH` and rewritten layer timestamps, BuildKit
+provenance and an SBOM, and signs a Sigstore provenance attestation with the
+workflow's OIDC identity. The footer names the build; `/privacy` says how a
+member checks it: write to `CONTACT_EMAIL` naming the build and receive the
+source for that commit and the attestation (`gh attestation verify
+oci://<image>:<sha7> --owner pungoyal` ties the image to it).
+
+Decided against, 2026-08-25: public verification (the repository may go
+private; a member who asks is the audience that matters), a public crypto
+library (reuse is not a goal and a library would not vouch for the app that
+uses it), and the per-trip hash chain (tamper-evident ordering was never part
+of the promise, and it was the one piece of the design whose complexity
+bought nothing a member asked for).
 
 ## 8. Decisions — settled 2026-08-24
 

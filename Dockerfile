@@ -13,6 +13,9 @@ WORKDIR /app
 RUN npm i -g pnpm@11
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
+# The commit this image is built from: the build id, and what /privacy names.
+ARG GIT_SHA=dev
+ENV GIT_SHA=$GIT_SHA
 ENV NEXT_TELEMETRY_DISABLED=1
 # Satisfies lib/env.ts validation during page-data collection. Build-stage
 # only — the runner stage starts FROM a fresh base and reads the real .env.
@@ -24,6 +27,8 @@ RUN pnpm build
 # migration SQL, and their dependencies into the standalone output.
 FROM node:24-alpine AS runner
 WORKDIR /app
+ARG GIT_SHA=dev
+ENV GIT_SHA=$GIT_SHA
 ENV NODE_ENV=production
 ENV HOSTNAME=0.0.0.0
 ENV PORT=3000

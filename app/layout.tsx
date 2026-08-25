@@ -10,6 +10,7 @@ import { RecoveryNotice } from "@/components/recovery-notice";
 import { TermsNudge } from "@/components/terms-nudge";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { passkeysConfigured } from "@/lib/auth";
+import { build } from "@/lib/build";
 import { hasPasskey, recoveryNoticeFor } from "@/lib/data";
 import { env } from "@/lib/env";
 import { lingoOf } from "@/lib/lingo";
@@ -143,6 +144,11 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             <Link href={routes.privacy} className="hover:underline">
               Privacy
             </Link>
+            {build && (
+              <span className="mono" title="The commit this build is from">
+                {build.short}
+              </span>
+            )}
           </span>
         </footer>
       </body>

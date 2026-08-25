@@ -166,6 +166,13 @@ Pre-commit (husky): biome on staged files, tsc, full test suite.
   transaction with the row locked.
   `members.email` is nullable because of it — a link-joined member has no
   address at all. New members pick their name and lingo at sign-up.
+- **The build is named, and verified on request.** CI attests every image
+  (Sigstore, `actions/attest-build-provenance`) and bakes the commit in as
+  `GIT_SHA`; `lib/build.ts` is the one place that names the running build,
+  for the footer and `/privacy`. A member who asks (`CONTACT_EMAIL`) gets
+  the source for that commit and the attestation; there is no public
+  verification and the repository may be private. Keep `GIT_SHA` out of
+  anything but `lib/build.ts`.
 - **A seat that goes takes its key with it.** Removal, leaving and account
   deletion (`dropSeat`) mark the trip `key_stale_since`; nothing can pull a
   key back from a phone. An organiser rotates from the members page, and the

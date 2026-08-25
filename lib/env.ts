@@ -42,6 +42,10 @@ const envSchema = z.object({
     .transform((v) => v === "true"),
 
   /** Resolved markets required before a member appears in the ranked leaderboard. */
+  /** Where a member writes: grievances, and a request to see the code they are running. */
+  CONTACT_EMAIL: z.string().email().optional(),
+  /** The commit the running image was built from (Dockerfile); absent in dev. */
+  GIT_SHA: z.string().optional(),
   RANKED_MIN_RESOLVED: z.coerce.number().int().positive().default(5),
 
   // Optional LLM used to polish market drafts before publishing.

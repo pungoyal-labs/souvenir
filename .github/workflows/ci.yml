@@ -40,6 +40,8 @@ jobs:
     permissions:
       contents: read
       packages: write
+      id-token: write
+      attestations: write
     outputs:
       image: ${{ steps.meta.outputs.image }}
       tag: ${{ steps.meta.outputs.tag }}
@@ -56,17 +58,36 @@ jobs:
         run: |
           echo "image=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
           echo "tag=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+          echo "epoch=$(git log -1 --format=%ct)" >> "$GITHUB_OUTPUT"
+      # Reproducible where the tooling allows: the build id is the commit, layer
+      # timestamps are the commit's, and the image carries the sha it was built
+      # from so /privacy can name it. The attestation below is what a member
+      # checks: `gh attestation verify oci://<image>:<tag> --owner <owner>`
+      # proves the image was built by this workflow from that commit.
       - name: Build & push image (arm64, matching the OCI host)
+        id: build
         uses: docker/build-push-action@v7
+        env:
+          SOURCE_DATE_EPOCH: ${{ steps.meta.outputs.epoch }}
         with:
           context: .
           platforms: linux/arm64
-          push: true
+          outputs: type=image,push=true,rewrite-timestamp=true
+          build-args: |
+            GIT_SHA=${{ github.sha }}
           tags: |
             ${{ steps.meta.outputs.image }}:${{ steps.meta.outputs.tag }}
             ${{ steps.meta.outputs.image }}:latest
+          provenance: mode=max
+          sbom: true
           cache-from: type=gha
           cache-to: type=gha,mode=max
+      - name: Attest the image (Sigstore, signed with this run's OIDC identity)
+        uses: actions/attest-build-provenance@v3
+        with:
+          subject-name: ${{ steps.meta.outputs.image }}
+          subject-digest: ${{ steps.build.outputs.digest }}
+          push-to-registry: true
 
   deploy:
     needs: image
@@ -76,7 +97,7 @@ jobs:
     # which is the single source of truth for the server's .env:
     #   vars:    OCI_HOST, OCI_USER, OCI_SSH_PORT (optional), DEPLOY_DIR,
     #            APP_PORT, APP_BIND, DB_PORT, AUTH_URL,
-    #            RANKED_MIN_RESOLVED, LLM_BASE_URL, LLM_MODEL
+    #            RANKED_MIN_RESOLVED, CONTACT_EMAIL, LLM_BASE_URL, LLM_MODEL
     #   secrets: OCI_SSH_KEY, POSTGRES_PASSWORD, AUTH_SECRET,
     #            AUTH_GOOGLE_ID, AUTH_GOOGLE_SECRET, LLM_API_KEY
     # The registry pull uses this run's ephemeral GITHUB_TOKEN — no PAT needed.
@@ -146,6 +167,7 @@ jobs:
             AUTH_GOOGLE_SECRET=${{ secrets.AUTH_GOOGLE_SECRET }}
             AUTH_DEV_LOGIN=false
             RANKED_MIN_RESOLVED=${{ vars.RANKED_MIN_RESOLVED }}
+            CONTACT_EMAIL=${{ vars.CONTACT_EMAIL }}
             LLM_BASE_URL=${{ vars.LLM_BASE_URL }}
             LLM_API_KEY=${{ secrets.LLM_API_KEY }}
             LLM_MODEL=${{ vars.LLM_MODEL }}

@@ -143,6 +143,7 @@ list. Highlights:
 | `AUTH_URL` | Public base URL; Google OAuth callbacks derive from it |
 | `AUTH_GOOGLE_ID/SECRET` | Google OAuth app (redirect URI `{AUTH_URL}/api/auth/callback/google`) |
 | `RANKED_MIN_RESOLVED` | Verdicts needed to appear ranked (default 5) |
+| `CONTACT_EMAIL` | Shown on `/privacy`: grievances, and verification requests |
 | `DB_PORT` / `APP_PORT` / `APP_BIND` / `PORT` | Database and HTTP ports |
 | `LLM_BASE_URL` / `LLM_API_KEY` / `LLM_MODEL` | Optional draft-polish and Thai interpreting endpoint (hidden when unset) |
 | `SPEECH_BASE_URL` / `SPEECH_API_KEY` / `SPEECH_FLAVOR` | Optional voice for phones with none: OpenAI-compatible `/audio/speech`, or `minimax` |
@@ -154,6 +155,18 @@ name, creates a passkey, and is in — no email and no Google account anywhere
 in that flow. The link carries the trip's key in its fragment, so copy it
 whole. Members are 18+ and accept the terms at sign-up; accounts can be
 deleted from the account page.
+
+## Verifying what runs
+
+The promise on `/privacy` rests on the code that runs on the phone, which the
+server serves. Every image is built by `.github/workflows/ci.yml` from one
+commit, with the commit baked in (`GIT_SHA`, shown in the footer) and a
+Sigstore provenance attestation signed by the workflow's identity. A member
+who wants to check writes to `CONTACT_EMAIL` naming the build in the footer
+and gets the source for that commit and the attestation
+(`gh attestation verify oci://ghcr.io/pungoyal/chiang-pai:<sha7> --owner pungoyal`
+proves the image came from it). Verification is on request, not public, so
+the repository can be private.
 
 ## Quality gates
 

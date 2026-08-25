@@ -2,6 +2,9 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   output: "standalone",
+  // Build time, not runtime (lib/env.ts owns process.env for the app): the
+  // build id is the commit, so two builds of one commit agree on every hash.
+  generateBuildId: () => process.env.GIT_SHA ?? null,
   // Before trips, the whole app was one table at the root. Old links and
   // bookmarks land on the trips list, which sends a one-trip member straight
   // through to the trip that table became.

@@ -78,7 +78,7 @@ If founding rate is under 10% at day 90, the loop is not compounding; the fix is
 - [x] Multi-trip rewrite, migration, legal pages, landing, card, recap, PWA, stats.
 - [ ] **Deploy** (you): merge → push to `main`; CI builds and runs the `migrate` service against the live database. The migration was verified on a copy of the old schema with representative data. Back up the database first (`pg_dump`) — the migration is forward-only.
 - [ ] Set `AUTH_URL` to the public hostname so passkeys work (they already do on the live box).
-- [ ] Put a grievance email address in `app/privacy/page.tsx` (currently "the footer of any email we send" — there is no email yet).
+- [x] Grievance address: set `CONTACT_EMAIL` in the `oracle-cloud` environment; `/privacy` shows it (and uses it for verification requests).
 - [ ] Google OAuth consent screen: app name, privacy URL, terms URL.
 
 ### Days 8–21 — dogfood Trip #1 and seed 3 more

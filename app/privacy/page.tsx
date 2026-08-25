@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { build } from "@/lib/build";
+import { env } from "@/lib/env";
 import { routes } from "@/lib/routes";
 
 export const metadata: Metadata = { title: "Privacy" };
@@ -13,6 +15,11 @@ export default function PrivacyPage() {
         We cannot read your trip
       </h1>
       <p className="text-sm text-soft">Last updated 25 August 2026.</p>
+
+      <Section title="Who is responsible">
+        The app is operated by an individual in India, who is the data fiduciary (DPDP Act, 2023)
+        and data controller (GDPR) for it. For anything on this page, write to <Contact />.
+      </Section>
 
       <Section title="The promise, precisely">
         A trip is readable only on the phones of the people on it. Every prediction, call, verdict,
@@ -80,11 +87,15 @@ export default function PrivacyPage() {
         advertising cookies, and use only the cookies the app needs to sign you in.
       </Section>
 
-      <Section title="The honest caveat">
+      <Section title="The honest caveat, and how to check">
         The server serves the code that runs on your phone and handles the key. A dishonest release
-        could ship code that leaks it; no web app escapes this. Our answer is to make such a release
-        detectable rather than ask you to trust us: the client source is being published, and
-        releases will be signed so the code you run can be checked against it.
+        could ship code that leaks it; no web app escapes this. What we do about it: every build is
+        made by an automated pipeline from one commit, carries that commit's name — this page was
+        served by {build ? "build " : "a local build"}
+        {build && <span className="mono">{build.short}</span>} (also in the footer) — and is signed
+        with a provenance attestation that ties the image to the commit. Any member can ask to see
+        the code they are running: write to <Contact /> naming the build, and you get the source for
+        that commit and the attestation to check it against the image.
       </Section>
 
       <Section title="Who can see it">
@@ -139,5 +150,15 @@ function Section({ title, children }: { title: string; children: React.ReactNode
       <h2 className="display text-xl font-bold uppercase tracking-wide">{title}</h2>
       <div className="mt-1 text-sm leading-relaxed">{children}</div>
     </section>
+  );
+}
+
+/** The one address, or the nearest person when none is configured. */
+function Contact() {
+  if (!env.CONTACT_EMAIL) return <>the organiser of your trip</>;
+  return (
+    <a href={`mailto:${env.CONTACT_EMAIL}`} className="text-felt hover:underline">
+      {env.CONTACT_EMAIL}
+    </a>
   );
 }
