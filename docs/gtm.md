@@ -19,6 +19,7 @@
 | Bills | Exactly two currencies per trip (destination + home), one for domestic, set at creation, never asked again | Matches the real trip; kills the Splitwise currency confusion |
 | Migration | The existing group becomes Trip #1 | Dogfood history is the first case study |
 | Age | 18+, India + global terms | Avoids DPDP parental-consent machinery |
+| Privacy | Trips sealed end to end; the server cannot read one | The centrepiece claim: a group's arguments and money are its own, and a database dump, a subpoena or the operator gets nothing readable (`docs/private-trips.md`) |
 
 ## What shipped (the product, as of this commit)
 
@@ -27,6 +28,7 @@
 - **Trip as a season.** Dates and phase ("In 12 days", "Last day", "Home"); starter predictions for an empty table; per-trip leaderboard; rivalries and a nemesis line on every profile; a recap page with a share-as-text button.
 - **The growth artifact.** `/card/[marketId]`: a public verdict card with an OG image built for WhatsApp, reachable from every resolved prediction with a share-sheet button and a `wa.me` link.
 - **Legal floor.** 18+ gate at every sign-up path; `/terms` and `/privacy` drafted against PROGA 2025, DPDP 2023/Rules 2025, GDPR; account deletion that scrubs identity and keeps the append-only ledger; no third-party cookies or analytics.
+- **Private trips.** Every prediction, call, comment and bill is encrypted on the phone under a key the server never holds; the key rides in the invite link's fragment and moves between members over short-lived key links. `/privacy` states what is sealed and what is not, plainly.
 - **PWA.** Manifest, icons, Apple home-screen metadata. No store needed.
 - **Instrumentation.** `pnpm stats`: members, trips, mean roster, and the number that decides everything — *invited → founded* (how many people who arrived by somebody's link went on to open their own trip).
 

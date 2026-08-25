@@ -1,53 +1,35 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
-import { betAction, switchAction } from "@/app/actions";
+import { useState } from "react";
 import type { Side } from "@/lib/engine";
-import { lingoOf } from "@/lib/lingo";
+import { toCents } from "@/lib/pies";
 import { Pies } from "./pies";
+import { useTrip } from "./trip-store";
+import { useAct } from "./use-act";
 
 export function BetPanel({
   marketId,
   mySide,
   myStakeC,
   maxStakeC,
-  lingo = "english",
 }: {
   marketId: string;
   mySide: Side | null;
   myStakeC: number;
   maxStakeC: number;
-  lingo?: string;
 }) {
-  const t = lingoOf(lingo);
-  const router = useRouter();
-  const [pending, startTransition] = useTransition();
+  const { t, append } = useTrip();
+  const { pending, error, act } = useAct(t.oops);
   const [pies, setPies] = useState(1);
-  const [error, setError] = useState<string | null>(null);
 
-  // Infinite bank: net going negative is fine, so the only ceiling is the
-  // per-market exposure cap.
+  // Infinite bank: the per-market exposure cap is the only ceiling.
   const roomC = maxStakeC - myStakeC;
   const maxPies = Math.floor(roomC / 100);
   const clamped = Math.min(Math.max(pies, 1), Math.max(maxPies, 1));
 
-  const bet = (side: Side) =>
-    startTransition(async () => {
-      setError(null);
-      const res = await betAction(marketId, side, clamped);
-      if (!res.ok) setError(res.error ?? t.oops);
-      else router.refresh();
-    });
-
-  const switchSide = () =>
-    startTransition(async () => {
-      setError(null);
-      const res = await switchAction(marketId);
-      if (!res.ok) setError(res.error ?? t.oops);
-      else router.refresh();
-    });
-
+  const call = (side: Side) =>
+    act(() => append({ t: "call", marketId, side, amountC: toCents(clamped) }));
+  const switchSide = () => act(() => append({ t: "switch", marketId }));
   const other: Side = mySide === "yes" ? "no" : "yes";
 
   return (
@@ -89,7 +71,7 @@ export function BetPanel({
             <button
               type="button"
               disabled={pending || mySide === "no"}
-              onClick={() => bet("yes")}
+              onClick={() => call("yes")}
               className="display rounded-md bg-yes py-2.5 text-lg font-bold uppercase text-white hover:bg-yes-press disabled:cursor-not-allowed disabled:opacity-40"
             >
               Call YES
@@ -97,7 +79,7 @@ export function BetPanel({
             <button
               type="button"
               disabled={pending || mySide === "yes"}
-              onClick={() => bet("no")}
+              onClick={() => call("no")}
               className="display rounded-md bg-no py-2.5 text-lg font-bold uppercase text-white hover:bg-no-press disabled:cursor-not-allowed disabled:opacity-40"
             >
               Call NO

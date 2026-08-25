@@ -203,11 +203,13 @@ export const recoveries = pgTable(
     /** Set the moment a passkey is added through it; the row is spent from then on. */
     usedAt: timestamp("used_at", { withTimezone: true }),
     /**
-     * Private trips: the trip key under the link's secret, put there by the
-     * organiser's browser. Null when minted from the console, which can give
-     * a seat back and nothing more.
+     * Private trips: one trip's key under the link's secret, put there by the
+     * organiser's browser, with which trip and which epoch it is. Null when
+     * minted from the console, which can give a seat back and nothing more.
      */
     wrappedKey: text("wrapped_key"),
+    tripId: text("trip_id").references(() => trips.id),
+    epoch: integer("epoch"),
   },
   (t) => [index("recoveries_member_idx").on(t.memberId)],
 );

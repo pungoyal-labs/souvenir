@@ -1,22 +1,15 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
-import { reactAction } from "@/app/actions";
-import type { ReactionKind } from "@/lib/data";
-import { lingoOf } from "@/lib/lingo";
+import type { Person } from "@/lib/views";
 import { Avatar } from "./avatar";
+import { useTrip } from "./trip-store";
+import { useAct } from "./use-act";
 
-interface Reactor {
-  id: string;
-  name: string;
-  avatarUpdatedAt: Date | null;
-}
+type ReactionKind = "upvote" | "watch";
 
 /**
- * The upvote and watch toggles on a prediction page. Both feed the "For you"
- * ranking; watching additionally routes the market's activity to the inbox.
- * Resolved predictions keep their reactions but only allow un-reacting.
+ * Upvote and watch, both feeding the For-you ranking; watching also routes the
+ * prediction's activity to the inbox. Once resolved, only un-reacting is left.
  */
 export function ReactionBar({
   marketId,
@@ -24,29 +17,20 @@ export function ReactionBar({
   upvoters,
   watchers,
   open,
-  lingo = "english",
 }: {
   marketId: string;
   meId: string;
-  upvoters: Reactor[];
-  watchers: Reactor[];
+  upvoters: Person[];
+  watchers: Person[];
   open: boolean;
-  lingo?: string;
 }) {
-  const t = lingoOf(lingo);
-  const router = useRouter();
-  const [pending, startTransition] = useTransition();
-  const [error, setError] = useState<string | null>(null);
+  const { t, append } = useTrip();
+  const { pending, error, act } = useAct(t.oops);
 
   const toggle = (kind: ReactionKind, on: boolean) =>
-    startTransition(async () => {
-      setError(null);
-      const res = await reactAction(marketId, kind, on);
-      if (!res.ok) setError(res.error ?? t.oops);
-      else router.refresh();
-    });
+    act(() => append({ t: "react", marketId, kind, on }));
 
-  const button = (kind: ReactionKind, reactors: Reactor[], label: string, activeLabel: string) => {
+  const button = (kind: ReactionKind, reactors: Person[], label: string, activeLabel: string) => {
     const mine = reactors.some((r) => r.id === meId);
     const count = reactors.length;
     return (

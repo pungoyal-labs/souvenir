@@ -1,26 +1,23 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
-import { mintInviteAction } from "@/app/actions";
+import { useState } from "react";
 import { CopyLink } from "@/components/copy-link";
+import { useMintInvite } from "./invite-links";
+import { useAct } from "./use-act";
 
-/** Mint a personal link rather than name an address. It shows up in the pending list too. */
-export function InviteForm({ tripId }: { tripId: string }) {
+/** Mint a personal link rather than name an address. */
+export function InviteForm() {
   const router = useRouter();
-  const [pending, startTransition] = useTransition();
+  const mintInvite = useMintInvite();
+  const { pending, error, act } = useAct();
   const [label, setLabel] = useState("");
   const [link, setLink] = useState<{ who: string; url: string } | null>(null);
-  const [error, setError] = useState<string | null>(null);
 
   const mint = () =>
-    startTransition(async () => {
-      setError(null);
-      const res = await mintInviteAction(tripId, label);
-      if (!res.ok || !res.url) {
-        setError(res.error ?? "Couldn't mint an invite.");
-        return;
-      }
+    act(async () => {
+      const res = await mintInvite(label);
+      if (!res.ok) return res;
       setLink({ who: label.trim(), url: res.url });
       setLabel("");
       router.refresh();

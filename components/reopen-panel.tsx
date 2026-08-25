@@ -1,30 +1,20 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
-import { reopenAction } from "@/app/actions";
+import { useState } from "react";
+import { useTrip } from "./trip-store";
+import { useAct } from "./use-act";
 
-/**
- * An organiser taking a resolution back. Resolving is the creator's call and says
- * "final" on the button, which is the point — so undoing one is deliberately
- * somebody else's job and asks twice before it moves anybody's pies.
- */
+/** An organiser taking a resolution back — deliberately somebody else's job, and it asks twice. */
 export function ReopenPanel({ marketId }: { marketId: string }) {
-  const router = useRouter();
-  const [pending, startTransition] = useTransition();
+  const { append } = useTrip();
+  const { pending, error, act } = useAct();
   const [confirming, setConfirming] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   const reopen = () =>
-    startTransition(async () => {
-      setError(null);
-      const res = await reopenAction(marketId);
-      if (!res.ok) {
-        setError(res.error ?? "That didn't work.");
-        setConfirming(false);
-      } else {
-        router.refresh();
-      }
+    act(async () => {
+      const res = await append({ t: "reopen", marketId });
+      if (!res.ok) setConfirming(false);
+      return res;
     });
 
   return (

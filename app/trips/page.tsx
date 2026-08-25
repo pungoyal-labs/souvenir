@@ -9,10 +9,6 @@ import { requireMember } from "@/lib/session";
 import { DESTINATIONS } from "@/lib/talk";
 import { tripPhase, tripToday } from "@/lib/trips";
 
-/**
- * Every trip the member is on. One trip is no choice, so a member with
- * exactly one lands on it — unless they asked for the list.
- */
 export default async function TripsPage({
   searchParams,
 }: {
@@ -22,6 +18,7 @@ export default async function TripsPage({
   const t = lingoOf(me.lingo);
   const { all } = await searchParams;
   const trips = await listTrips(me.id);
+  // One trip is no choice — unless they asked for the list.
   if (trips.length === 1 && all == null) redirect(routes.trip(trips[0].trip.id));
 
   return (
@@ -48,7 +45,7 @@ export default async function TripsPage({
         </div>
       ) : (
         <ul className="mt-6 grid gap-3">
-          {trips.map(({ trip, role, memberCount, openCount }) => {
+          {trips.map(({ trip, role, memberCount }) => {
             const there = DESTINATIONS[trip.destination];
             const phase = tripPhase(trip, tripToday(trip));
             return (
@@ -74,9 +71,6 @@ export default async function TripsPage({
                   <span className="text-right text-xs text-soft">
                     <span className="block">
                       {memberCount} {memberCount === 1 ? "person" : "people"}
-                    </span>
-                    <span className="block">
-                      {openCount} open call{openCount === 1 ? "" : "s"}
                     </span>
                     {role === "organiser" && <span className="block text-gold">organiser</span>}
                   </span>

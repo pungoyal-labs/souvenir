@@ -1,5 +1,5 @@
 import { Bills } from "@/components/bills";
-import { billComments, billsOverview, membersOf } from "@/lib/data";
+import { Sealed } from "@/components/sealed";
 import { lingoOf } from "@/lib/lingo";
 import { requireTrip } from "@/lib/session";
 import { currencyName, isDomestic, tripCurrencies } from "@/lib/trips";
@@ -8,11 +8,6 @@ export default async function BillsPage({ params }: { params: Promise<{ tripId: 
   const { tripId } = await params;
   const { me, trip } = await requireTrip(tripId);
   const t = lingoOf(me.lingo);
-  const [{ bills, balances }, members, comments] = await Promise.all([
-    billsOverview(tripId),
-    membersOf(tripId),
-    billComments(tripId),
-  ]);
   const currencies = tripCurrencies(trip);
 
   return (
@@ -27,16 +22,9 @@ export default async function BillsPage({ params }: { params: Promise<{ tripId: 
             : `${currencyName(currencies[0])} there, ${currencyName(currencies[1])} at home — each settles on its own.`}
         </span>
       </p>
-      <Bills
-        tripId={tripId}
-        currencies={currencies}
-        members={members}
-        meId={me.id}
-        lingo={me.lingo}
-        bills={bills}
-        balances={balances}
-        comments={comments}
-      />
+      <Sealed>
+        <Bills currencies={currencies} />
+      </Sealed>
     </div>
   );
 }

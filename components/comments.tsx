@@ -1,14 +1,12 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-import { Fragment, useEffect, useRef, useState, useTransition } from "react";
-import { commentAction } from "@/app/actions";
-import type { CommentView } from "@/lib/data";
-import type { Member } from "@/lib/db/schema";
+import { Fragment, useEffect, useRef, useState } from "react";
 import { timeAgo } from "@/lib/format";
 import { lingoOf } from "@/lib/lingo";
-import { segmentBody } from "@/lib/mentions";
+import { parseMentions, segmentBody } from "@/lib/mentions";
+import { type CommentView, commentError, type Person } from "@/lib/views";
 import { Avatar } from "./avatar";
+import { useAct } from "./use-act";
 
 /** The "@pre" the caret is completing, if it's in one. */
 function mentionPrefix(text: string, caret: number): { start: number; query: string } | null {
@@ -17,30 +15,25 @@ function mentionPrefix(text: string, caret: number): { start: number; query: str
   return { start: caret - match[1].length, query: match[2] };
 }
 
-/**
- * One comment thread plus its composer — the same component under a
- * prediction and inside an expanded bill. Typing @ suggests members; a tagged
- * member finds it in their inbox.
- */
+/** One thread plus its composer, under a prediction or inside a bill. Typing @ suggests members. */
 export function CommentsSection({
-  target,
   comments,
   members,
   meId,
   lingo,
+  onPost,
 }: {
-  target: { marketId?: string; billId?: string };
   comments: CommentView[];
-  members: Member[];
+  members: Person[];
   meId: string;
   lingo: string;
+  /** Post the trimmed body, with the member ids it @mentions. */
+  onPost: (body: string, mentions: string[]) => Promise<{ ok: boolean; error?: string }>;
 }) {
   const t = lingoOf(lingo);
-  const router = useRouter();
-  const [pending, startTransition] = useTransition();
+  const { pending, error, act } = useAct(t.oops);
   const [body, setBody] = useState("");
   const [caret, setCaret] = useState(0);
-  const [error, setError] = useState<string | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [pendingCaret, setPendingCaret] = useState<number | null>(null);
 
@@ -67,7 +60,7 @@ export function CommentsSection({
         .slice(0, 5)
     : [];
 
-  const insertMention = (member: Member) => {
+  const insertMention = (member: Person) => {
     if (!prefix) return;
     const next = `${body.slice(0, prefix.start)}@${member.name} ${body.slice(caret)}`;
     const position = prefix.start + member.name.length + 2;
@@ -77,15 +70,16 @@ export function CommentsSection({
   };
 
   const post = () =>
-    startTransition(async () => {
-      setError(null);
-      const res = await commentAction(target, body);
-      if (!res.ok) setError(res.error ?? t.oops);
-      else {
+    act(async () => {
+      const trimmed = body.trim();
+      const refused = commentError(trimmed);
+      if (refused) return { ok: false, error: refused };
+      const res = await onPost(trimmed, parseMentions(trimmed, members));
+      if (res.ok) {
         setBody("");
         setCaret(0);
-        router.refresh();
       }
+      return res;
     });
 
   return (

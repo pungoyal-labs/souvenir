@@ -1,11 +1,6 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-import { useEffect, useState, useTransition } from "react";
-import { addBillAction, editBillAction } from "@/app/actions";
-import type { BillView } from "@/lib/data";
-import type { Member } from "@/lib/db/schema";
-import { lingoOf } from "@/lib/lingo";
+import { useEffect, useState } from "react";
 import {
   type BillEntryInput,
   CURRENCY_SYMBOL,
@@ -14,19 +9,14 @@ import {
   parseAmount,
   type SplitMode,
 } from "@/lib/split";
+import { type BillView, billError } from "@/lib/views";
 import { Avatar } from "./avatar";
-
-/** Today in the member's own timezone, as the YYYY-MM-DD a date input wants. */
-export function todayLocal(): string {
-  return new Date().toLocaleDateString("en-CA");
-}
+import { firstName, todayLocal } from "./bill-label";
+import { useOpenTrip } from "./trip-store";
+import { useAct } from "./use-act";
 
 function centsToText(c: number): string {
   return c % 100 === 0 ? String(c / 100) : (c / 100).toFixed(2);
-}
-
-function firstName(member: Member): string {
-  return member.name.split(" ")[0];
 }
 
 const CURRENCY_KEY = "billCurrency";
@@ -39,58 +29,43 @@ const chip = (on: boolean) =>
 const field =
   "w-full rounded-md border border-line bg-surface px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-felt";
 
+const amountField =
+  "mono w-28 rounded-md border border-line bg-surface px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-felt";
+
 /**
  * Add or edit one bill. The fast path is one screen: amount, what for, who
- * paid (you, prefilled), split equally with everyone (prefilled). Multiple
- * payers and unequal shares unfold only when asked for.
+ * paid (you), split equally with everyone. Multiple payers and unequal shares
+ * unfold only when asked for.
  */
 export function BillForm({
-  members,
-  meId,
-  lingo,
-  tripId,
   currencies,
   initial,
   onDone,
 }: {
-  members: Member[];
-  meId: string;
-  lingo: string;
-  /** Where the group is, so a new bill starts in the money they are spending. */
-  tripId: string;
   /** The trip's one or two currencies, the default first. */
   currencies: readonly Currency[];
-  /** Editing an existing bill; omitted when adding. */
   initial?: BillView;
   onDone: () => void;
 }) {
-  const t = lingoOf(lingo);
-  const router = useRouter();
-  const [pending, startTransition] = useTransition();
-  const [error, setError] = useState<string | null>(null);
+  const { me, t, roster: members, append } = useOpenTrip();
+  const meId = me.id;
+  const { pending, error, act } = useAct(t.oops);
 
   const [onDate, setOnDate] = useState(initial?.onDate ?? todayLocal());
   const [description, setDescription] = useState(initial?.description ?? "");
   const [currency, setCurrency] = useState<Currency>(initial?.currency ?? currencies[0]);
+  const paid = initial?.entries.filter((e) => e.paidC > 0) ?? [];
   const [payerIds, setPayerIds] = useState<string[]>(() =>
-    initial ? initial.entries.filter((e) => e.paidC > 0).map((e) => e.member.id) : [meId],
+    initial ? paid.map((e) => e.member.id) : [meId],
   );
   const [paidText, setPaidText] = useState<Record<string, string>>(() =>
-    initial
-      ? Object.fromEntries(
-          initial.entries
-            .filter((e) => e.paidC > 0)
-            .map((e) => [e.member.id, centsToText(e.paidC)]),
-        )
-      : {},
+    Object.fromEntries(paid.map((e) => [e.member.id, centsToText(e.paidC)])),
   );
-  // The one-payer fast path types the bill's total, not a person's share, so it
-  // is kept apart from the per-payer amounts: unticking yourself to tick
-  // somebody else changes who paid, not how much the dinner cost.
-  const [soloText, setSoloText] = useState<string>(() => {
-    const paid = initial?.entries.filter((e) => e.paidC > 0) ?? [];
-    return paid.length === 1 ? centsToText(paid[0].paidC) : "";
-  });
+  // The one-payer fast path types the bill's total, not a share, so it is kept
+  // apart: switching who paid changes the payer, not what the dinner cost.
+  const [soloText, setSoloText] = useState<string>(() =>
+    paid.length === 1 ? centsToText(paid[0].paidC) : "",
+  );
   const [inSplit, setInSplit] = useState<Record<string, boolean>>(() =>
     Object.fromEntries(
       members.map((m) => [
@@ -101,7 +76,7 @@ export function BillForm({
   );
   const [split, setSplit] = useState<SplitMode>(initial?.split ?? "equal");
   const [owedText, setOwedText] = useState<Record<string, string>>(() =>
-    initial && initial.split === "custom"
+    initial?.split === "custom"
       ? Object.fromEntries(
           initial.entries
             .filter((e) => e.participant)
@@ -110,8 +85,7 @@ export function BillForm({
       : {},
   );
 
-  // Remember the last currency for the next new bill; never fight an edit,
-  // and never remember one this trip doesn't spend.
+  // Remember the last currency for the next new bill; never fight an edit.
   useEffect(() => {
     if (initial) return;
     const saved = localStorage.getItem(CURRENCY_KEY);
@@ -123,11 +97,7 @@ export function BillForm({
   };
 
   const singlePayer = payerIds.length === 1;
-  /**
-   * Tick a payer on or off, handing the amount over as the form crosses
-   * between the one-payer field and the per-payer rows — in either direction
-   * the number stays on screen instead of starting again.
-   */
+  // Crossing between the one-payer field and the per-payer rows keeps the number on screen.
   const togglePayer = (id: string) => {
     const next = payerIds.includes(id) ? payerIds.filter((x) => x !== id) : [...payerIds, id];
     if (payerIds.length === 1 && next.length === 2) {
@@ -147,10 +117,10 @@ export function BillForm({
   const owedCOf = (id: string) => parseAmount(owedText[id] ?? "") ?? 0;
   const assignedC = participantIds.reduce((sum, id) => sum + owedCOf(id), 0);
   const remainingC = totalC - assignedC;
+  const nameOf = (id: string) => firstName(members.find((m) => m.id === id) ?? me);
 
   const submit = () =>
-    startTransition(async () => {
-      setError(null);
+    act(async () => {
       const entries: BillEntryInput[] = members
         .map((m) => ({
           memberId: m.id,
@@ -159,16 +129,61 @@ export function BillForm({
           ...(split === "custom" && inSplit[m.id] ? { owedC: owedCOf(m.id) } : {}),
         }))
         .filter((e) => e.paidC > 0 || e.participant);
-      const input = { onDate, description, currency, split, entries };
-      const res = initial
-        ? await editBillAction(tripId, initial.id, input)
-        : await addBillAction(tripId, input);
-      if (!res.ok) setError(res.error ?? t.oops);
-      else {
-        onDone();
-        router.refresh();
-      }
+      const refused = billError({
+        onDate,
+        description,
+        currency,
+        currencies,
+        memberIds: entries.map((e) => e.memberId),
+        roster: new Set(members.map((m) => m.id)),
+      });
+      if (refused) return { ok: false, error: refused };
+      const res = await append({
+        t: "bill.rev",
+        billId: initial?.id ?? crypto.randomUUID(),
+        kind: "expense",
+        onDate,
+        description: description.trim(),
+        currency,
+        split,
+        entries,
+      });
+      if (res.ok) onDone();
+      return res;
     });
+
+  const memberChips = (on: (id: string) => boolean, toggle: (id: string) => void) => (
+    <div className="mt-1.5 flex flex-wrap gap-1.5">
+      {members.map((m) => (
+        <button
+          key={m.id}
+          type="button"
+          onClick={() => toggle(m.id)}
+          aria-pressed={on(m.id)}
+          className={chip(on(m.id))}
+        >
+          <Avatar member={m} size={18} />
+          {m.id === meId ? "You" : firstName(m)}
+        </button>
+      ))}
+    </div>
+  );
+
+  const amountRow = (id: string, verb: string, value: string, onChange: (v: string) => void) => (
+    <label key={id} className="flex items-center gap-2 text-sm">
+      <span className="w-24 truncate">
+        {nameOf(id)} {verb}
+      </span>
+      <input
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        inputMode="decimal"
+        placeholder="0"
+        className={amountField}
+      />
+      <span className="text-soft">{CURRENCY_SYMBOL[currency]}</span>
+    </label>
+  );
 
   return (
     <div className="card p-4">
@@ -178,7 +193,6 @@ export function BillForm({
 
       <div className="mt-3 grid gap-3">
         <div className="flex flex-wrap items-center gap-2">
-          {/* One currency is not a choice: a domestic trip never shows this. */}
           {currencies.length > 1 && (
             <div className="flex overflow-hidden rounded-md border border-line">
               {currencies.map((c) => (
@@ -208,13 +222,9 @@ export function BillForm({
           ) : (
             <span className="mono text-lg font-bold">{fmtMoney(currency, totalC)}</span>
           )}
-          {/* Uncontrolled on purpose. A date input reads as "" from the first
-              keystroke until the last, and committing that emptied the date
-              the form was going to save — leaving "Pick a date for the bill."
-              as the answer to pressing Add. Only whole dates are committed;
-              blurring a half-typed one puts the committed date back on screen,
-              so what is showing is always what saves. Controlling the value
-              instead would write that "" back into the field mid-edit. */}
+          {/* Uncontrolled on purpose: a date input reads "" mid-edit, and a
+              controlled value would write that back into the field. Only whole
+              dates are committed; blurring a half-typed one restores the last. */}
           <input
             type="date"
             defaultValue={onDate}
@@ -241,39 +251,14 @@ export function BillForm({
 
         <div>
           <p className="text-xs font-semibold uppercase tracking-wide text-soft">Paid by</p>
-          <div className="mt-1.5 flex flex-wrap gap-1.5">
-            {members.map((m) => (
-              <button
-                key={m.id}
-                type="button"
-                onClick={() => togglePayer(m.id)}
-                aria-pressed={payerIds.includes(m.id)}
-                className={chip(payerIds.includes(m.id))}
-              >
-                <Avatar member={m} size={18} />
-                {m.id === meId ? "You" : firstName(m)}
-              </button>
-            ))}
-          </div>
+          {memberChips((id) => payerIds.includes(id), togglePayer)}
           {!singlePayer && (
             <div className="mt-2 grid gap-1.5">
-              {payerIds.map((id) => {
-                const m = members.find((x) => x.id === id);
-                if (!m) return null;
-                return (
-                  <label key={id} className="flex items-center gap-2 text-sm">
-                    <span className="w-24 truncate">{firstName(m)} paid</span>
-                    <input
-                      value={paidText[id] ?? ""}
-                      onChange={(e) => setPaidText({ ...paidText, [id]: e.target.value })}
-                      inputMode="decimal"
-                      placeholder="0"
-                      className="mono w-28 rounded-md border border-line bg-surface px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-felt"
-                    />
-                    <span className="text-soft">{CURRENCY_SYMBOL[currency]}</span>
-                  </label>
-                );
-              })}
+              {payerIds.map((id) =>
+                amountRow(id, "paid", paidText[id] ?? "", (v) =>
+                  setPaidText({ ...paidText, [id]: v }),
+                ),
+              )}
             </div>
           )}
         </div>
@@ -302,20 +287,10 @@ export function BillForm({
               ))}
             </div>
           </div>
-          <div className="mt-1.5 flex flex-wrap gap-1.5">
-            {members.map((m) => (
-              <button
-                key={m.id}
-                type="button"
-                onClick={() => setInSplit({ ...inSplit, [m.id]: !inSplit[m.id] })}
-                aria-pressed={Boolean(inSplit[m.id])}
-                className={chip(Boolean(inSplit[m.id]))}
-              >
-                <Avatar member={m} size={18} />
-                {m.id === meId ? "You" : firstName(m)}
-              </button>
-            ))}
-          </div>
+          {memberChips(
+            (id) => Boolean(inSplit[id]),
+            (id) => setInSplit({ ...inSplit, [id]: !inSplit[id] }),
+          )}
           {split === "equal" ? (
             totalC > 0 &&
             participantIds.length > 0 && (
@@ -326,23 +301,11 @@ export function BillForm({
             )
           ) : (
             <div className="mt-2 grid gap-1.5">
-              {participantIds.map((id) => {
-                const m = members.find((x) => x.id === id);
-                if (!m) return null;
-                return (
-                  <label key={id} className="flex items-center gap-2 text-sm">
-                    <span className="w-24 truncate">{firstName(m)} owes</span>
-                    <input
-                      value={owedText[id] ?? ""}
-                      onChange={(e) => setOwedText({ ...owedText, [id]: e.target.value })}
-                      inputMode="decimal"
-                      placeholder="0"
-                      className="mono w-28 rounded-md border border-line bg-surface px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-felt"
-                    />
-                    <span className="text-soft">{CURRENCY_SYMBOL[currency]}</span>
-                  </label>
-                );
-              })}
+              {participantIds.map((id) =>
+                amountRow(id, "owes", owedText[id] ?? "", (v) =>
+                  setOwedText({ ...owedText, [id]: v }),
+                ),
+              )}
               <p
                 className={`text-xs ${remainingC === 0 ? "text-soft" : "font-semibold text-no-deep"}`}
               >

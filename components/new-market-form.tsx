@@ -2,10 +2,13 @@
 
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { createMarketAction, polishAction } from "@/app/actions";
+import { polishAction } from "@/app/actions";
 import { lingoOf } from "@/lib/lingo";
 import type { PolishedDraft } from "@/lib/llm";
 import { routes } from "@/lib/routes";
+import { draftError } from "@/lib/views";
+import { useTrip } from "./trip-store";
+import { useAct } from "./use-act";
 
 export function NewMarketForm({
   tripId,
@@ -21,14 +24,14 @@ export function NewMarketForm({
 }) {
   const t = lingoOf(lingo);
   const router = useRouter();
-  const [publishing, startPublish] = useTransition();
+  const { append } = useTrip();
+  const { pending: publishing, error, setError, act } = useAct("Couldn't publish.");
   const [polishing, startPolish] = useTransition();
 
   const [question, setQuestion] = useState(initial?.question ?? "");
   const [criteria, setCriteria] = useState(initial?.criteria ?? "");
   const [suggestion, setSuggestion] = useState<PolishedDraft | null>(null);
   const [feedback, setFeedback] = useState("");
-  const [error, setError] = useState<string | null>(null);
 
   const polish = () =>
     startPolish(async () => {
@@ -43,14 +46,18 @@ export function NewMarketForm({
     });
 
   const publish = () =>
-    startPublish(async () => {
-      setError(null);
-      const res = await createMarketAction(tripId, question, criteria);
-      if (!res.ok || !res.marketId) {
-        setError(res.error ?? "Couldn't publish.");
-      } else {
-        router.push(routes.market(tripId, res.marketId));
-      }
+    act(async () => {
+      const refused = draftError(question, criteria);
+      if (refused) return { ok: false, error: refused };
+      const id = crypto.randomUUID();
+      const res = await append({
+        t: "market.create",
+        id,
+        question: question.trim(),
+        criteria: criteria.trim(),
+      });
+      if (res.ok) router.push(routes.market(tripId, id));
+      return res;
     });
 
   const busy = publishing || polishing;

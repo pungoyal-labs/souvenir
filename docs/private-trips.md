@@ -1,6 +1,6 @@
 # Private trips — end-to-end encryption, planned properly
 
-Status: decisions settled 2026-08-24; Phase 0 in review (`private-trips-phase-0`). Written against the codebase at `a654787`.
+Status: decisions settled 2026-08-24; Phase 0 merged (#4); Phase 1 — predictions and bills sealed — in PR #5 (`private-trips-phase-1`). Written against the codebase at `a654787`; §7 records what shipped.
 
 ## 0. The promise, stated precisely
 
@@ -369,29 +369,61 @@ Estimates are one engineer, full time, and rough.
 - This document into `docs/`, threat model text drafted for `/privacy`.
 - Exit: `pnpm test` green with the four new modules; no page touched.
 
-### Phase 1 — Private predictions (≈3 weeks)
+### Phase 1 — Private predictions and bills (PR #5)
 
-- Create trip → TK, keyring upload, `member.hello`.
-- Invite mint with fragment; `/join` client-rendered with decrypted preview;
-  join unwraps and uploads.
-- `appendEvent` / `eventsSince` in `lib/data.ts` (I/O only, as ever).
-- Client trip store; `/t/[id]`, `/p/[id]`, `/member/[id]`, `/members`,
-  `/inbox`, `/recap` as client trees fed by the store. Read the Next 16 docs in
-  `node_modules/next/dist/docs/` before touching a page.
-- Markets, calls, switches, resolve/reopen, comments, mentions, reactions,
-  views as events; For-you and inbox derived on the client.
-- Rekey links (§4.8.2) and device links (§4.8.1); *Get the key* screen.
-- `GROUP_INVITE_TTL_MS` → 7 days (`lib/invites.ts` + test): a link that carries
-  the key does not sit in a chat for a month. One-tap re-mint on the members
-  page.
-- `/card` publish step; `cards` table; OG from it.
-- Exit: a new trip is fully playable with the plaintext tables empty for it.
-  Old trips untouched (feature flag: `trips.key_epoch IS NOT NULL`).
+Shipped: create trip → TK on the phone, `member.hello`; invite links with the
+key in the fragment and the join preview sealed under the link's secret;
+`appendEvent` / `eventsSince`; the client trip store and every trip page as a
+client tree over it; markets, calls, switches, resolve/reopen, comments,
+mentions, reactions, views, bills (`bill.rev`) and bill talk as events; For-you
+and inbox derived on the phone; rekey links (`/k/[code]`); the *Get the key*
+and *wrong key* screens; the `/card` publish step; `GROUP_INVITE_TTL_MS` → 7
+days; `pnpm private:migrate`.
 
-### Phase 2 — Bills, phrases, name (≈1 week)
+What differs from the plan, and why:
 
-- `bill.rev`/`bill.settle` events; `lib/split` on the client; `/bills` as a
-  client tree.
+- **No dual mode.** With one existing trip and a script to seal it, every
+  trip is sealed from creation (`createTrip` sets `key_epoch = 0`) and every
+  page reads only the log. The migration script planned for Phase 4 moved up
+  here, since a deploy needs it.
+- **Bills moved in from Phase 2.** The seal script migrates them and refuses
+  to commit unless every balance matches the old entries.
+- **Device links are rekey-for-self.** A member mints a rekey link for their
+  own seat from the phone that has the key and opens it on the other; no
+  whole-keyring wrap, no extra schema.
+- **Recovery links name a trip.** `recoveries.trip_id`/`epoch` (migration
+  `0021`) say which trip's key the wrap is; an organiser's phone wraps the
+  trip they share.
+- **A link's secret survives sign-in** by being parked in the tab's
+  `sessionStorage` under the link's code — never in the `next` query string
+  the server reads.
+- **A key link always replaces what the phone holds**, and a trip whose rows
+  the held key opens none of says so instead of showing an empty table — the
+  two are indistinguishable otherwise, and a re-sealed trip keeps its id.
+- **Rekey links tolerate a second open** within ten minutes by the same
+  member: in-app browsers and StrictMode redeem twice.
+- **The trips list no longer counts open calls** — the server cannot.
+- **Keyrings are not uploaded yet.** Without a PRF wrap (Phase 4) a server
+  copy opens on no other device, so the row stays empty until then.
+
+#### Cutover for the existing trip
+
+1. Deploy `main` with this phase; the migration adds the tables and leaves
+   the plaintext ones in place.
+2. Back up: `docker compose exec db pg_dump -U chiangpai chiangpai > before-seal.sql`.
+3. `docker compose run --rm migrate node scripts/seal-trip.ts "<trip id>"`
+   — by id, not name, if a test trip could share it. The script prints one
+   key link per member, with their name; it commits nothing if a replayed
+   net or a bill balance differs from the old tables.
+4. Hand each link to its member out of band. A link is that member's only:
+   it redeems only signed in as them, and it is the last time the key exists
+   outside a phone. Anyone who missed theirs gets a fresh one from any
+   member's table page (*Send the key*).
+5. `docker compose run --rm migrate node scripts/stats.ts` — `sealed events`
+   should match what the script reported.
+
+### Phase 2 — Phrases and the name (≈1 week)
+
 - `phrase.keep`/`phrase.drop`; slug uniqueness by replay; `/talk` phrasebook
   reads the store.
 - `trip.rename` event; `name_enc`; layout header from the store.
@@ -414,16 +446,10 @@ Estimates are one engineer, full time, and rough.
 - Passkey PRF: request the extension in `beginPasskey*`, parse the output
   (`lib/webauthn.ts` + test — today it deliberately rejects extensions),
   `keyring_wraps`. Silent for passkey members; nothing to explain.
-- One-off migration of the single existing trip: `pnpm private:migrate
-  "<trip>"` (a `scripts/` file, `DATABASE_URL` only, like `recovery:link`)
-  generates TK[0], encrypts every plaintext row into `events`, sets
-  `key_epoch`, and prints one rekey link per member with the key in its
-  fragment, to be handed out by hand. The operator sees that trip's plaintext
-  once — which is exactly what they can see today, and never again after.
-  No in-app migration UI; the script is deleted with the plaintext tables.
-- Drop the retired tables; `pnpm seed` prints an invite link with its
-  fragment; `pnpm stats` unchanged.
-- `/privacy` rewritten to §0; `AGENTS.md` gains §9; lingo strings.
+- Drop the retired plaintext tables and `scripts/seal-trip.ts` with them
+  (the one existing trip was sealed in Phase 1; the operator saw its
+  plaintext once, which is what they could see before, and never again).
+- `/privacy` loses its "still stored readable" line once Phase 2 is in.
 - Exit: no plaintext content column exists in the schema.
 
 ### Phase 5 — Verifiable client (≈1 week, optional but the centrepiece needs it)

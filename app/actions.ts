@@ -7,7 +7,9 @@ import { z } from "zod";
 import {
   createSession,
   destroySession,
-  getSession,
+  type LinkClaims,
+  type PasskeyChallenge,
+  type PasskeyPurpose,
   passkeysConfigured,
   RP_ID,
   RP_ORIGIN,
@@ -17,53 +19,47 @@ import {
 } from "@/lib/auth";
 import {
   acceptTerms,
-  addBill,
-  addComment,
   addCredential,
-  type BillInput,
+  appendEvent,
   clearAvatar,
   createAccount,
-  createMarket,
   createTrip,
   DataError,
   deleteAccount,
-  deleteBill,
   deletePhrase,
-  editBill,
+  eventsSince,
   findCredential,
   findInvite,
   findRecovery,
-  getMarket,
   getMember,
   joinTripWithInvite,
   joinWithInvite,
+  type KeyHandover,
   listCredentials,
+  markInboxSeen,
   mintInvite,
   mintRecovery,
+  mintRekey,
   noteCredentialUse,
-  placeBet,
-  type ReactionKind,
-  recordMarketView,
-  recordSettlement,
+  publishCard,
+  type RecoveryKey,
   recoverWithLink,
   removeCredential,
-  reopenMarket,
-  resolveMarket,
   revokeInvite,
   revokeRecovery,
+  revokeRekey,
   type SavedPhrase,
   savePhrase,
   setAvatar,
   setLingo,
   setName,
-  setReaction,
   setRole,
-  switchSides,
+  spendRekey,
   tripFor,
+  unpublishCard,
   updateTrip,
 } from "@/lib/data";
-import type { Member, MembershipRole } from "@/lib/db/schema";
-import type { Side } from "@/lib/engine";
+import type { EventRow, MembershipRole } from "@/lib/db/schema";
 import { inviteState, inviteUrl } from "@/lib/invites";
 import { isLingoKey, lingoOf } from "@/lib/lingo";
 import {
@@ -75,9 +71,9 @@ import {
 } from "@/lib/llm";
 import { logger } from "@/lib/logger";
 import { recoveryState, recoveryUrl } from "@/lib/recovery";
+import { rekeyUrl } from "@/lib/rekeys";
 import { routes } from "@/lib/routes";
 import { currentMember } from "@/lib/session";
-import type { Currency } from "@/lib/split";
 import {
   clampUtterance,
   otherSide as otherTalkSide,
@@ -93,6 +89,7 @@ import {
   type PasskeySignInOptions,
   registrationOptions,
   signInOptions,
+  type VerifiedRegistration,
   verifyAssertion,
   verifyRegistration,
   WebAuthnError,
@@ -103,11 +100,7 @@ export interface ActionResult {
   error?: string;
 }
 
-/**
- * Checked against the member row, not just the cookie: a session can outlive
- * its account (deleted from another device), and a departed member mutates
- * nothing.
- */
+/** Checked against the member row, not just the cookie: a session can outlive its account. */
 async function requireMemberId(): Promise<string> {
   const member = await currentMember();
   if (!member) redirect(routes.signin);
@@ -116,7 +109,6 @@ async function requireMemberId(): Promise<string> {
 
 function failure(err: unknown): ActionResult {
   if (err instanceof DataError) {
-    // Expected rule violations (stake caps, closed markets, …), not faults.
     logger.debug({ reason: err.message }, "action rejected");
     return { ok: false, error: err.message };
   }
@@ -124,48 +116,46 @@ function failure(err: unknown): ActionResult {
   return { ok: false, error: "Something went wrong. Try again." };
 }
 
+/** Revalidate every page — for what the header or footer shows. */
+const LAYOUT = "layout";
+
 /**
- * Every mutation is the same shape: act as the signed-in member, turn a broken
- * rule into a message the panel can show, and revalidate what the write
- * changed. `run` returns whatever extra the caller needs on success.
+ * Every mutation: act as the signed-in member, turn a broken rule into a message the panel can
+ * show, revalidate what changed. Whatever `run` returns rides along on success.
  */
-async function mutate<T extends object>(
+function mutate(run: (memberId: string) => Promise<void>, paths?: string[]): Promise<ActionResult>;
+function mutate<T extends object>(
   run: (memberId: string) => Promise<T>,
-  paths: (result: T) => string[],
+  paths?: string[] | ((result: T) => string[]),
+): Promise<ActionResult & Partial<T>>;
+async function mutate<T extends object>(
+  run: (memberId: string) => Promise<unknown>,
+  paths: string[] | ((result: T) => string[]) = [],
 ): Promise<ActionResult & Partial<T>> {
   const memberId = await requireMemberId();
   let result: T;
   try {
-    result = await run(memberId);
+    result = ((await run(memberId)) ?? {}) as T;
   } catch (err) {
-    // A failure carries no payload, which TypeScript can't know for a generic
-    // T — hence the one cast.
     return failure(err) as ActionResult & Partial<T>;
   }
-  for (const path of paths(result)) revalidatePath(path);
+  for (const path of typeof paths === "function" ? paths(result) : paths) {
+    if (path === LAYOUT) revalidatePath("/", "layout");
+    else revalidatePath(path);
+  }
   return { ok: true, ...result };
-}
-
-/** The trip a market belongs to, for revalidating its pages after a write. */
-async function marketPaths(marketId: string): Promise<string[]> {
-  const market = await getMarket(marketId);
-  if (!market) return [];
-  const t = market.tripId;
-  return [routes.trip(t), routes.market(t, marketId), routes.members(t), routes.inbox(t)];
 }
 
 // ---------- trips ----------
 
-export async function createTripAction(input: TripInput): Promise<ActionResult> {
-  const memberId = await requireMemberId();
-  let tripId: string;
-  try {
-    tripId = (await createTrip(memberId, input)).id;
-  } catch (err) {
-    return failure(err);
-  }
-  revalidatePath(routes.trips);
-  redirect(routes.trip(tripId));
+/** Returns rather than redirects: the phone still has to seal the first event with its new key. */
+export async function createTripAction(
+  input: TripInput,
+): Promise<ActionResult & { tripId?: string }> {
+  return mutate(
+    async (memberId) => ({ tripId: (await createTrip(memberId, input)).id }),
+    [routes.trips],
+  );
 }
 
 export async function updateTripAction(
@@ -175,9 +165,8 @@ export async function updateTripAction(
   return mutate(
     async (memberId) => {
       await updateTrip(memberId, tripId, input);
-      return {};
     },
-    () => [routes.trip(tripId), routes.settings(tripId), routes.trips],
+    [routes.trip(tripId), routes.settings(tripId), routes.trips],
   );
 }
 
@@ -187,77 +176,8 @@ export async function setRoleAction(
   role: MembershipRole,
 ): Promise<ActionResult> {
   return mutate(
-    async (actorId) => {
-      await setRole(actorId, tripId, memberId, role);
-      return {};
-    },
-    () => [routes.members(tripId), routes.member(tripId, memberId)],
-  );
-}
-
-// ---------- predictions ----------
-
-export async function betAction(marketId: string, side: Side, pies: number): Promise<ActionResult> {
-  const r = await mutate(
-    async (memberId) => {
-      await placeBet(memberId, marketId, side, pies);
-      return {};
-    },
-    () => [],
-  );
-  for (const p of await marketPaths(marketId)) revalidatePath(p);
-  return r;
-}
-
-export async function switchAction(marketId: string): Promise<ActionResult> {
-  const r = await mutate(
-    async (memberId) => {
-      await switchSides(memberId, marketId);
-      return {};
-    },
-    () => [],
-  );
-  for (const p of await marketPaths(marketId)) revalidatePath(p);
-  return r;
-}
-
-export async function resolveAction(
-  marketId: string,
-  outcome: Side | "refunded",
-  note: string,
-): Promise<ActionResult> {
-  const r = await mutate(
-    async (memberId) => {
-      await resolveMarket(marketId, memberId, outcome, note);
-      return {};
-    },
-    () => [],
-  );
-  for (const p of await marketPaths(marketId)) revalidatePath(p);
-  return r;
-}
-
-/** Organisers only (lib/data.ts): the settlement is handed back and the call reopens. */
-export async function reopenAction(marketId: string): Promise<ActionResult> {
-  const r = await mutate(
-    async (memberId) => {
-      await reopenMarket(marketId, memberId);
-      return {};
-    },
-    () => [],
-  );
-  for (const p of await marketPaths(marketId)) revalidatePath(p);
-  return r;
-}
-
-export async function createMarketAction(
-  tripId: string,
-  question: string,
-  criteria: string,
-): Promise<ActionResult & { marketId?: string }> {
-  return mutate(
-    async (memberId) => ({ marketId: await createMarket(tripId, memberId, question, criteria) }),
-    () => [routes.trip(tripId), routes.inbox(tripId)],
+    (actorId) => setRole(actorId, tripId, memberId, role),
+    [routes.members(tripId), routes.member(tripId, memberId)],
   );
 }
 
@@ -285,34 +205,88 @@ export async function polishAction(
   }
 }
 
-/**
- * Telemetry, not a mutation: log that the signed-in member opened a
- * prediction. Best-effort — a lost view must never break the page.
- */
-export async function recordViewAction(marketId: string): Promise<void> {
-  const session = await getSession();
-  if (!session) return;
-  try {
-    await recordMarketView(session.memberId, marketId);
-  } catch (err) {
-    logger.debug({ err, marketId }, "view not recorded");
-  }
+// ---------- the sealed log ----------
+// Two actions carry the whole game: append one envelope, fetch what landed since. What an
+// envelope means is decided on the phone (lib/replay.ts); the server checks seat and epoch.
+
+export async function appendEventAction(
+  tripId: string,
+  envelope: string,
+): Promise<ActionResult & { id?: number; at?: Date }> {
+  if (typeof envelope !== "string") return { ok: false, error: "That didn't come through right." };
+  return mutate((memberId) => appendEvent(memberId, tripId, envelope));
 }
 
-export async function reactAction(
-  marketId: string,
-  kind: ReactionKind,
-  on: boolean,
-): Promise<ActionResult> {
-  const r = await mutate(
-    async (memberId) => {
-      await setReaction(memberId, marketId, kind, on);
-      return {};
+export async function eventsSinceAction(
+  tripId: string,
+  afterId: number,
+): Promise<ActionResult & { rows?: EventRow[] }> {
+  if (!Number.isInteger(afterId) || afterId < 0) return { ok: false, error: "Bad cursor." };
+  return mutate(async (memberId) => ({ rows: await eventsSince(memberId, tripId, afterId) }));
+}
+
+export async function markInboxSeenAction(tripId: string): Promise<ActionResult> {
+  return mutate((memberId) => markInboxSeen(tripId, memberId));
+}
+
+// ---------- rekey links ----------
+
+export async function mintRekeyAction(
+  tripId: string,
+  forMemberId: string,
+  wrappedKey: string,
+  epoch: number,
+): Promise<ActionResult & { url?: string; code?: string }> {
+  return mutate(
+    async (actorId) => {
+      const code = await mintRekey(actorId, tripId, forMemberId, wrappedKey, epoch);
+      return { url: rekeyUrl(RP_ORIGIN, code), code };
     },
-    () => [],
+    [routes.members(tripId)],
   );
-  for (const p of await marketPaths(marketId)) revalidatePath(p);
-  return r;
+}
+
+/** Spend a rekey link as the member it names, and get its wrap back to open. */
+export async function redeemRekeyAction(
+  code: string,
+): Promise<ActionResult & { tripId?: string; key?: KeyHandover }> {
+  return mutate(
+    async (memberId) => {
+      const row = await spendRekey(memberId, code);
+      return { tripId: row.tripId, key: { wrappedKey: row.wrappedKey, epoch: row.epoch } };
+    },
+    ({ tripId }) => [routes.members(tripId)],
+  );
+}
+
+export async function revokeRekeyAction(tripId: string, code: string): Promise<ActionResult> {
+  return mutate((actorId) => revokeRekey(actorId, code), [routes.members(tripId)]);
+}
+
+// ---------- the card ----------
+
+const cardLines = z
+  .array(z.object({ name: z.string().max(40), profitC: z.number().int() }))
+  .max(12);
+const cardSchema = z.object({
+  marketId: z.string().min(1).max(64),
+  question: z.string().min(1).max(200),
+  verdict: z.enum(["yes", "no", "refunded"]),
+  winners: cardLines,
+  losers: cardLines,
+});
+
+export async function publishCardAction(tripId: string, input: unknown): Promise<ActionResult> {
+  const parsed = cardSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: "That's not a card." };
+  return mutate(
+    (memberId) => publishCard(memberId, tripId, parsed.data),
+    [routes.card(parsed.data.marketId)],
+  );
+}
+
+export async function unpublishCardAction(marketId: string): Promise<ActionResult> {
+  return mutate((memberId) => unpublishCard(memberId, marketId), [routes.card(marketId)]);
 }
 
 // ---------- talk ----------
@@ -320,8 +294,7 @@ export async function reactAction(
 /** The pair this trip interprets between, checked against the caller's seat. */
 async function pairOf(memberId: string, tripId: string) {
   const ctx = await tripFor(memberId, tripId);
-  if (!ctx) return null;
-  return pairFor(ctx.trip);
+  return ctx ? pairFor(ctx.trip) : null;
 }
 
 export async function interpretAction(
@@ -340,8 +313,7 @@ export async function interpretAction(
   if (!worthSaying(utterance)) {
     return { ok: false, error: "Nothing came through. Say that again?" };
   }
-  // Which languages these are is the trip's configuration, not something the
-  // browser gets to assert — the client says only which way round it goes.
+  // The languages are the trip's configuration; the browser says only which way round.
   const target = to === "them" ? pair.them : pair.us;
   const source = to === "them" ? pair.us : pair.them;
   try {
@@ -360,92 +332,62 @@ export async function interpretAction(
   }
 }
 
-/**
- * Keep one turn, under a name the member picked.
- *
- * The browser hands over the words and which side said them, and nothing else:
- * which language the phrase is in is read off the trip's pair here, the same
- * trade interpretAction and /api/speak make. It is stored with the phrase, so
- * a replay years later is still read in the language it was said in.
- */
+/** Which language the phrase is in is read off the trip's pair here, never asserted by the browser. */
 export async function keepPhraseAction(
   tripId: string,
   name: string,
   turn: { side: TalkSide; heard: string; said: string; roman?: string; literal?: string },
 ): Promise<ActionResult & { phrase?: SavedPhrase }> {
-  const memberId = await requireMemberId();
-  const pair = await pairOf(memberId, tripId);
-  if (!pair) return { ok: false, error: "Nothing to keep on this trip." };
-  const said: TalkSide = turn.side === "them" ? "them" : "us";
-  const spoken = speakerOf(pair, otherTalkSide(said));
-  try {
-    const phrase = await savePhrase(tripId, memberId, {
-      name,
-      side: said,
-      heard: turn.heard,
-      said: turn.said,
-      roman: turn.roman,
-      literal: turn.literal,
-      language: spoken.language,
-      tag: spoken.tag,
-    });
-    revalidatePath(routes.talk(tripId));
-    return { ok: true, phrase };
-  } catch (err) {
-    return failure(err);
-  }
+  return mutate(
+    async (memberId) => {
+      const pair = await pairOf(memberId, tripId);
+      if (!pair) throw new DataError("Nothing to keep on this trip.");
+      const said: TalkSide = turn.side === "them" ? "them" : "us";
+      const spoken = speakerOf(pair, otherTalkSide(said));
+      const phrase = await savePhrase(tripId, memberId, {
+        name,
+        side: said,
+        heard: turn.heard,
+        said: turn.said,
+        roman: turn.roman,
+        literal: turn.literal,
+        language: spoken.language,
+        tag: spoken.tag,
+      });
+      return { phrase };
+    },
+    [routes.talk(tripId)],
+  );
 }
 
 export async function dropPhraseAction(id: string): Promise<ActionResult> {
-  const memberId = await requireMemberId();
-  try {
-    const { tripId } = await deletePhrase(memberId, id);
-    revalidatePath(routes.talk(tripId));
-  } catch (err) {
-    return failure(err);
-  }
-  return { ok: true };
+  return mutate(
+    (memberId) => deletePhrase(memberId, id),
+    ({ tripId }) => [routes.talk(tripId)],
+  );
 }
 
 // ---------- account ----------
 
 export async function setLingoAction(lingo: string): Promise<ActionResult> {
-  const memberId = await requireMemberId();
   if (!isLingoKey(lingo)) return { ok: false, error: "Pick a lingo from the list." };
-  await setLingo(memberId, lingo);
-  // The lingo colors copy on every page, including the layout's footer.
-  revalidatePath("/", "layout");
-  return { ok: true };
+  return mutate((memberId) => setLingo(memberId, lingo), [LAYOUT]);
 }
 
 export async function setNameAction(name: string): Promise<ActionResult> {
-  const memberId = await requireMemberId();
-  try {
-    await setName(memberId, name);
-  } catch (err) {
-    return failure(err);
-  }
-  revalidatePath("/", "layout");
-  return { ok: true };
+  return mutate((memberId) => setName(memberId, name), [LAYOUT]);
 }
 
 export async function acceptTermsAction(): Promise<ActionResult> {
-  const memberId = await requireMemberId();
-  await acceptTerms(memberId);
-  revalidatePath("/", "layout");
-  return { ok: true };
+  return mutate((memberId) => acceptTerms(memberId), [LAYOUT]);
 }
 
 export async function deleteAccountAction(confirm: string): Promise<ActionResult> {
-  const memberId = await requireMemberId();
   if (confirm.trim().toUpperCase() !== "DELETE") {
     return { ok: false, error: "Type DELETE to confirm." };
   }
-  try {
-    await deleteAccount(memberId);
-  } catch (err) {
-    return failure(err);
-  }
+  const result = await mutate((memberId) => deleteAccount(memberId));
+  if (!result.ok) return result;
   await destroySession();
   redirect(routes.home);
 }
@@ -456,162 +398,69 @@ export async function signOutAction(): Promise<void> {
 }
 
 export async function setAvatarAction(formData: FormData): Promise<ActionResult> {
-  const memberId = await requireMemberId();
   const file = formData.get("avatar");
   if (!(file instanceof File) || file.size === 0) {
     return { ok: false, error: "Pick an image first." };
   }
-  try {
-    await setAvatar(memberId, Buffer.from(await file.arrayBuffer()));
-  } catch (err) {
-    return failure(err);
-  }
-  // The avatar shows in the header on every page.
-  revalidatePath("/", "layout");
-  return { ok: true };
+  const bytes = Buffer.from(await file.arrayBuffer());
+  return mutate((memberId) => setAvatar(memberId, bytes), [LAYOUT]);
 }
 
 export async function clearAvatarAction(): Promise<ActionResult> {
-  const memberId = await requireMemberId();
-  try {
-    await clearAvatar(memberId);
-  } catch (err) {
-    return failure(err);
-  }
-  revalidatePath("/", "layout");
-  return { ok: true };
-}
-
-// ---------- bills ----------
-
-export async function addBillAction(tripId: string, input: BillInput): Promise<ActionResult> {
-  return mutate(
-    async (memberId) => {
-      await addBill(tripId, memberId, input);
-      return {};
-    },
-    () => [routes.bills(tripId), routes.members(tripId)],
-  );
-}
-
-export async function editBillAction(
-  tripId: string,
-  billId: string,
-  input: BillInput,
-): Promise<ActionResult> {
-  return mutate(
-    async (memberId) => {
-      await editBill(memberId, billId, input);
-      return {};
-    },
-    () => [routes.bills(tripId), routes.members(tripId)],
-  );
-}
-
-export async function deleteBillAction(tripId: string, billId: string): Promise<ActionResult> {
-  return mutate(
-    async (memberId) => {
-      await deleteBill(memberId, billId);
-      return {};
-    },
-    () => [routes.bills(tripId), routes.members(tripId)],
-  );
-}
-
-export async function settleUpAction(
-  tripId: string,
-  payerId: string,
-  receiverId: string,
-  currency: Currency,
-  amountC: number,
-  onDate: string,
-): Promise<ActionResult> {
-  return mutate(
-    async (memberId) => {
-      await recordSettlement(tripId, memberId, { payerId, receiverId, currency, amountC, onDate });
-      return {};
-    },
-    () => [routes.bills(tripId), routes.members(tripId)],
-  );
-}
-
-export async function commentAction(
-  target: { marketId?: string; billId?: string },
-  body: string,
-): Promise<ActionResult> {
-  return mutate(
-    async (memberId) => addComment(memberId, target, body),
-    ({ tripId }) =>
-      target.marketId
-        ? [routes.market(tripId, target.marketId), routes.inbox(tripId)]
-        : [routes.bills(tripId), routes.inbox(tripId)],
-  );
+  return mutate((memberId) => clearAvatar(memberId), [LAYOUT]);
 }
 
 // ---------- invites ----------
 
-/** Both minting actions hand back the whole link, so no caller rebuilds the URL. */
+/** Both minting actions hand back the link without its fragment: the secret never comes here. */
 export async function mintInviteAction(
   tripId: string,
   label: string,
-  opts?: { isOpen?: boolean },
-): Promise<ActionResult & { url?: string }> {
+  opts: { isOpen?: boolean; wrappedKey: string; epoch: number; preview: string },
+): Promise<ActionResult & { url?: string; code?: string }> {
   return mutate(
-    async (memberId) => ({
-      url: inviteUrl(RP_ORIGIN, await mintInvite(tripId, memberId, label, opts)),
-    }),
-    () => [routes.members(tripId)],
+    async (memberId) => {
+      const code = await mintInvite(tripId, memberId, label, opts);
+      return { url: inviteUrl(RP_ORIGIN, code), code };
+    },
+    [routes.members(tripId)],
   );
 }
 
 export async function revokeInviteAction(code: string): Promise<ActionResult> {
   const invite = await findInvite(code);
   return mutate(
-    async (memberId) => {
-      await revokeInvite(memberId, code);
-      return {};
-    },
-    () => (invite ? [routes.members(invite.tripId)] : []),
+    (memberId) => revokeInvite(memberId, code),
+    invite ? [routes.members(invite.tripId)] : [],
   );
 }
 
-/** A signed-in member opening somebody's link: seat them, spend it, go. */
-export async function joinAsMemberAction(code: string): Promise<ActionResult> {
-  const memberId = await requireMemberId();
-  let tripId: string;
-  try {
-    tripId = await joinTripWithInvite(memberId, code);
-  } catch (err) {
-    return failure(err);
-  }
-  revalidatePath(routes.trips);
-  revalidatePath(routes.members(tripId));
-  redirect(routes.trip(tripId));
+/** A signed-in member opening somebody's link: seat them, spend it, hand back the key wrap. */
+export async function joinAsMemberAction(
+  code: string,
+): Promise<ActionResult & { tripId?: string; key?: KeyHandover | null }> {
+  return mutate(
+    (memberId) => joinTripWithInvite(memberId, code),
+    ({ tripId }) => [routes.trips, routes.members(tripId)],
+  );
 }
 
 // ---------- passkeys ----------
-//
-// Two round trips each way: the browser asks for a challenge, talks to the
-// authenticator, and posts the result back. The challenge lives in a signed
-// cookie between the two (lib/auth.ts); the checking is lib/webauthn.ts. Both
-// finish actions are reachable by anyone who can POST, so every field they
-// receive is treated as a string of unknown provenance.
+// Two round trips: the browser asks for a challenge, talks to the authenticator, posts the result
+// back. The challenge lives in a signed cookie between the two (lib/auth.ts); the checking is
+// lib/webauthn.ts. Every field a finish action receives is a string of unknown provenance.
 
-/** The relying party as the browser is told it, shared by both registration paths. */
 const RP = { id: RP_ID, name: "Chiang Pai" } as const;
+const RP_CHECK = { rpId: RP_ID, origin: RP_ORIGIN } as const;
 
-/** Said once, in both directions: the browser's own error for this is useless. */
 const NOT_CONFIGURED =
   "Passkeys need this server to be reachable by hostname over HTTPS (or localhost) — " +
   "AUTH_URL is currently an IP address.";
+const NOT_VERIFIED = "That passkey didn't check out. Try again.";
 
-/**
- * A refused ceremony is the browser or the authenticator disagreeing with us,
- * not a fault: log why and say something the member can act on. Anything else
- * falls through to the usual failure path.
- */
-function ceremonyRefused(err: unknown, message: string, context: object): ActionResult | null {
-  if (!(err instanceof WebAuthnError)) return null;
+/** A refused ceremony is the authenticator disagreeing with us, not a fault. */
+function ceremonyFailure(err: unknown, message = NOT_VERIFIED, context: object = {}): ActionResult {
+  if (!(err instanceof WebAuthnError)) return failure(err);
   logger.warn({ ...context, reason: err.message }, "passkey ceremony rejected");
   return { ok: false, error: message };
 }
@@ -629,7 +478,59 @@ const assertionSchema = z.object({
   signature: z.string().min(1).max(4096),
 });
 
-/** Step one of adding a passkey, for a member who is already signed in. */
+/** Step one of any registration: mint the challenge and the options the browser needs. */
+async function beginRegistration(
+  purpose: PasskeyPurpose,
+  memberId: string,
+  displayName: string,
+  opts: { link?: LinkClaims; exclude?: string[] } = {},
+): Promise<ActionResult & { options?: PasskeyRegistrationOptions }> {
+  return {
+    ok: true,
+    options: registrationOptions({
+      rp: RP,
+      origin: RP_ORIGIN,
+      challenge: await startPasskeyChallenge(purpose, opts.link),
+      memberId,
+      displayName,
+      exclude: opts.exclude,
+    }),
+  };
+}
+
+/** Step two's preamble: the posted body and the cookie the ceremony left, or null for either missing. */
+async function takeCeremony<S extends z.ZodType>(
+  schema: S,
+  input: unknown,
+  purpose: PasskeyPurpose,
+): Promise<{ data: z.infer<S>; pending: PasskeyChallenge } | null> {
+  const parsed = schema.safeParse(input);
+  const pending = await takePasskeyChallenge(purpose);
+  if (!parsed.success || !pending) {
+    logger.warn({ purpose }, "passkey ceremony: malformed response or expired challenge");
+    return null;
+  }
+  return { data: parsed.data, pending };
+}
+
+/** Verify a fresh registration and refuse a credential id already on file. */
+async function verifyNewPasskey(
+  response: z.infer<typeof registrationSchema>,
+  challenge: string,
+  duplicateMessage: string,
+): Promise<VerifiedRegistration> {
+  const verified = verifyRegistration(response, { ...RP_CHECK, challenge });
+  if (await findCredential(verified.credentialId)) throw new DataError(duplicateMessage);
+  return verified;
+}
+
+/** Ceremonies that make an account or take a seat are for the signed-out only. */
+async function refuseSignedIn(): Promise<ActionResult | null> {
+  if (!passkeysConfigured) return { ok: false, error: NOT_CONFIGURED };
+  if (await currentMember()) return { ok: false, error: "You're already signed in." };
+  return null;
+}
+
 export async function beginPasskeyRegistrationAction(): Promise<
   ActionResult & { options?: PasskeyRegistrationOptions }
 > {
@@ -637,97 +538,61 @@ export async function beginPasskeyRegistrationAction(): Promise<
   if (!passkeysConfigured) return { ok: false, error: NOT_CONFIGURED };
   const member = await getMember(memberId);
   if (!member) redirect(routes.signin);
-
   const held = await listCredentials(memberId);
-  return {
-    ok: true,
-    options: registrationOptions({
-      rp: RP,
-      origin: RP_ORIGIN,
-      challenge: await startPasskeyChallenge("register"),
-      memberId,
-      displayName: member.name,
-      exclude: held.map((c) => c.id),
-    }),
-  };
+  return beginRegistration("register", memberId, member.name, {
+    exclude: held.map((c) => c.id),
+  });
 }
 
-/** Step two: check what the authenticator produced and keep the public key. */
 export async function finishPasskeyRegistrationAction(response: unknown): Promise<ActionResult> {
   const memberId = await requireMemberId();
-  const parsed = registrationSchema.safeParse(response);
-  const challenge = await takePasskeyChallenge("register");
-  if (!parsed.success || !challenge) {
-    logger.warn({ memberId }, "passkey registration: malformed response or expired challenge");
-    return { ok: false, error: "That took too long. Try adding the passkey again." };
-  }
-
+  const ceremony = await takeCeremony(registrationSchema, response, "register");
+  if (!ceremony) return { ok: false, error: "That took too long. Try adding the passkey again." };
   try {
-    const verified = verifyRegistration(parsed.data, {
-      rpId: RP_ID,
-      origin: RP_ORIGIN,
-      challenge: challenge.challenge,
-    });
-    if (await findCredential(verified.credentialId)) {
-      return { ok: false, error: "That passkey is already on the list." };
-    }
+    const verified = await verifyNewPasskey(
+      ceremony.data,
+      ceremony.pending.challenge,
+      "That passkey is already on the list.",
+    );
     await addCredential(memberId, verified);
   } catch (err) {
-    return (
-      ceremonyRefused(err, "That passkey didn't check out. Try again.", { memberId }) ??
-      failure(err)
-    );
+    return ceremonyFailure(err, NOT_VERIFIED, { memberId });
   }
-
   revalidatePath("/", "layout");
   return { ok: true };
 }
 
-/**
- * Step one of signing in. Deliberately unauthenticated, and deliberately
- * without an allowCredentials list: the browser offers whichever passkey it
- * holds for this site, so nobody types an identifier of any kind.
- */
+/** Unauthenticated, and without an allowCredentials list: nobody types an identifier. */
 export async function beginPasskeySignInAction(): Promise<
   ActionResult & { options?: PasskeySignInOptions }
 > {
   if (!passkeysConfigured) return { ok: false, error: NOT_CONFIGURED };
   return {
     ok: true,
-    options: signInOptions({
-      rpId: RP_ID,
-      origin: RP_ORIGIN,
-      challenge: await startPasskeyChallenge("login"),
-    }),
+    options: signInOptions({ ...RP_CHECK, challenge: await startPasskeyChallenge("login") }),
   };
 }
 
-/** Step two: the signature decides who this is. Redirects on success. */
 export async function finishPasskeySignInAction(
   response: unknown,
   next?: string,
 ): Promise<ActionResult> {
-  const parsed = assertionSchema.safeParse(response);
-  const challenge = await takePasskeyChallenge("login");
-  if (!parsed.success || !challenge) {
-    logger.warn("passkey sign-in: malformed response or expired challenge");
-    return { ok: false, error: "That took too long. Try signing in again." };
-  }
+  const ceremony = await takeCeremony(assertionSchema, response, "login");
+  if (!ceremony) return { ok: false, error: "That took too long. Try signing in again." };
 
-  const credential = await findCredential(parsed.data.id);
-  // One message for "no such credential" and "bad signature" alike: which of
-  // the two it was is not something an unauthenticated caller should learn.
+  // One message for "no such credential" and "bad signature" alike: an unauthenticated caller
+  // should not learn which.
   const rejected: ActionResult = { ok: false, error: "That passkey didn't work. Try again." };
+  const credential = await findCredential(ceremony.data.id);
   if (!credential) {
     logger.warn("passkey sign-in: unknown credential");
     return rejected;
   }
-
   let memberId: string;
   try {
     const verified = verifyAssertion(
-      parsed.data,
-      { rpId: RP_ID, origin: RP_ORIGIN, challenge: challenge.challenge },
+      ceremony.data,
+      { ...RP_CHECK, challenge: ceremony.pending.challenge },
       credential,
     );
     const member = await getMember(credential.memberId);
@@ -738,31 +603,20 @@ export async function finishPasskeySignInAction(
     await noteCredentialUse(credential.id, verified.signCount, verified.backedUp);
     memberId = member.id;
   } catch (err) {
-    return ceremonyRefused(err, rejected.error ?? "", {}) ?? failure(err);
+    return ceremonyFailure(err, rejected.error);
   }
-
   await createSession(memberId);
   logger.info({ memberId, provider: "passkey" }, "member signed in");
   redirect(safeNext(next));
 }
 
 export async function removePasskeyAction(credentialId: string): Promise<ActionResult> {
-  const memberId = await requireMemberId();
-  try {
-    await removeCredential(memberId, credentialId);
-  } catch (err) {
-    return failure(err);
-  }
-  revalidatePath(routes.account);
-  return { ok: true };
+  return mutate((memberId) => removeCredential(memberId, credentialId), [routes.account]);
 }
 
 // ---------- an account from nothing ----------
-//
-// For whoever is about to open the first trip and has no link to arrive by:
-// the join ceremony below, without the invite. The member id is minted at
-// step one and carried in the sealed challenge, so the passkey and the row
-// agree on who this is before either exists.
+// The join ceremony without the invite. The member id is minted at step one and carried in the
+// sealed challenge, so the passkey and the row agree on who this is before either exists.
 
 const signupSchema = z.object({
   name: z.string().min(1).max(64),
@@ -771,250 +625,190 @@ const signupSchema = z.object({
   response: registrationSchema,
 });
 
+const lingoOrDefault = (lingo: string | undefined) => (isLingoKey(lingo ?? "") ? lingo : undefined);
+
 export async function beginSignupAction(
   name: string,
 ): Promise<ActionResult & { options?: PasskeyRegistrationOptions }> {
-  if (!passkeysConfigured) return { ok: false, error: NOT_CONFIGURED };
-  if (await currentMember()) return { ok: false, error: "You're already signed in." };
+  const refused = await refuseSignedIn();
+  if (refused) return refused;
   const memberId = randomUUID();
-  return {
-    ok: true,
-    options: registrationOptions({
-      rp: RP,
-      origin: RP_ORIGIN,
-      challenge: await startPasskeyChallenge("signup", { memberId, code: "signup" }),
-      memberId,
-      displayName: name.trim() || "New member",
-    }),
-  };
+  return beginRegistration("signup", memberId, name.trim() || "New member", {
+    link: { memberId, code: "signup" },
+  });
 }
 
 export async function finishSignupAction(input: unknown): Promise<ActionResult> {
-  const parsed = signupSchema.safeParse(input);
-  const pending = await takePasskeyChallenge("signup");
-  if (!parsed.success || !pending?.link) {
-    logger.warn("signup: malformed response or expired challenge");
-    return {
-      ok: false,
-      error: "That took too long, or the box wasn't ticked. Try again.",
-    };
+  const ceremony = await takeCeremony(signupSchema, input, "signup");
+  if (!ceremony?.pending.link) {
+    return { ok: false, error: "That took too long, or the box wasn't ticked. Try again." };
   }
-  let member: Member;
+  let memberId: string;
   try {
-    const verified = verifyRegistration(parsed.data.response, {
-      rpId: RP_ID,
-      origin: RP_ORIGIN,
-      challenge: pending.challenge,
-    });
-    if (await findCredential(verified.credentialId)) {
-      return { ok: false, error: "That passkey already belongs to an account. Sign in instead." };
-    }
-    member = await createAccount({
-      memberId: pending.link.memberId,
-      name: parsed.data.name,
-      lingo: isLingoKey(parsed.data.lingo ?? "") ? parsed.data.lingo : undefined,
+    const verified = await verifyNewPasskey(
+      ceremony.data.response,
+      ceremony.pending.challenge,
+      "That passkey already belongs to an account. Sign in instead.",
+    );
+    const member = await createAccount({
+      memberId: ceremony.pending.link.memberId,
+      name: ceremony.data.name,
+      lingo: lingoOrDefault(ceremony.data.lingo),
       credential: verified,
     });
+    memberId = member.id;
   } catch (err) {
-    return ceremonyRefused(err, "That passkey didn't check out. Try again.", {}) ?? failure(err);
+    return ceremonyFailure(err);
   }
-  await createSession(member.id);
-  logger.info({ memberId: member.id }, "member signed in");
+  await createSession(memberId);
+  logger.info({ memberId }, "member signed in");
   redirect(routes.newTrip);
 }
 
 // ---------- joining by invite link ----------
-//
-// The same two-step ceremony as adding a passkey, for someone who has no
-// account yet. A separate challenge purpose keeps a join ceremony from being
-// finished as an "add a passkey to my account" one.
 
-const joinSchema = z.object({
-  code: z.string().min(1).max(128),
-  name: z.string().min(1).max(64),
-  lingo: z.string().max(32).optional(),
-  agreed: z.literal(true),
-  response: registrationSchema,
-});
+const joinSchema = signupSchema.extend({ code: z.string().min(1).max(128) });
 
 export async function beginJoinAction(
   code: string,
   name: string,
 ): Promise<ActionResult & { options?: PasskeyRegistrationOptions }> {
-  if (!passkeysConfigured) return { ok: false, error: NOT_CONFIGURED };
-  if (await currentMember()) return { ok: false, error: "You're already signed in." };
-
+  const refused = await refuseSignedIn();
+  if (refused) return refused;
   const invite = await findInvite(code);
   if (!invite || inviteState(invite, new Date()) !== "live") {
     return { ok: false, error: "That invite link has already been used or has expired." };
   }
-
   const memberId = randomUUID();
-  return {
-    ok: true,
-    options: registrationOptions({
-      rp: RP,
-      origin: RP_ORIGIN,
-      challenge: await startPasskeyChallenge("join", { memberId, code }),
-      memberId,
-      displayName: name.trim() || invite.label,
-    }),
-  };
+  return beginRegistration("join", memberId, name.trim() || invite.label, {
+    link: { memberId, code },
+  });
 }
 
-/** Verify the new passkey, then create the member and spend the link together. */
-export async function finishJoinAction(input: unknown): Promise<ActionResult> {
-  const parsed = joinSchema.safeParse(input);
-  const pending = await takePasskeyChallenge("join");
-  if (!parsed.success || !pending?.link) {
-    logger.warn("join: malformed response or expired challenge");
+/** Returns the trip and the key wrap; the phone opens it with the fragment's secret, then goes. */
+export async function finishJoinAction(
+  input: unknown,
+): Promise<ActionResult & { tripId?: string; key?: KeyHandover | null }> {
+  const ceremony = await takeCeremony(joinSchema, input, "join");
+  if (!ceremony?.pending.link) {
     return {
       ok: false,
       error: "That took too long, or the box wasn't ticked. Open the link again.",
     };
   }
   // The link finished with must be the one the ceremony started for.
-  if (pending.link.code !== parsed.data.code) {
+  if (ceremony.pending.link.code !== ceremony.data.code) {
     logger.warn("join: challenge belongs to a different invite");
     return { ok: false, error: "That didn't work. Open the link again." };
   }
-
-  let joined: { member: Member; tripId: string };
+  let joined: Awaited<ReturnType<typeof joinWithInvite>>;
   try {
-    const verified = verifyRegistration(parsed.data.response, {
-      rpId: RP_ID,
-      origin: RP_ORIGIN,
-      challenge: pending.challenge,
-    });
+    const verified = await verifyNewPasskey(
+      ceremony.data.response,
+      ceremony.pending.challenge,
+      "That passkey already belongs to an account. Sign in instead.",
+    );
     joined = await joinWithInvite({
-      code: parsed.data.code,
-      memberId: pending.link.memberId,
-      name: parsed.data.name,
-      // An unknown key would be a stale client; english is the baseline anyway.
-      lingo: isLingoKey(parsed.data.lingo ?? "") ? parsed.data.lingo : undefined,
+      code: ceremony.data.code,
+      memberId: ceremony.pending.link.memberId,
+      name: ceremony.data.name,
+      lingo: lingoOrDefault(ceremony.data.lingo),
       credential: verified,
     });
   } catch (err) {
-    return ceremonyRefused(err, "That passkey didn't check out. Try again.", {}) ?? failure(err);
+    return ceremonyFailure(err);
   }
-
   await createSession(joined.member.id);
   logger.info({ memberId: joined.member.id }, "member signed in");
-  redirect(routes.trip(joined.tripId));
+  revalidatePath(routes.members(joined.tripId));
+  return { ok: true, tripId: joined.tripId, key: joined.key };
 }
 
 // ---------- recovering a seat ----------
-//
-// The same registration ceremony again, aimed at a member who already exists.
-// It is the one flow in the app that can hand somebody an account with history
-// in it, so: its own challenge purpose, the member id pinned in the sealed
-// cookie at step one and re-checked against the row at step two, and the link
-// spent in the transaction that stores the key (lib/data.ts).
+// The one flow that can hand somebody an account with history in it: its own challenge purpose,
+// the member id pinned in the cookie at step one and re-checked at step two, the link spent in
+// the transaction that stores the key (lib/data.ts).
 
 const recoverSchema = z.object({
   code: z.string().min(1).max(128),
   response: registrationSchema,
 });
 
-/** Organisers of a shared trip only; the member never has to be reachable for this to work. */
+/** `key` is a shared trip's key under the link's secret, sealed on the organiser's phone; null when it has none. */
 export async function mintRecoveryAction(
   tripId: string,
   memberId: string,
-): Promise<ActionResult & { url?: string }> {
+  key: { epoch: number; wrappedKey: string } | null,
+): Promise<ActionResult & { url?: string; code?: string }> {
   return mutate(
-    async (actorId) => ({
-      url: recoveryUrl(RP_ORIGIN, await mintRecovery(actorId, memberId)),
-    }),
-    () => [routes.members(tripId), routes.member(tripId, memberId)],
+    async (actorId) => {
+      const code = await mintRecovery(actorId, memberId, key ? { tripId, ...key } : null);
+      return { url: recoveryUrl(RP_ORIGIN, code), code };
+    },
+    [routes.members(tripId), routes.member(tripId, memberId)],
   );
 }
 
 /** The member a link names, shutting it from the banner that follows them anywhere. */
 export async function shutOwnRecoveryAction(code: string): Promise<ActionResult> {
-  return mutate(
-    async (memberId) => {
-      await revokeRecovery(memberId, code);
-      return {};
-    },
-    () => [],
-  );
+  return mutate((memberId) => revokeRecovery(memberId, code));
 }
 
-/** Any organiser on a shared trip, or the member the link names — see revokeRecovery. */
 export async function revokeRecoveryAction(tripId: string, code: string): Promise<ActionResult> {
-  return mutate(
-    async (memberId) => {
-      await revokeRecovery(memberId, code);
-      return {};
-    },
-    () => [routes.members(tripId)],
-  );
+  return mutate((memberId) => revokeRecovery(memberId, code), [routes.members(tripId)]);
 }
 
 export async function beginRecoveryAction(
   code: string,
 ): Promise<ActionResult & { options?: PasskeyRegistrationOptions }> {
-  if (!passkeysConfigured) return { ok: false, error: NOT_CONFIGURED };
-  if (await currentMember()) return { ok: false, error: "You're already signed in." };
-
+  const refused = await refuseSignedIn();
+  if (refused) return refused;
   const row = await findRecovery(code);
   if (!row || recoveryState(row, new Date()) !== "live") {
     return { ok: false, error: "That recovery link has already been used or has expired." };
   }
   const member = await getMember(row.memberId);
   if (!member) return { ok: false, error: "That seat is gone." };
-
-  // Excluding the keys already on the seat means a device that can still sign
-  // in says so, loudly, instead of quietly enrolling itself a second time.
+  // Excluding the keys already on the seat makes a device that can still sign in say so.
   const held = await listCredentials(member.id);
-  return {
-    ok: true,
-    options: registrationOptions({
-      rp: RP,
-      origin: RP_ORIGIN,
-      challenge: await startPasskeyChallenge("recover", { memberId: member.id, code }),
-      memberId: member.id,
-      displayName: member.name,
-      exclude: held.map((c) => c.id),
-    }),
-  };
+  return beginRegistration("recover", member.id, member.name, {
+    link: { memberId: member.id, code },
+    exclude: held.map((c) => c.id),
+  });
 }
 
-/** Verify the new passkey, add it to the seat, and spend the link together. */
-export async function finishRecoveryAction(input: unknown): Promise<ActionResult> {
-  const parsed = recoverSchema.safeParse(input);
-  const pending = await takePasskeyChallenge("recover");
-  if (!parsed.success || !pending?.link) {
-    logger.warn("recovery: malformed response or expired challenge");
+/** Returns the key wrap the link carried, if any; the phone opens it before going anywhere. */
+export async function finishRecoveryAction(
+  input: unknown,
+): Promise<ActionResult & { key?: RecoveryKey | null }> {
+  const ceremony = await takeCeremony(recoverSchema, input, "recover");
+  if (!ceremony?.pending.link) {
     return { ok: false, error: "That took too long. Open the link again." };
   }
-  if (pending.link.code !== parsed.data.code) {
+  if (ceremony.pending.link.code !== ceremony.data.code) {
     logger.warn("recovery: challenge belongs to a different link");
     return { ok: false, error: "That didn't work. Open the link again." };
   }
-
-  let member: Member;
+  let recovered: Awaited<ReturnType<typeof recoverWithLink>>;
   try {
-    const verified = verifyRegistration(parsed.data.response, {
-      rpId: RP_ID,
-      origin: RP_ORIGIN,
-      challenge: pending.challenge,
-    });
-    if (await findCredential(verified.credentialId)) {
-      return { ok: false, error: "That passkey is already on the list." };
-    }
-    member = await recoverWithLink({
-      code: parsed.data.code,
-      memberId: pending.link.memberId,
+    const verified = await verifyNewPasskey(
+      ceremony.data.response,
+      ceremony.pending.challenge,
+      "That passkey is already on the list.",
+    );
+    recovered = await recoverWithLink({
+      code: ceremony.data.code,
+      memberId: ceremony.pending.link.memberId,
       credential: verified,
     });
   } catch (err) {
-    return ceremonyRefused(err, "That passkey didn't check out. Try again.", {}) ?? failure(err);
+    return ceremonyFailure(err);
   }
-
-  await createSession(member.id);
-  logger.warn({ memberId: member.id, provider: "recovery" }, "member signed in after a recovery");
-  // Their own page, where the passkey list is: whoever just came back should
-  // land looking at every key that can sign in as them, and drop the lost ones.
-  redirect(routes.account);
+  await createSession(recovered.member.id);
+  logger.warn(
+    { memberId: recovered.member.id, provider: "recovery" },
+    "member signed in after a recovery",
+  );
+  // The phone sends them to their own page, where every key that can sign in as them is listed.
+  return { ok: true, key: recovered.key };
 }

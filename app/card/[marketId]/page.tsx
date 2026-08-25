@@ -3,33 +3,23 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Logo } from "@/components/logo";
 import { Pies } from "@/components/pies";
-import { marketCard } from "@/lib/data";
+import { cardOf } from "@/lib/data";
 import { fmtDate } from "@/lib/format";
 import { routes } from "@/lib/routes";
 import { currentMember } from "@/lib/session";
 import { DESTINATIONS } from "@/lib/talk";
 
-/**
- * The public face of one prediction: what a member drops in the group chat.
- * Reachable by URL alone — an unguessable id — and deliberately thin: the
- * question, the verdict, first names and pies. Nothing about the trip beyond
- * its name, and a way in for whoever was shown it. This page is the app's
- * only advertisement, and it is written by the people playing.
- */
+// Reachable by URL alone, on purpose (AGENTS.md): exactly what a member's phone
+// put in `cards` when they tapped share, and nothing else exists to show.
 export async function generateMetadata({
   params,
 }: {
   params: Promise<{ marketId: string }>;
 }): Promise<Metadata> {
   const { marketId } = await params;
-  const card = await marketCard(marketId);
+  const card = await cardOf(marketId);
   if (!card) return { title: "Chiang Pai" };
-  const verdict =
-    card.status === "open"
-      ? "Still open"
-      : card.status === "refunded"
-        ? "Voided"
-        : card.status.toUpperCase();
+  const verdict = card.verdict === "refunded" ? "Voided" : card.verdict.toUpperCase();
   return {
     title: card.question,
     description: `${verdict} · ${card.trip.name} · Chiang Pai`,
@@ -39,30 +29,29 @@ export async function generateMetadata({
 
 export default async function CardPage({ params }: { params: Promise<{ marketId: string }> }) {
   const { marketId } = await params;
-  const [card, me] = await Promise.all([marketCard(marketId), currentMember()]);
+  const [card, me] = await Promise.all([cardOf(marketId), currentMember()]);
   if (!card) notFound();
   const there = DESTINATIONS[card.trip.destination];
-  const settled = card.status === "yes" || card.status === "no";
+  const settled = card.verdict === "yes" || card.verdict === "no";
+  const poolC = [...card.winners, ...card.losers].reduce((s, l) => s + Math.abs(l.profitC), 0);
 
   return (
     <div className="mx-auto max-w-md">
       <div className="card overflow-hidden">
         <div className="bg-felt-deep px-5 py-4 text-[#f1eee4]">
           <p className="text-xs uppercase tracking-wider text-white/60">
-            {there?.flag} {card.trip.name}
-            {card.resolvedAt && ` · ${fmtDate(card.resolvedAt)}`}
+            {there?.flag} {card.trip.name} · {fmtDate(card.at)}
           </p>
           <p className="display mt-1 text-3xl font-extrabold leading-tight">{card.question}</p>
         </div>
         <div className="px-5 py-4">
           <p className="display text-xl font-bold uppercase tracking-wide">
-            {card.status === "open" && "Still open"}
-            {card.status === "refunded" && "Voided — everyone got their pies back"}
+            {card.verdict === "refunded" && "Voided — everyone got their pies back"}
             {settled && (
               <>
                 Resolved{" "}
-                <span className={card.status === "yes" ? "text-yes-deep" : "text-no-deep"}>
-                  {card.status.toUpperCase()}
+                <span className={card.verdict === "yes" ? "text-yes-deep" : "text-no-deep"}>
+                  {card.verdict.toUpperCase()}
                 </span>
               </>
             )}
@@ -103,9 +92,9 @@ export default async function CardPage({ params }: { params: Promise<{ marketId:
               </div>
             </div>
           )}
-          {card.poolC > 0 && (
+          {poolC > 0 && (
             <p className="mono mt-3 text-xs text-soft">
-              <Pies c={card.poolC} /> in the pool · pies are play money, always
+              <Pies c={poolC} /> changed hands · pies are play money, always
             </p>
           )}
         </div>

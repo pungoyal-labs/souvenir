@@ -1,9 +1,9 @@
 import Link from "next/link";
-import type { MarketView } from "@/lib/data";
 import { timeAgo } from "@/lib/format";
 import { lingoOf } from "@/lib/lingo";
 import { piesText } from "@/lib/pies";
 import { routes } from "@/lib/routes";
+import type { MarketView } from "@/lib/views";
 import { Avatar } from "./avatar";
 import { Pies } from "./pies";
 import { PoolBar } from "./pool-bar";
@@ -22,13 +22,26 @@ export function MarketCard({
 }) {
   const t = lingoOf(lingo);
   const { market, creator, participants } = view;
-  const yesBackers = participants.filter((p) => p.side === "yes");
-  const noBackers = participants.filter((p) => p.side === "no");
   const social = [
     view.upvotes > 0 && `👍 ${view.upvotes}`,
     view.watchers > 0 && `👁 ${view.watchers}`,
     view.commentCount > 0 && `💬 ${view.commentCount}`,
   ].filter(Boolean);
+  const backers = (side: "yes" | "no") => (
+    <div className="flex -space-x-1.5">
+      {participants
+        .filter((p) => p.side === side)
+        .map((p) => (
+          <span
+            key={p.member.id}
+            className={`rounded-full ring-2 ${side === "yes" ? "ring-yes-tint" : "ring-no-tint"}`}
+            title={`${p.member.name}: ${piesText(p.stakeC)} on ${side.toUpperCase()}`}
+          >
+            <Avatar member={p.member} size={22} />
+          </span>
+        ))}
+    </div>
+  );
 
   return (
     <Link
@@ -52,28 +65,8 @@ export function MarketCard({
 
       {participants.length > 0 && (
         <div className="mt-2 flex items-center justify-between">
-          <div className="flex -space-x-1.5">
-            {yesBackers.map((p) => (
-              <span
-                key={p.member.id}
-                className="rounded-full ring-2 ring-yes-tint"
-                title={`${p.member.name}: ${piesText(p.stakeC)} on YES`}
-              >
-                <Avatar member={p.member} size={22} />
-              </span>
-            ))}
-          </div>
-          <div className="flex -space-x-1.5">
-            {noBackers.map((p) => (
-              <span
-                key={p.member.id}
-                className="rounded-full ring-2 ring-no-tint"
-                title={`${p.member.name}: ${piesText(p.stakeC)} on NO`}
-              >
-                <Avatar member={p.member} size={22} />
-              </span>
-            ))}
-          </div>
+          {backers("yes")}
+          {backers("no")}
         </div>
       )}
 
@@ -90,7 +83,7 @@ export function MarketCard({
         <p className={`mono mt-2 text-sm font-bold ${tone(myProfitC)}`}>
           {myProfitC === 0
             ? t.brokeEven
-            : (myProfitC > 0 ? t.youWon : t.youLost)(`${piesText(Math.abs(myProfitC))}`)}
+            : (myProfitC > 0 ? t.youWon : t.youLost)(piesText(Math.abs(myProfitC)))}
         </p>
       )}
     </Link>

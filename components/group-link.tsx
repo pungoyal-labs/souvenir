@@ -1,41 +1,44 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
-import { mintInviteAction, revokeInviteAction } from "@/app/actions";
+import { useState } from "react";
+import { revokeInviteAction } from "@/app/actions";
 import { CopyLink } from "@/components/copy-link";
 import { fmtDate } from "@/lib/format";
+import { linkSecretOf, linkWithSecret } from "@/lib/keys";
+import { useMintInvite } from "./invite-links";
+import { useKeyring } from "./keyring";
+import { useAct } from "./use-act";
 
-/**
- * One open door for the whole group: anyone holding it can join, as many times
- * as people click it, until it expires or an organiser shuts it. Stronger than a
- * personal invite in every sense — hence the plain warning and the revoke
- * button sitting right next to it.
- */
+/** One open door for the whole group, until it expires or an organiser shuts it. */
 export function GroupLink({
-  tripId,
   existing,
 }: {
-  tripId: string;
   existing: { code: string; url: string; expiresAt: Date; useCount: number } | null;
 }) {
   const router = useRouter();
-  const [pending, startTransition] = useTransition();
-  const [error, setError] = useState<string | null>(null);
+  const mintInvite = useMintInvite();
+  const { keyring } = useKeyring();
+  const { pending, error, act } = useAct();
   const [minted, setMinted] = useState<string | null>(null);
 
-  const url = minted ?? existing?.url;
+  // The link is whole only with its secret, which only the minting phone holds.
+  const secret = existing ? linkSecretOf(keyring, existing.code) : null;
+  const url = minted ?? (existing && secret ? linkWithSecret(existing.url, secret) : null);
 
-  const act = (run: () => Promise<{ ok: boolean; error?: string; url?: string }>) =>
-    startTransition(async () => {
-      setError(null);
-      const res = await run();
-      if (!res.ok) {
-        setError(res.error ?? "That didn't work.");
-        return;
-      }
-      if (res.url) setMinted(res.url);
+  const mint = () =>
+    act(async () => {
+      const res = await mintInvite("Anyone with the link", { isOpen: true });
+      if (!res.ok) return res;
+      setMinted(res.url);
       router.refresh();
+    });
+  const shut = (code: string) =>
+    act(async () => {
+      setMinted(null);
+      const res = await revokeInviteAction(code);
+      if (res.ok) router.refresh();
+      return res;
     });
 
   if (!existing && !minted) {
@@ -44,9 +47,7 @@ export function GroupLink({
         <button
           type="button"
           disabled={pending}
-          onClick={() =>
-            act(() => mintInviteAction(tripId, "Anyone with the link", { isOpen: true }))
-          }
+          onClick={mint}
           className="rounded-md border border-line px-3 py-2 text-sm font-semibold hover:bg-surface disabled:opacity-40"
         >
           {pending ? "Minting…" : "Create a group link"}
@@ -60,7 +61,7 @@ export function GroupLink({
     <div className="rounded-md border border-line bg-surface/60 px-3 py-2">
       <div className="flex items-center gap-2">
         <code className="mono min-w-0 flex-1 truncate rounded bg-surface px-2 py-1 text-xs">
-          {url}
+          {url ?? "Minted on another phone — shut it and mint a fresh one here to share it."}
         </code>
         {url && <CopyLink url={url} />}
       </div>
@@ -75,10 +76,7 @@ export function GroupLink({
           <button
             type="button"
             disabled={pending}
-            onClick={() => {
-              setMinted(null);
-              act(() => revokeInviteAction(existing.code));
-            }}
+            onClick={() => shut(existing.code)}
             className="font-semibold text-no-deep hover:underline disabled:opacity-40"
           >
             Shut it

@@ -11,7 +11,7 @@ export default async function NewTripPage() {
       <h1 className="display text-4xl font-extrabold uppercase tracking-wide">{t.newTripTitle}</h1>
       <p className="mt-1 text-sm text-soft">{t.newTripSub}</p>
       <div className="mt-5">
-        <TripForm />
+        <TripForm creatorId={me.id} />
       </div>
     </div>
   );

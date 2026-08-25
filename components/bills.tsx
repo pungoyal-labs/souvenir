@@ -1,71 +1,76 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
-import { deleteBillAction, settleUpAction } from "@/app/actions";
-import type { BillView, CommentView, CurrencyBalances } from "@/lib/data";
-import type { Member } from "@/lib/db/schema";
+import { useState } from "react";
 import { fmtDate, timeAgo } from "@/lib/format";
-import { lingoOf } from "@/lib/lingo";
 import { CURRENCY_SYMBOL, type Currency, fmtMoney, parseAmount } from "@/lib/split";
+import { type BillView, billComments, billsOverview, type Person } from "@/lib/views";
 import { Avatar } from "./avatar";
-import { BillForm, todayLocal } from "./bill-form";
-import { billLabel, firstName } from "./bill-label";
+import { BillForm } from "./bill-form";
+import { billLabel, firstName, todayLocal } from "./bill-label";
 import { CommentsSection } from "./comments";
+import { useOpenTrip } from "./trip-store";
 import { EmptyState, tone } from "./ui";
+import { useAct } from "./use-act";
 
 /**
- * The whole /bills page below the heading: who's up and down per currency,
- * the shortest way to settle it, and every bill on the record. Real money —
- * this never touches the pie ledger.
+ * The /bills page below the heading: who's up and down per currency, the
+ * shortest way to settle it, and every bill on the record. Real money, never
+ * the pie ledger — and sealed: every bill is a `bill.rev` event replayed here.
  */
 export function Bills({
-  tripId,
-  members,
-  meId,
-  lingo,
   currencies,
-  bills,
-  balances,
-  comments,
 }: {
-  tripId: string;
-  members: Member[];
   /** The trip's one or two currencies, the default first. */
   currencies: readonly Currency[];
-  meId: string;
-  lingo: string;
-  bills: BillView[];
-  balances: CurrencyBalances[];
-  /** Each bill's comment thread, keyed by bill id. */
-  comments: Record<string, CommentView[]>;
 }) {
-  const t = lingoOf(lingo);
-  const router = useRouter();
-  const [pending, startTransition] = useTransition();
-  const [error, setError] = useState<string | null>(null);
+  const { me, lingo, t, roster: members, people, state, append } = useOpenTrip();
+  const meId = me.id;
+  const { pending, error, act } = useAct(t.oops);
   const [adding, setAdding] = useState(false);
   const [paying, setPaying] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [openId, setOpenId] = useState<string | null>(null);
+  const { bills, balances } = billsOverview(state, people);
+  const comments = billComments(state, people);
+  const who = (m: Person, you = "You") => (m.id === meId ? you : firstName(m));
 
-  const act = (run: () => Promise<{ ok: boolean; error?: string }>) =>
-    startTransition(async () => {
-      setError(null);
-      const res = await run();
-      if (!res.ok) setError(res.error ?? t.oops);
-      else router.refresh();
+  /** "X paid Y back" — a settlement bill, so replay cancels the debt. */
+  const settle = (from: Person, to: Person, currency: Currency, amountC: number, onDate: string) =>
+    append({
+      t: "bill.rev",
+      billId: crypto.randomUUID(),
+      kind: "settlement",
+      onDate,
+      description: "",
+      currency,
+      split: "custom",
+      entries: [
+        { memberId: from.id, paidC: amountC, participant: false },
+        { memberId: to.id, paidC: 0, participant: true, owedC: amountC },
+      ],
     });
 
-  const recordTransfer = (from: Member, to: Member, currency: Currency, amountC: number) => {
+  const recordTransfer = (from: Person, to: Person, currency: Currency, amountC: number) => {
     const line = `${firstName(from)} paid ${firstName(to)} ${fmtMoney(currency, amountC)}`;
     if (!confirm(`Record it? ${line}.`)) return;
-    act(() => settleUpAction(tripId, from.id, to.id, currency, amountC, todayLocal()));
+    act(() => settle(from, to, currency, amountC, todayLocal()));
   };
 
   const remove = (bill: BillView) => {
     if (!confirm(`Delete "${billLabel(bill, meId)}"? The group's balances will change.`)) return;
-    act(() => deleteBillAction(tripId, bill.id));
+    act(() =>
+      append({
+        t: "bill.rev",
+        billId: bill.id,
+        kind: bill.kind,
+        onDate: bill.onDate,
+        description: bill.description,
+        currency: bill.currency,
+        split: bill.split,
+        entries: [],
+        deleted: true,
+      }),
+    );
   };
 
   const byDate = new Map<string, BillView[]>();
@@ -110,10 +115,8 @@ export function Bills({
                           className="flex items-center gap-2 text-sm"
                         >
                           <span className="truncate">
-                            <span className="font-semibold">
-                              {transfer.fromId === meId ? "You" : firstName(transfer.from)}
-                            </span>{" "}
-                            → {transfer.toId === meId ? "you" : firstName(transfer.to)}
+                            <span className="font-semibold">{who(transfer.from)}</span> →{" "}
+                            {who(transfer.to, "you")}
                           </span>
                           <span className="mono font-bold">
                             {fmtMoney(b.currency, transfer.amountC)}
@@ -171,16 +174,7 @@ export function Bills({
         )}
       </div>
 
-      {adding && (
-        <BillForm
-          tripId={tripId}
-          members={members}
-          meId={meId}
-          lingo={lingo}
-          currencies={currencies}
-          onDone={() => setAdding(false)}
-        />
-      )}
+      {adding && <BillForm currencies={currencies} onDone={() => setAdding(false)} />}
       {paying && (
         <PaymentForm
           members={members}
@@ -188,7 +182,7 @@ export function Bills({
           currencies={currencies}
           pending={pending}
           onRecord={(payer, receiver, currency, amountC, onDate) => {
-            act(() => settleUpAction(tripId, payer.id, receiver.id, currency, amountC, onDate));
+            act(() => settle(payer, receiver, currency, amountC, onDate));
             setPaying(false);
           }}
           onCancel={() => setPaying(false)}
@@ -208,10 +202,6 @@ export function Bills({
                 editingId === bill.id ? (
                   <li key={bill.id} className="p-2">
                     <BillForm
-                      tripId={tripId}
-                      members={members}
-                      meId={meId}
-                      lingo={lingo}
                       currencies={currencies}
                       initial={bill}
                       onDone={() => setEditingId(null)}
@@ -237,7 +227,7 @@ export function Bills({
                             ? "payment"
                             : `${bill.entries
                                 .filter((e) => e.paidC > 0)
-                                .map((e) => (e.member.id === meId ? "you" : firstName(e.member)))
+                                .map((e) => who(e.member, "you"))
                                 .join(" & ")} paid · split ${
                                 bill.entries.filter((e) => e.participant).length
                               } ways`}
@@ -256,9 +246,7 @@ export function Bills({
                           {bill.entries.map((e) => (
                             <li key={e.member.id} className="flex items-center gap-2">
                               <Avatar member={e.member} size={20} />
-                              <span className="truncate">
-                                {e.member.id === meId ? "You" : firstName(e.member)}
-                              </span>
+                              <span className="truncate">{who(e.member)}</span>
                               <span className="mono ml-auto text-xs text-soft">
                                 {e.paidC > 0 && `paid ${fmtMoney(bill.currency, e.paidC)}`}
                                 {e.paidC > 0 && e.owedC > 0 && " · "}
@@ -268,13 +256,10 @@ export function Bills({
                           ))}
                         </ul>
                         <p className="mt-2 text-xs text-soft">
-                          added by {bill.createdBy.id === meId ? "you" : firstName(bill.createdBy)}{" "}
-                          {timeAgo(bill.createdAt)}
+                          added by {who(bill.createdBy, "you")} {timeAgo(bill.createdAt)}
                           {bill.editedBy &&
                             bill.editedAt &&
-                            ` · edited by ${
-                              bill.editedBy.id === meId ? "you" : firstName(bill.editedBy)
-                            } ${timeAgo(bill.editedAt)}`}
+                            ` · edited by ${who(bill.editedBy, "you")} ${timeAgo(bill.editedAt)}`}
                         </p>
                         <div className="mt-2 flex items-center gap-2">
                           {bill.kind === "expense" && (
@@ -305,11 +290,19 @@ export function Bills({
                           </p>
                           <div className="mt-2">
                             <CommentsSection
-                              target={{ billId: bill.id }}
                               comments={comments[bill.id] ?? []}
                               members={members}
                               meId={meId}
                               lingo={lingo}
+                              onPost={(body, mentions) =>
+                                append({
+                                  t: "comment",
+                                  id: crypto.randomUUID(),
+                                  billId: bill.id,
+                                  body,
+                                  mentions,
+                                })
+                              }
                             />
                           </div>
                         </div>
@@ -338,13 +331,13 @@ function PaymentForm({
   onRecord,
   onCancel,
 }: {
-  members: Member[];
+  members: Person[];
   meId: string;
   currencies: readonly Currency[];
   pending: boolean;
   onRecord: (
-    payer: Member,
-    receiver: Member,
+    payer: Person,
+    receiver: Person,
     currency: Currency,
     amountC: number,
     onDate: string,
@@ -361,6 +354,20 @@ function PaymentForm({
   const amountC = parseAmount(amountText);
   const select =
     "rounded-md border border-line bg-surface px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-felt";
+  const memberSelect = (value: string, onChange: (id: string) => void, label: string) => (
+    <select
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      aria-label={label}
+      className={select}
+    >
+      {members.map((m) => (
+        <option key={m.id} value={m.id}>
+          {m.id === meId ? "You" : firstName(m)}
+        </option>
+      ))}
+    </select>
+  );
 
   return (
     <div className="card p-4">
@@ -368,31 +375,9 @@ function PaymentForm({
         Record a payment
       </h3>
       <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
-        <select
-          value={payerId}
-          onChange={(e) => setPayerId(e.target.value)}
-          aria-label="Who paid"
-          className={select}
-        >
-          {members.map((m) => (
-            <option key={m.id} value={m.id}>
-              {m.id === meId ? "You" : firstName(m)}
-            </option>
-          ))}
-        </select>
+        {memberSelect(payerId, setPayerId, "Who paid")}
         <span className="text-soft">paid</span>
-        <select
-          value={receiverId}
-          onChange={(e) => setReceiverId(e.target.value)}
-          aria-label="Who got paid"
-          className={select}
-        >
-          {members.map((m) => (
-            <option key={m.id} value={m.id}>
-              {m.id === meId ? "You" : firstName(m)}
-            </option>
-          ))}
-        </select>
+        {memberSelect(receiverId, setReceiverId, "Who got paid")}
         {currencies.length > 1 && (
           <div className="flex overflow-hidden rounded-md border border-line">
             {currencies.map((c) => (

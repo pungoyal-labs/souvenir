@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
 import {
   beginJoinAction,
   beginSignupAction,
@@ -11,37 +12,40 @@ import {
 import { createCredential } from "@/components/passkeys";
 import { LINGO_KEYS, LINGOS } from "@/lib/lingo";
 import { routes } from "@/lib/routes";
+import { useTakeKey } from "./take-key";
+import { useAct } from "./use-act";
 
 /**
- * Everything a new member does: pick a name, tick the box, make a passkey.
- * No address, no password, no account anywhere else. With a `code` it joins
- * the trip the link is for; without one it opens an account for whoever is
- * about to start the first trip. The server action redirects once the
- * signature checks out.
+ * A new member: pick a name, tick the box, make a passkey. With a `code` it
+ * joins that link's trip and takes the key it carries; without one it opens an
+ * account and the server sends them to open their first trip.
  */
 export function JoinForm({ code, label }: { code?: string; label?: string }) {
+  const router = useRouter();
+  const takeKey = useTakeKey();
   const [name, setName] = useState(label ?? "");
   const [lingo, setLingo] = useState("english");
   const [agreed, setAgreed] = useState(false);
-  const [pending, startTransition] = useTransition();
-  const [error, setError] = useState<string | null>(null);
+  const { pending, error, act } = useAct();
 
   const join = () =>
-    startTransition(async () => {
-      setError(null);
+    act(async () => {
       const made = await createCredential(
         () => (code ? beginJoinAction(code, name) : beginSignupAction(name)),
         "created",
       );
-      if ("error" in made) {
-        setError(made.error);
-        return;
+      if ("error" in made) return { ok: false, error: made.error };
+      if (!code) {
+        // Success redirects, so anything returned here is a refusal.
+        const result = await finishSignupAction({ name, lingo, agreed, response: made.wire });
+        return { ok: false, error: result.error };
       }
-      // Success redirects, so anything returned here is a refusal.
-      const result = code
-        ? await finishJoinAction({ code, name, lingo, agreed, response: made.wire })
-        : await finishSignupAction({ name, lingo, agreed, response: made.wire });
-      setError(result.error ?? "That didn't work.");
+      const result = await finishJoinAction({ code, name, lingo, agreed, response: made.wire });
+      const tripId = result.tripId;
+      if (!result.ok || !tripId) return { ok: false, error: result.error };
+      const refused = await takeKey({ code, purpose: "invite", tripId, key: result.key });
+      if (refused) return { ok: false, error: refused };
+      router.push(routes.trip(tripId));
     });
 
   return (

@@ -1,8 +1,12 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
-import { createTripAction, updateTripAction } from "@/app/actions";
+import { useState } from "react";
+import { appendEventAction, createTripAction, updateTripAction } from "@/app/actions";
+import { exportKey, newKey, seal } from "@/lib/crypto";
+import { encodeEvent } from "@/lib/events";
+import { withTripKey } from "@/lib/keys";
+import { routes } from "@/lib/routes";
 import { CURRENCIES, CURRENCY_INFO, type Currency } from "@/lib/split";
 import { DESTINATION_LIST, HOME } from "@/lib/talk";
 import {
@@ -11,20 +15,23 @@ import {
   DEFAULT_MAX_STAKE_PIES,
   MAX_STAKE_CEILING,
 } from "@/lib/trips";
+import { useKeyring } from "./keyring";
+import { useAct } from "./use-act";
 
 const field =
   "mt-1 w-full rounded-md border border-line bg-surface px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-felt";
 const label = "block text-[11px] font-semibold uppercase tracking-wider text-soft";
 
 /**
- * Open a trip, or change one. Where the group is going and what it speaks and
- * settles in are fixed once — the foreign currency follows from the
- * destination and is shown, never typed — so editing offers only the name,
- * the dates, and the cap.
+ * Open a trip, or change one. Destination, language and home currency are
+ * fixed once; editing offers only the name, the dates, and the cap.
  */
 export function TripForm({
   initial,
+  creatorId,
 }: {
+  /** The signed-in member, who seals the first event on a new trip. */
+  creatorId?: string;
   initial?: {
     id: string;
     name: string;
@@ -37,8 +44,8 @@ export function TripForm({
   };
 }) {
   const router = useRouter();
-  const [pending, start] = useTransition();
-  const [error, setError] = useState<string | null>(null);
+  const keyring = useKeyring();
+  const { pending, error, act } = useAct();
   const [name, setName] = useState(initial?.name ?? "");
   const [destination, setDestination] = useState(initial?.destination ?? "TH");
   const [homeLanguage, setHomeLanguage] = useState(initial?.homeLanguage ?? DEFAULT_HOME_LANGUAGE);
@@ -55,20 +62,40 @@ export function TripForm({
   const sameLanguage = there && HOME[homeLanguage]?.code === there.them.code;
 
   const submit = () =>
-    start(async () => {
-      setError(null);
+    act(async () => {
       const input = {
         name,
         startsOn: startsOn || null,
         endsOn: endsOn || null,
         maxStakePies,
       };
-      const res = initial
-        ? await updateTripAction(initial.id, input)
-        : await createTripAction({ ...input, destination, homeLanguage, homeCurrency });
-      // Creating redirects; anything that comes back is a refusal.
-      if (res && !res.ok) setError(res.error ?? "That didn't work.");
-      else if (initial) router.refresh();
+      if (initial) {
+        const res = await updateTripAction(initial.id, input);
+        if (res.ok) router.refresh();
+        return res;
+      }
+      // A trip is sealed from its first event: this phone makes the key,
+      // keeps it, opens the trip, and says hello under it.
+      if (keyring.status === "unavailable") {
+        return {
+          ok: false,
+          error: "This browser can't keep a key between visits. Try another, or install the app.",
+        };
+      }
+      if (!creatorId) return;
+      const key = await newKey();
+      const raw = await exportKey(key);
+      const res = await createTripAction({ ...input, destination, homeLanguage, homeCurrency });
+      const tripId = res.tripId;
+      if (!res.ok || !tripId) return { ok: false, error: res.error };
+      await keyring.update((kr) => withTripKey(kr, tripId, 0, raw));
+      const hello = await seal(
+        key,
+        { tripId, authorId: creatorId, epoch: 0 },
+        encodeEvent({ t: "member.hello" }),
+      );
+      await appendEventAction(tripId, hello);
+      router.push(routes.trip(tripId));
     });
 
   return (

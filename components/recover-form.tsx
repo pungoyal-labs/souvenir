@@ -1,30 +1,29 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { beginRecoveryAction, finishRecoveryAction } from "@/app/actions";
 import { createCredential } from "@/components/passkeys";
+import { routes } from "@/lib/routes";
+import { useTakeKey } from "./take-key";
+import { useAct } from "./use-act";
 
-/**
- * The whole of coming back: make a new passkey, and it is added to the seat the
- * link names. No name to pick and nothing to choose — this member already
- * exists, and everything about them stays exactly as they left it.
- */
+/** Coming back: a new passkey on the seat the link names, nothing to pick. */
 export function RecoverForm({ code, name }: { code: string; name: string }) {
-  const [pending, startTransition] = useTransition();
-  const [error, setError] = useState<string | null>(null);
+  const router = useRouter();
+  const takeKey = useTakeKey();
+  const { pending, error, setError, act } = useAct();
 
   const recover = () =>
-    startTransition(async () => {
-      setError(null);
+    act(async () => {
       const made = await createCredential(() => beginRecoveryAction(code), "added");
-      if ("error" in made) {
-        setError(made.error);
-        return;
-      }
-      // Success redirects to the member's own page, so anything returned here
-      // is a refusal.
+      if ("error" in made) return { ok: false, error: made.error };
       const result = await finishRecoveryAction({ code, response: made.wire });
-      setError(result.error ?? "That didn't work.");
+      if (!result.ok) return result;
+      const key = result.key;
+      const refused = key && (await takeKey({ code, purpose: "recover", tripId: key.tripId, key }));
+      if (refused) setError(refused);
+      // Their own page, where the passkey list is: land looking at every key that signs in as them.
+      router.push(routes.account);
     });
 
   return (

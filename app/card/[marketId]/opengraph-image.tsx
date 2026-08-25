@@ -1,27 +1,18 @@
 import { ImageResponse } from "next/og";
-import { marketCard } from "@/lib/data";
+import { cardOf } from "@/lib/data";
 import { piesText } from "@/lib/pies";
 
 export const alt = "A prediction from a friend trip on Chiang Pai";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
-/**
- * What WhatsApp unfurls: the question, the verdict, the names. Drawn with
- * system fonts only — the card has to render in the time a chat gives it.
- */
+// System fonts only: the card has to render in the time a chat gives it.
 export default async function Image({ params }: { params: Promise<{ marketId: string }> }) {
   const { marketId } = await params;
-  const card = await marketCard(marketId);
+  const card = await cardOf(marketId);
   const question = card?.question ?? "Chiang Pai";
-  const settled = card && (card.status === "yes" || card.status === "no");
-  const verdict = !card
-    ? ""
-    : card.status === "open"
-      ? "STILL OPEN"
-      : card.status === "refunded"
-        ? "VOIDED"
-        : card.status.toUpperCase();
+  const settled = card && (card.verdict === "yes" || card.verdict === "no");
+  const verdict = !card ? "" : card.verdict === "refunded" ? "VOIDED" : card.verdict.toUpperCase();
   const names = (list: { name: string; profitC: number }[]) =>
     list
       .slice(0, 4)
@@ -63,7 +54,11 @@ export default async function Image({ params }: { params: Promise<{ marketId: st
               fontSize: 40,
               fontWeight: 800,
               color:
-                card?.status === "yes" ? "#9db9e8" : card?.status === "no" ? "#eda06d" : "#e8c46a",
+                card?.verdict === "yes"
+                  ? "#9db9e8"
+                  : card?.verdict === "no"
+                    ? "#eda06d"
+                    : "#e8c46a",
             }}
           >
             {settled ? `RESOLVED ${verdict}` : verdict}

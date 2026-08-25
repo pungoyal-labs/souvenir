@@ -1,14 +1,6 @@
-// Every flavored UI string lives in lingo.yaml at the repo root — edit that,
-// not this file. `pnpm lingo:gen` (which `pnpm dev` and `pnpm build` run for
-// you) compiles it into lingo.data.ts; this module gives that data its types
-// and turns the placeholder templates into functions.
-//
-// Each member picks the lingo the app speaks to them in (members.lingo);
-// "english" is the default and the plain-vocabulary baseline. The dialects are
-// written as friend-group roast: they tease the reader freely. Buttons, nav,
-// and rule errors stay plain everywhere — personality lives in headings, empty
-// states, asides, result lines, and placeholders.
-// Pure data: safe to import from both server and client components.
+// Every flavored UI string lives in lingo.yaml — edit that, not this. `pnpm lingo:gen` compiles it
+// into lingo.data.ts; this module types that data and turns {placeholders} into functions.
+// Pure data: safe on server and client.
 
 import { LINGO_KEYS, RAW_LINGOS } from "./lingo.data.ts";
 
@@ -79,16 +71,16 @@ export interface Lingo {
   recapSub: string;
   recapEmptyTitle: string;
   recapEmptySub: string;
+  sealedNote: string;
+  keylessTitle: string;
+  keylessSub: string;
+  noKeyYet: (name: string) => string;
+  cardPublishNote: string;
 }
 
-/**
- * One lingo exactly as YAML holds it: every field a string, including the ones
- * that carry {placeholders}. The generated data is checked against this, so a
- * field renamed in lingo.yaml fails to compile instead of rendering blank.
- */
+/** As YAML holds it: every field a string. A field renamed in lingo.yaml fails to compile. */
 export type RawLingo = { [K in keyof Lingo]: string };
 
-/** Substitute {named} placeholders; anything unknown is left visible. */
 function fill(template: string, vars: Record<string, string | number>): string {
   return template.replace(/\{(\w+)\}/g, (whole, name) =>
     name in vars ? String(vars[name]) : whole,
@@ -103,6 +95,7 @@ function hydrate(raw: RawLingo): Lingo {
     talkTitle: (language) => fill(raw.talkTitle, { language }),
     talkSub: (language) => fill(raw.talkSub, { language }),
     youLost: (amount) => fill(raw.youLost, { amount }),
+    noKeyYet: (name) => fill(raw.noKeyYet, { name }),
   };
 }
 
@@ -114,7 +107,6 @@ export function isLingoKey(key: string): key is LingoKey {
   return (LINGO_KEYS as readonly string[]).includes(key);
 }
 
-/** The member's lingo, falling back to plain English for anything unknown. */
 export function lingoOf(key: string): Lingo {
   return isLingoKey(key) ? LINGOS[key] : LINGOS.english;
 }

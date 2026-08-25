@@ -1,4 +1,5 @@
 import { NewMarketForm } from "@/components/new-market-form";
+import { Sealed } from "@/components/sealed";
 import { lingoOf } from "@/lib/lingo";
 import { llmEnabled } from "@/lib/llm";
 import { requireTrip } from "@/lib/session";
@@ -25,12 +26,14 @@ export default async function NewMarketPage({
         pies on either side.
       </p>
       <div className="mt-5">
-        <NewMarketForm
-          tripId={tripId}
-          polishAvailable={llmEnabled}
-          lingo={me.lingo}
-          initial={initial}
-        />
+        <Sealed>
+          <NewMarketForm
+            tripId={tripId}
+            polishAvailable={llmEnabled}
+            lingo={me.lingo}
+            initial={initial}
+          />
+        </Sealed>
       </div>
     </div>
   );

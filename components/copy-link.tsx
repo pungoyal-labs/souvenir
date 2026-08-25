@@ -1,17 +1,41 @@
 "use client";
 
 import { useState } from "react";
+import { linkSecretOf, linkWithSecret } from "@/lib/keys";
+import { useKeyring } from "./keyring";
 
 /**
- * Copy an invite link. Codes are stored, not just hashed, precisely so this
- * button can exist — an organiser re-sending what they already sent, or pasting
- * the group link into the chat again.
+ * Copy a link again. With `withSecretFor`, the link is whole only with the
+ * secret this phone's keyring holds under that code; a phone that did not
+ * mint it says so rather than copy a link that seats somebody keyless.
  */
-export function CopyLink({ url, compact = false }: { url: string; compact?: boolean }) {
+export function CopyLink({
+  url,
+  compact = false,
+  withSecretFor,
+}: {
+  url: string;
+  compact?: boolean;
+  withSecretFor?: string;
+}) {
   const [state, setState] = useState<"idle" | "copied" | "failed">("idle");
+  const { keyring } = useKeyring();
+  const secret = withSecretFor ? linkSecretOf(keyring, withSecretFor) : null;
+  const whole = withSecretFor ? (secret ? linkWithSecret(url, secret) : null) : url;
+
+  if (!whole) {
+    return (
+      <span
+        className="text-xs text-soft"
+        title="Only the phone that minted this link has its key. Mint a fresh one."
+      >
+        minted elsewhere
+      </span>
+    );
+  }
 
   const copy = () =>
-    navigator.clipboard.writeText(url).then(
+    navigator.clipboard.writeText(whole).then(
       () => setState("copied"),
       () => setState("failed"),
     );
@@ -20,7 +44,7 @@ export function CopyLink({ url, compact = false }: { url: string; compact?: bool
     <button
       type="button"
       onClick={copy}
-      title={state === "failed" ? "Couldn't copy — select the link by hand" : `Copy ${url}`}
+      title={state === "failed" ? "Couldn't copy — select the link by hand" : `Copy ${whole}`}
       className={
         compact
           ? "inline-flex shrink-0 items-center gap-1 rounded-md px-2 py-1 text-xs font-semibold text-soft hover:bg-surface"

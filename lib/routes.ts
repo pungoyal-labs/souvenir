@@ -1,5 +1,4 @@
-// Every path in the app, in one place: pages link with these, actions
-// revalidate with these, and a route that moves moves here. Pure strings.
+// Every path in the app, in one place. Pure strings.
 
 export const routes = {
   home: "/",
@@ -11,7 +10,7 @@ export const routes = {
   privacy: "/privacy",
   join: (code: string) => `/join/${code}`,
   recover: (code: string) => `/recover/${code}`,
-  /** The public face of one resolved prediction — what gets shared. */
+  rekey: (code: string) => `/k/${code}`,
   card: (marketId: string) => `/card/${marketId}`,
 
   trip: (tripId: string) => `/t/${tripId}`,

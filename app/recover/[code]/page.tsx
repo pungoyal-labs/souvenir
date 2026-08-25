@@ -7,13 +7,8 @@ import { type RecoveryState, recoveryState } from "@/lib/recovery";
 
 const EYEBROW = "Back to your seat";
 
-/**
- * Where a recovery link lands. Unlike /join, walking through this does not
- * create anybody — it adds a key to a member who is already at the table, with
- * their pies, their bills, and their say on what resolved how. So the page
- * names whose seat it is, out loud, before offering the button: a link that
- * reached the wrong person should be obvious to that person immediately.
- */
+// A recovery link *becomes* a member rather than creating one, so the page
+// names whose seat it is before offering the button.
 export default async function RecoverPage({ params }: { params: Promise<{ code: string }> }) {
   const { code } = await params;
   const [row, session] = await Promise.all([findRecovery(code), getSession()]);

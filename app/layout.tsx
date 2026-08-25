@@ -3,13 +3,14 @@ import { Big_Shoulders, Instrument_Sans, Spline_Sans_Mono } from "next/font/goog
 import Link from "next/link";
 import { signOutAction } from "@/app/actions";
 import { Avatar } from "@/components/avatar";
+import { KeyringProvider } from "@/components/keyring";
 import { Logo } from "@/components/logo";
 import { PasskeyNudge } from "@/components/passkey-nudge";
 import { RecoveryNotice } from "@/components/recovery-notice";
 import { TermsNudge } from "@/components/terms-nudge";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { passkeysConfigured } from "@/lib/auth";
-import { anyUnread, hasPasskey, recoveryNoticeFor } from "@/lib/data";
+import { hasPasskey, recoveryNoticeFor } from "@/lib/data";
 import { env } from "@/lib/env";
 import { lingoOf } from "@/lib/lingo";
 import { routes } from "@/lib/routes";
@@ -55,10 +56,9 @@ export const viewport: Viewport = {
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const member = await currentMember();
-  // Independent of each other, so they go together rather than one at a time.
-  const [unread, enrolled, recoveries] = member
-    ? await Promise.all([anyUnread(member.id), hasPasskey(member.id), recoveryNoticeFor(member.id)])
-    : [false, true, null];
+  const [enrolled, recoveries] = member
+    ? await Promise.all([hasPasskey(member.id), recoveryNoticeFor(member.id)])
+    : [true, null];
   const liveRecovery = recoveries?.live[0] ?? null;
   const usedRecovery = recoveries?.used[0] ?? null;
   const needsPasskey = passkeysConfigured && member != null && !enrolled;
@@ -68,8 +68,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
-        {/* Apply the saved theme before first paint (system preference is
-            pure CSS); suppressHydrationWarning covers the attribute change. */}
+        {/* Saved theme before first paint; suppressHydrationWarning covers the attribute. */}
         <script
           // biome-ignore lint/security/noDangerouslySetInnerHtml: static theme bootstrap, no user input
           dangerouslySetInnerHTML={{
@@ -91,17 +90,8 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             <div className="ml-auto flex items-center gap-3">
               {member ? (
                 <>
-                  <Link
-                    href={routes.trips}
-                    className="relative rounded px-2 py-1 text-sm hover:bg-white/10"
-                  >
+                  <Link href={routes.trips} className="rounded px-2 py-1 text-sm hover:bg-white/10">
                     Trips
-                    {unread && (
-                      <span
-                        className="absolute right-0 top-0.5 h-2 w-2 rounded-full bg-no"
-                        title="Unread activity"
-                      />
-                    )}
                   </Link>
                   <Link
                     href={routes.account}
@@ -141,7 +131,9 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         {member && needsPasskey && !needsTerms && (
           <PasskeyNudge memberId={member.id} needsPicture={member.avatarUpdatedAt == null} />
         )}
-        <main className="mx-auto max-w-5xl px-4 py-6">{children}</main>
+        <KeyringProvider>
+          <main className="mx-auto max-w-5xl px-4 py-6">{children}</main>
+        </KeyringProvider>
         <footer className="mx-auto flex max-w-5xl flex-wrap items-center gap-x-4 gap-y-1 px-4 pb-8 pt-4 text-xs text-soft">
           <span>{t.footer}</span>
           <span className="ml-auto flex gap-3">

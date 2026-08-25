@@ -1,24 +1,16 @@
-// Invite links: how someone joins the table without an email address.
-//
-// The old allowlist worked by naming an address and waiting for Google to
-// assert it. With no provider to assert anything, the invite itself has to be
-// the credential — so it is a random code, and whoever holds it can join once.
-//
-// The code is stored as-is: a founder has to be able to re-share a link they
-// already sent, and a group link is worth nothing if it cannot be pasted
-// twice. So an invite is a readable capability, kept survivable by being
-// short-lived and revocable rather than by being unreadable.
+// Invite links: the invite itself is the credential — a random code whoever holds can join with.
+// The code is stored as-is so a link can be re-shared; it survives by being short-lived and
+// revocable rather than unreadable.
 
 import { randomBytes } from "node:crypto";
 
 /** 128 bits: not guessable, and still short enough to read out over a call. */
 const CODE_BYTES = 16;
 
-/** Long enough to get round to sending it, short enough that stale links die. */
 export const INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
-/** A group link is meant to sit in a chat for a while, so it lives longer. */
-export const GROUP_INVITE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+/** A week, not a month: the link carries the trip's key, and minting again is one tap. */
+export const GROUP_INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
 export type InviteState = "live" | "used" | "expired";
 
@@ -27,11 +19,7 @@ export function newInviteCode(): string {
   return randomBytes(CODE_BYTES).toString("base64url");
 }
 
-/**
- * Used beats expired: a link somebody joined through is spent, whatever the
- * clock says, and which of the two it was is what the inviter wants to know.
- * An open link is never spent — that is the whole point of it.
- */
+/** Used beats expired; an open link is never spent. */
 export function inviteState(
   invite: { expiresAt: Date; useCount: number; isOpen: boolean },
   now: Date,
@@ -49,12 +37,7 @@ export function inviteUrl(baseUrl: string, code: string): string {
   return `${baseUrl}/join/${code}`;
 }
 
-/**
- * Split a list of invites into what the members page shows: the one open group
- * link, and the personal invites still waiting to be accepted. Spent and
- * expired rows fall out. Newest wins if more than one group link is somehow
- * live — the page only ever mints one, but nothing in the table enforces it.
- */
+/** The one live group link (newest wins) and the personal invites still waiting. */
 export function partitionInvites<T extends { expiresAt: Date; useCount: number; isOpen: boolean }>(
   rows: readonly T[],
   now: Date,

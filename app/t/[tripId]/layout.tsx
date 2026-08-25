@@ -1,16 +1,25 @@
-import Link from "next/link";
-import { Pies } from "@/components/pies";
-import { TripNav } from "@/components/trip-nav";
-import { inbox, netOf } from "@/lib/data";
-import { routes } from "@/lib/routes";
+import { appendEventAction, eventsSinceAction } from "@/app/actions";
+import { TripHeader } from "@/components/trip-header";
+import { TripStoreProvider } from "@/components/trip-store";
+import { eventsSince, membersOf } from "@/lib/data";
 import { requireTrip } from "@/lib/session";
 import { DESTINATIONS, pairFor } from "@/lib/talk";
-import { daysBetween, tripPhase, tripToday } from "@/lib/trips";
+import { daysBetween, placeOf, tripCurrencies, tripPhase, tripToday } from "@/lib/trips";
+import type { RosterMember } from "@/lib/views";
+
+// What the phone gets to know about a person: a face and a seat, no email.
+const seat = ({ id, name, avatarUpdatedAt, joinedAt, role }: RosterMember): RosterMember => ({
+  id,
+  name,
+  avatarUpdatedAt,
+  joinedAt,
+  role,
+});
 
 /**
- * Everything under /t/[tripId] sits inside this: the trip's name and where it
- * is in its life, the tabs, and the viewer's number on this trip. A member
- * with no seat is sent to their trips list by requireTrip before any of it.
+ * The sealed log is fetched here, once, into the store every page under
+ * /t/[tripId] reads; layouts persist across navigation, so moving between
+ * the trip's pages does not fetch it again.
  */
 export default async function TripLayout({
   children,
@@ -20,19 +29,17 @@ export default async function TripLayout({
   params: Promise<{ tripId: string }>;
 }) {
   const { tripId } = await params;
-  const { me, trip } = await requireTrip(tripId);
-  const [netC, { unreadCount }] = await Promise.all([
-    netOf(tripId, me.id),
-    inbox(tripId, me.id, 1),
+  const { me, trip, membership } = await requireTrip(tripId);
+  const [roster, initial] = await Promise.all([
+    membersOf(tripId),
+    trip.keyEpoch === null ? [] : eventsSince(me.id, tripId, 0),
   ]);
   const pair = pairFor(trip);
-  const there = DESTINATIONS[trip.destination];
   const today = tripToday(trip);
   const phase = tripPhase(trip, today);
 
   let when: string | null = null;
   if (phase === "before" && trip.startsOn) {
-    // "before" means today < startsOn, so the countdown starts at 1.
     const d = daysBetween(today, trip.startsOn);
     when = d === 1 ? "Leaving tomorrow" : `In ${d} days`;
   } else if (phase === "during" && trip.endsOn) {
@@ -43,32 +50,30 @@ export default async function TripLayout({
   }
 
   return (
-    <div>
-      <div className="-mt-2 flex flex-wrap items-end justify-between gap-x-4 gap-y-2">
-        <div className="min-w-0">
-          <p className="eyebrow">
-            {there?.flag} {there?.place ?? trip.destination}
-            {when && <span className="text-soft"> · {when}</span>}
-          </p>
-          <h1 className="display truncate text-3xl font-extrabold uppercase tracking-wide sm:text-4xl">
-            <Link href={routes.trip(tripId)}>{trip.name}</Link>
-          </h1>
-        </div>
-        <Link
-          href={routes.member(tripId, me.id)}
-          className="mono rounded-full bg-felt-tint px-3 py-1 text-sm font-semibold text-felt"
-          title="Your pies on this trip"
-        >
-          <Pies c={netC} sign />
-        </Link>
-      </div>
-      <TripNav
+    <TripStoreProvider
+      tripId={tripId}
+      epoch={trip.keyEpoch}
+      config={{
+        creatorId: trip.createdBy,
+        maxStakePies: trip.maxStakePies,
+        currencies: tripCurrencies(trip),
+      }}
+      me={seat({ ...me, role: membership.role })}
+      lingo={me.lingo}
+      roster={roster.map(seat)}
+      initial={initial}
+      seenAt={membership.inboxSeenAt}
+      actions={{ append: appendEventAction, since: eventsSinceAction }}
+    >
+      <TripHeader
         tripId={tripId}
-        unread={unreadCount > 0}
+        name={trip.name}
+        place={`${DESTINATIONS[trip.destination]?.flag ?? ""} ${placeOf(trip)}`.trim()}
+        when={when}
         talkLabel={pair ? pair.them.language : null}
         ended={phase === "after"}
       />
       <div className="mt-5">{children}</div>
-    </div>
+    </TripStoreProvider>
   );
 }

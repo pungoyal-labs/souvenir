@@ -72,6 +72,12 @@ english:
   recapSub: "The whole season on one page: the table, the rivalries, the swing nobody will let go of."
   recapEmptyTitle: "Nothing settled yet."
   recapEmptySub: "A recap needs verdicts. Resolve something and come back."
+  sealedNote: "This trip lives on the phones that joined it. Nobody else can read it — not even us."
+  keylessTitle: "You've got a seat, not the key."
+  keylessSub: "Open the app on your other phone and send this one the key, or ask anyone on the trip to send it."
+  noKeyYet: "{name} hasn't got the key yet."
+  cardPublishNote: "This puts the verdict on a public page: first names and pies. Everything else stays sealed."
+
 bangalore:
   name: "South Bangalore"
   register: "Bangalore English with natural Kannada seasoning and dry friend-group banter. Conversational, understated, locally recognisable — not a caricature."
@@ -133,6 +139,12 @@ bangalore:
   recapSub: "Full trip on one page — the board, the rivalries, the one call nobody in the adda will let go of."
   recapEmptyTitle: "Innu enu settle aagilla."
   recapEmptySub: "Recap needs verdicts, guru. Resolve something first, then come back."
+  sealedNote: "This trip lives on the phones that joined it, only. Nobody else can read it — not even us, machaa."
+  keylessTitle: "Seat is there. Key is not."
+  keylessSub: "Open the app on your other phone and send this one the key, or ask anyone on the trip. Somebody will oblige, eventually."
+  noKeyYet: "{name} hasn't got the key yet. Sad scene."
+  cardPublishNote: "This puts the verdict on a public page — first names and pies, that's it. Everything else stays sealed, don't worry."
+
 hyderabad:
   name: "Hyderabadi"
   register: "Hyderabadi English with natural Deccani seasoning. Casual, dry and teasing; use local expressions where they sound spoken, not pasted on."
@@ -194,6 +206,12 @@ hyderabad:
   recapSub: "Poora trip ek page pe — board, dushmaniyan, aur woh ek bet jo koi bhoolne nahi dega."
   recapEmptyTitle: "Abhi kuch settle nahi hua."
   recapEmptySub: "Recap ke liye verdict chahiye, miyan. Kuch resolve karo, phir aao."
+  sealedNote: "Yeh trip sirf unhi phones pe hai jo join kiye. Aur koi nahi padh sakta — hum bhi nahi, miyan."
+  keylessTitle: "Seat hai, key nahi."
+  keylessSub: "Doosre phone pe app kholo aur isko key bhejo, ya trip pe kisi se bhi maango. Koi na koi dega."
+  noKeyYet: "{name} ko abhi tak key nahi mili."
+  cardPublishNote: "Yeh verdict ko public page pe daalta hai — bas first names aur pies. Baaki sab sealed rehta hai, tension nahi."
+
 mumbai:
   name: "Bambaiyya"
   register: "Mumbai English with natural Bambaiyya. Fast, dry, cocky, conversational. Use boss, bhidu, apun, scene, vaat and related slang without turning every line into a movie dialogue."
@@ -255,6 +273,12 @@ mumbai:
   recapSub: "Poora trip ek page pe — board, dushmani, aur woh ek daav jiski vaat koi bhoolne nahi dega."
   recapEmptyTitle: "Abhi kuch settle nahi hua."
   recapEmptySub: "Recap ko verdict chahiye, boss. Kuch resolve kar, phir aa."
+  sealedNote: "Yeh trip sirf un phones pe hai jo join kiye. Aur koi nahi padh sakta — hum bhi nahi, boss."
+  keylessTitle: "Seat hai, chaabi nahi."
+  keylessSub: "Doosre phone pe app khol aur isko chaabi bhej, ya trip pe kisi se bhi maang. Koi toh dega."
+  noKeyYet: "{name} ko abhi tak chaabi nahi mili."
+  cardPublishNote: "Yeh verdict ko public page pe daalta hai — bas first names aur pies. Baaki sab sealed, chill."
+
 delhi:
   name: "Dilli"
   register: "Delhi English with natural Dilli speech. Blunt, cocky, sarcastic and matey. Use bhai, scene, bawaal, bakchodi, phattu and similar slang naturally rather than as decoration."
@@ -316,6 +340,12 @@ delhi:
   recapSub: "Poora trip ek page pe — board, dushmaniyan, aur woh ek claim jo koi bhoolne nahi dega, bhai."
   recapEmptyTitle: "Abhi kuch settle nahi hua."
   recapEmptySub: "Recap ke liye verdict chahiye. Kuch resolve kar, phir aa."
+  sealedNote: "Yeh trip sirf un phones pe hai jinhone join kiya. Aur koi nahi padh sakta — hum bhi nahi."
+  keylessTitle: "Seat hai, chaabi nahi."
+  keylessSub: "Doosre phone pe app khol aur isko chaabi bhej, ya trip pe kisi se bhi maang le. Itna toh koi karega."
+  noKeyYet: "{name} ko abhi tak chaabi nahi mili."
+  cardPublishNote: "Yeh verdict ko public page pe daal dega — bas first names aur pies. Baaki sab sealed hai, relax."
+
 chennai:
   name: "Chennai Tanglish"
   register: "Chennai English with natural Tanglish. Dry, affectionate and cutting. Use da, machan, semma, mokka and similar expressions where a Chennai friend would actually use them."
@@ -377,6 +407,12 @@ chennai:
   recapSub: "Full trip one page-la — board, rivalries, andha oru bet yaarum vidamaatanga."
   recapEmptyTitle: "Innum onnum settle aagala."
   recapEmptySub: "Recap-ku verdict venum, machan. Edhavadhu resolve pannu, apram vaa."
+  sealedNote: "Indha trip join panna phones-la mattum dhaan irukku. Vera yaarum padikka mudiyaadhu — naanga kooda illa."
+  keylessTitle: "Seat irukku, key illa."
+  keylessSub: "Un vera phone-la app-a open pannu, idhukku key anuppu — illa trip-la yaarukitta venumnaalum kelu. Yaaravadhu tharuvaanga."
+  noKeyYet: "{name}-ku innum key varala."
+  cardPublishNote: "Idhu verdict-a public page-la podum — first names, pies, avlo dhaan. Matha ellaame sealed."
+
 kolkata:
   name: "Kolkata"
   register: "Kolkata English with natural Bangla seasoning. Conversational, dry, slightly theatrical only when it feels organic. Use dada, ki re, lyadh, fatafati and similar slang sparingly."
@@ -438,6 +474,12 @@ kolkata:
   recapSub: "Puro trip ek page-e — board, rivalry, aar shei ekta bet ja keu bhulte debe na."
   recapEmptyTitle: "Ekhono kichhu settle hoyni."
   recapEmptySub: "Recap-er jonno verdict lage, dada. Kichhu resolve koro, tarpor esho."
+  sealedNote: "Ei trip shudhu join kora phone-gulo tei ache. Ar keu porte parbe na — amra-o na."
+  keylessTitle: "Seat ache, chabi nei."
+  keylessSub: "Onno phone-e app khulo ar eta-ke chabi pathao, ba trip-er je kauke bolo. Keu na keu debe."
+  noKeyYet: "{name} ekhono chabi pay ni."
+  cardPublishNote: "Eta verdict-ta public page-e debe — shudhu first name ar pies. Baki shob sealed thakbe."
+
 kochi:
   name: "Kochi Manglish"
   register: "Kochi English with natural Manglish. Casual, teasing and understated. Use machane, aliya, poli, mwone and related Malayalam expressions where they feel like actual speech."
@@ -499,6 +541,12 @@ kochi:
   recapSub: "Muzhuvan trip oru page-il — board, rivalries, aarum vidaatha aa oru bet."
   recapEmptyTitle: "Ithu vare onnum settle aayilla."
   recapEmptySub: "Recap-inu verdict venam, machane. Enthenkilum resolve cheyyu, ennittu vaa."
+  sealedNote: "Ee trip join cheytha phones-il maathrame ullu. Vere aarkkum vaayikkaan pattilla — njangalkku polum."
+  keylessTitle: "Seat undu, key illa."
+  keylessSub: "Ninte vere phone-il app thurannu ithinu key ayakku, allenkil trip-il aarodenkilum chodikku. Aarenkilum tharum."
+  noKeyYet: "{name}-nu innum key kittiyittilla."
+  cardPublishNote: "Ithu verdict public page-il idum — first names-um pies-um maathram. Baaki ellaam sealed aanu."
+
 ahmedabad:
   name: "Amdavadi"
   register: "Ahmedabad English with natural Amdavadi Gujarati seasoning. Casual, entrepreneurial, teasing and economical. Use bhai, su, jalsa, dhando, locha and similar phrases naturally."
@@ -560,6 +608,12 @@ ahmedabad:
   recapSub: "Aakhi trip ek page par — board, haribhaari, ane te ek bet je koi bhoolvanu nathi."
   recapEmptyTitle: "Haji kai settle nathi thayu."
   recapEmptySub: "Recap mate verdict joiye, bhai. Kai resolve karo, pachi aavo."
+  sealedNote: "Aa trip fakt join karela phones ma j chhe. Biju koi vaanchi na shake — ame pan nahi."
+  keylessTitle: "Seat chhe, chaavi nathi."
+  keylessSub: "Bija phone ma app kholo ane aane chaavi moklo, ke trip ma koi ne pan pucho. Koi to aapse."
+  noKeyYet: "{name} ne haju chaavi nathi mali."
+  cardPublishNote: "Aa verdict ne public page par mukse — fakt first names ane pies. Baaki badhu sealed rahe chhe."
+
 pune:
   name: "Puneri"
   register: "Pune English with light Marathi seasoning and dry Puneri signboard energy. Polite on the surface, savage underneath. The humour is in understatement and administrative disapproval."
@@ -621,6 +675,12 @@ pune:
   recapSub: "The entire trip on one page: the table, the rivalries, and the one call that will be mentioned at every future dinner."
   recapEmptyTitle: "Nothing settled yet."
   recapEmptySub: "A recap requires verdicts. Kindly resolve something and return. — Management"
+  sealedNote: "This trip lives only on the phones that joined it. Nobody else can read it — including us. — Management"
+  keylessTitle: "Seat: present. Key: absent."
+  keylessSub: "Kindly open the app on your other phone and send this one the key, or request it from anyone on the trip. Timings apply."
+  noKeyYet: "{name} has not yet collected the key."
+  cardPublishNote: "This puts the verdict on a public page — first names and pies only. Everything else remains sealed. — Management"
+
 unhinged:
   name: "Unhinged"
   register: "Mega-offensive private-group banter between four adult college friends who have explicitly opted into ruthless roasting. Natural Indian English/Hinglish with actual gaali — chutiya, bakchod, gaandu, harami, nalayak, dhakkan, bhosdi ke — dropped where it lands, plus dry contempt, personal digs, absurd escalation and deadpan humiliation. Use current slang only when it sounds natural: aura, mog, cooked, delulu, BFFR, clocked, touch grass, etc. The joke should come from the situation or the person's decision — gaali is seasoning, not the meal, so never stuff it in place of an actual burn. No slurs, no protected-class attacks."
@@ -682,3 +742,8 @@ unhinged:
   recapSub: "Poori trip ek page pe — board, dushmaniyan, aur woh ek bet jo baaki teen tujhe marte dam tak yaad dilayenge."
   recapEmptyTitle: "Abhi kuch settle nahi hua."
   recapEmptySub: "Recap ko verdict chahiye, bakchod. Kuch resolve kar, phir aa ke beizzati dekh."
+  sealedNote: "Yeh trip sirf un phones pe hai jinhone join kiya. Aur koi nahi padh sakta — hum bhi nahi. Teri beizzati fully private hai."
+  keylessTitle: "Seat hai, chaabi nahi. Classic."
+  keylessSub: "Doosre phone pe app khol aur isko chaabi bhej, ya trip pe kisi bhi bakchod se maang le. Koi toh tarass khaayega."
+  noKeyYet: "{name} ko abhi tak chaabi nahi mili. Bechara."
+  cardPublishNote: "Yeh verdict ko public page pe daal dega — bas first names aur pies. Baaki ghatiya calls sealed rehte hain, don't worry."

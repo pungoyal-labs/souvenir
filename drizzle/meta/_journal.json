@@ -148,6 +148,13 @@
       "when": 1787583637787,
       "tag": "0020_private_trips",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1787585574080,
+      "tag": "0021_recovery_key",
+      "breakpoints": true
     }
   ]
 }

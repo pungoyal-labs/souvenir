@@ -1,46 +1,31 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
-import { resolveAction } from "@/app/actions";
+import { useState } from "react";
 import type { Side } from "@/lib/engine";
-import { lingoOf } from "@/lib/lingo";
+import { useTrip } from "./trip-store";
+import { useAct } from "./use-act";
 
 type Outcome = Side | "refunded";
 
 const OPTIONS: { value: Outcome; label: string; hint: string | null }[] = [
   { value: "yes", label: "YES", hint: "The YES side splits the whole pool" },
   { value: "no", label: "NO", hint: "The NO side splits the whole pool" },
-  // The void hint comes from the lingo dictionary at render time.
   { value: "refunded", label: "Void", hint: null },
 ];
 
-export function ResolvePanel({
-  marketId,
-  lingo = "english",
-}: {
-  marketId: string;
-  lingo?: string;
-}) {
-  const t = lingoOf(lingo);
-  const router = useRouter();
-  const [pending, startTransition] = useTransition();
+export function ResolvePanel({ marketId }: { marketId: string }) {
+  const { t, append } = useTrip();
+  const { pending, error, act } = useAct(t.oops);
   const [outcome, setOutcome] = useState<Outcome | null>(null);
   const [note, setNote] = useState("");
   const [confirming, setConfirming] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   const resolve = () =>
-    startTransition(async () => {
+    act(async () => {
       if (!outcome) return;
-      setError(null);
-      const res = await resolveAction(marketId, outcome, note);
-      if (!res.ok) {
-        setError(res.error ?? t.oops);
-        setConfirming(false);
-      } else {
-        router.refresh();
-      }
+      const res = await append({ t: "resolve", marketId, outcome, note });
+      if (!res.ok) setConfirming(false);
+      return res;
     });
 
   return (

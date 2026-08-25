@@ -43,9 +43,32 @@ Pre-commit (husky): biome on staged files, tsc, full test suite.
 
 ## Rules
 
-- The `ledger` is append-only; balances, positions, pools, results are derived
-  by replay. `market_views` (page-open telemetry) is append-only too. Never
-  store a balance, score, or profile.
+- **A trip is sealed.** Its predictions, calls, verdicts, table talk,
+  reactions and views are envelopes in `events` — sealed on the phone under
+  the trip's key (`lib/crypto`), ordered by the server, and never readable by
+  it. The server checks the seat, the epoch, the size and the shape
+  (`appendEvent`), and nothing else. The rules of the game — cap, one side,
+  creator resolves, organiser reopens, zero-sum — are `lib/replay.ts`, run on
+  every phone over the whole log (`components/trip-store.tsx`), and the pages
+  are derived from that state by `lib/views.ts`. Never add a server-side
+  check that needs plaintext: there is none. The plaintext `markets`,
+  `ledger`, `market_views`, `market_reactions` tables and prediction
+  `comments` are the pre-sealing record, read only by `scripts/seal-trip.ts`
+  (`pnpm private:migrate`) and dropped in Phase 4 of `docs/private-trips.md`.
+  Bills are sealed the same way (`bill.rev` events, replayed by `lib/views`
+  `billsOverview`); the phrasebook and the trip's name are still plaintext
+  until Phase 2.
+- **Keys move only through people.** A key reaches a phone through a link
+  fragment — invite, rekey (`lib/rekeys`, `/k/[code]`), recovery — opened by
+  that phone and put in its keyring (`components/keyring.tsx`, IndexedDB).
+  The server stores keys only wrapped under secrets it has never seen. Never
+  encrypt to a public key the server supplied; never add a path that returns
+  a key to the server. The console (`pnpm recovery:link`) restores seats,
+  never keys; `pnpm private:migrate` and `pnpm seed` mint console rekey links
+  because they hold the key for the one moment it exists in the clear.
+- The `ledger` is append-only and still the shape every derivation uses —
+  `lib/replay` emits `LedgerRow`s so `lib/stats` is unchanged. Never store a
+  balance, score, or profile.
 - Pure math lives in tested modules (`engine`, `stats`, `recommend`);
   `lib/data.ts` does I/O + assembly only. New derivation logic goes in a pure
   module with tests — `data.ts`'s import chain needs env + a DB pool, so
@@ -73,12 +96,14 @@ Pre-commit (husky): biome on staged files, tsc, full test suite.
   the app never records, links, or settles money on a prediction. A UPI link,
   a "loser pays ₹500" field, or a rupee amount on a market would cross it.
   Bills are the one place real money is named, and they are a ledger of what
-  members say, never a rail. UI vocabulary is *prediction / call / resolve /
+  members say, never a rail — and a sealed one: the server cannot read an
+  amount either. UI vocabulary is *prediction / call / resolve /
   pool / pie / points*; never *bet, wager, stake (as money), odds, payout,
   cash*. Code keeps `market/stake/settle*/amountC`. Don't half-rename either.
-- Inbox and the For-you rail are derived at read time. Stored state is only
-  `memberships.inbox_seen_at` plus raw view rows; views are recorded by a
-  client effect (`components/record-view.tsx`) so link prefetches never count.
+- Inbox and the For-you rail are derived on the phone from the replayed trip
+  (`lib/views` `inbox`/`listMarkets`). Stored state is only
+  `memberships.inbox_seen_at`; views are `view` events appended by a client
+  effect in `components/market-page.tsx` so link prefetches never count.
 - The group and the leaderboard are one page (`/t/[id]/members`): a single
   ranked table, calibrating members under a divider row, with the invite and
   recovery machinery below it. Its only stats source is `leaderboard(tripId)`,
@@ -90,9 +115,13 @@ Pre-commit (husky): biome on staged files, tsc, full test suite.
   pages are reachable by URL alone, on purpose: `/join/[code]` shows the table
   before anyone sits down (trip, roster names, a few open questions), and
   `/card/[marketId]` is one prediction's verdict with first names and pies,
-  with an OG image for the group chat. Both carry nothing a member didn't
-  choose to put on the record, and neither leaks the trip beyond its name.
-  Keep them thin; never add a third without that test. `pnpm stats` reads the
+  with an OG image for the group chat — and on a sealed trip it is literally
+  what a member's phone put in `cards` when they tapped share
+  (`publishCard`), since the server can draw nothing else; anyone on the trip
+  can take it down. The join preview's questions ride in the invite link,
+  sealed under its secret (`invites.preview`). Both carry nothing a member
+  didn't choose to put on the record, and neither leaks the trip beyond its
+  name. Keep them thin; never add a third without that test. `pnpm stats` reads the
   loop: trips opened, roster size, and how many who arrived by invite later
   opened a trip of their own (`memberships.invited_with`).
 - 18+ and terms: a member row carries `terms_accepted_at`; sign-up forms tick
@@ -104,12 +133,10 @@ Pre-commit (husky): biome on staged files, tsc, full test suite.
   member", because append-only means a payout cannot vanish.
 - **Private trips** (end-to-end encryption) are being built to
   `docs/private-trips.md` — read it before touching invites, recovery, the
-  ledger, or `lib/data.ts`. Phase 0 landed the pure modules, the schema
-  (`events`, `keyrings`, `rekeys`, `cards`, the wrapped-key columns) and
-  `components/keyring.tsx`; nothing writes to `events` yet and every page still
-  reads the plaintext tables. Do not add a plaintext content column or a
-  server-side check that needs plaintext: both are about to have nothing to
-  read.
+  log, or `lib/data.ts`. Phase 1 sealed predictions and bills end to end;
+  the phrasebook and the trip's name (Phase 2), key rotation on leaving
+  (Phase 3) and passkey-PRF key backup (Phase 4) are still to come. Do not add a
+  plaintext content column.
 - `lib/env.ts` is the only file reading `process.env` (zod-validated).
 - Relative imports in `lib/` and `scripts/` carry explicit `.ts` extensions so
   plain `node scripts/*.ts` runs (Node type stripping).
@@ -119,7 +146,9 @@ Pre-commit (husky): biome on staged files, tsc, full test suite.
 - Emails go through `normalizeEmail` (`lib/email.ts`) before any lookup or
   write — Gmail ignores dots.
 - New members join a trip by invite link — personal (single use, 7 days) or
-  an open group link (30 days, unlimited). A member of one trip opening a link
+  an open group link (7 days, unlimited). The link carries the trip's key in
+  its URL fragment, which never reaches the server; a link copied without it
+  seats a member keyless, and the key comes by rekey. A member of one trip opening a link
   to another is seated with one tap (`joinTripWithInvite`). The code is the
   row's primary key and is stored as-is, so an organiser can re-share a link; invites survive on being
   short-lived and revocable rather than unreadable (`lib/invites.ts`).
@@ -164,7 +193,7 @@ Pre-commit (husky): biome on staged files, tsc, full test suite.
 - Avatars are an upload or a generated monogram — initials on a gradient seeded
   by member id, never the name, so a rename keeps the same face. Nothing reads
   `members.image` any more.
-- Vocabulary: UI says *prediction/bet/resolve/pool/pie*; code says
+- Vocabulary: UI says *prediction/call/resolve/pool/pie*; code says
   `market/stake/settle*/amountC`. Don't half-rename either side.
 - `/talk` is the one page pointed *outward*, at somebody who is not in the
   group: tap a side, speak, and the phone says it in the other language.

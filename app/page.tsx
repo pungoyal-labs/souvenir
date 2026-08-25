@@ -6,11 +6,7 @@ import { googleConfigured, passkeysConfigured } from "@/lib/auth";
 import { routes } from "@/lib/routes";
 import { currentMember } from "@/lib/session";
 
-/**
- * The front door, for somebody who has never seen the app. One promise, three
- * things it does, the one legal line that matters, and the form that opens a
- * trip. Members never see it — they land on their trips.
- */
+// The front door. Members never see it — they land on their trips.
 export default async function Landing() {
   const me = await currentMember();
   if (me) redirect(routes.trips);
@@ -48,7 +44,8 @@ export default async function Landing() {
           </Link>
         </div>
         <p className="mt-3 text-xs text-soft">
-          Free. No money, ever. Your friends join by link — no app store, no email.
+          Free. No money, ever. Sealed end to end — we can't read your trip. Your friends join by
+          link: no app store, no email.
         </p>
       </section>
 
@@ -67,7 +64,25 @@ export default async function Landing() {
         />
       </section>
 
-      <section className="mt-12 rounded-lg border border-gold/40 bg-surface p-5 text-sm">
+      <section className="mt-12 card p-5">
+        <p className="eyebrow">Sealed</p>
+        <p className="display mt-1 text-2xl font-extrabold uppercase tracking-wide">
+          Only the group can read it. Not even us.
+        </p>
+        <p className="mt-2 text-sm text-soft">
+          Every prediction, call, verdict, comment and bill is encrypted on your phone before it
+          leaves, under a key that exists only on the phones of the people on the trip. The key
+          travels inside the invite link — in the part of the URL a browser never sends — and the
+          server keeps the record sealed: it can order it and count it, it cannot read a word of it,
+          and neither can anyone holding a copy of the database. Lose your phone and a friend on the
+          trip hands you the key again. There is no reset button on our side, on purpose.{" "}
+          <Link href={routes.privacy} className="text-felt hover:underline">
+            How it works
+          </Link>
+        </p>
+      </section>
+
+      <section className="mt-6 rounded-lg border border-gold/40 bg-surface p-5 text-sm">
         <p className="display text-lg font-bold uppercase tracking-wide">The one rule</p>
         <p className="mt-1 text-soft">
           Pies are points. They are never bought, never sold, never cashed out, and the app never
