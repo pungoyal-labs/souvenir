@@ -38,11 +38,14 @@ async function main() {
   }
 
   let clock = Date.now() - 6 * 60 * 60 * 1000;
+  let seq = 0;
   const post = async (authorId: string, payload: EventPayload) => {
     clock += 60_000;
-    await db
-      .insert(events)
-      .values(await sealedRow(key, trip.id, { at: new Date(clock), authorId, payload }));
+    seq += 1;
+    await db.insert(events).values({
+      ...(await sealedRow(key, trip.id, { at: new Date(clock), authorId, payload })),
+      seq,
+    });
   };
   const create = async (authorId: string, question: string, criteria: string) => {
     const id = randomUUID();

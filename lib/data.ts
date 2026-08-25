@@ -31,21 +31,11 @@ import {
   trips,
 } from "./db/schema.ts";
 import { normalizeEmail } from "./email.ts";
-import { expiresAtFrom, inviteState, newInviteCode } from "./invites.ts";
+import { expiresAtFrom, inviteState } from "./invites.ts";
+import { expiresAfter, linkState, newLinkCode } from "./links.ts";
 import { logger } from "./logger.ts";
-import {
-  newRecoveryCode,
-  recoveryExpiresAt,
-  recoveryState,
-  visibleRecoveries,
-} from "./recovery.ts";
-import {
-  CONSOLE_REKEY_TTL_MS,
-  liveRekeys,
-  newRekeyCode,
-  rekeyExpiresAt,
-  rekeyState,
-} from "./rekeys.ts";
+import { RECOVERY_TTL_MS, visibleRecoveries } from "./recovery.ts";
+import { CONSOLE_REKEY_TTL_MS, liveRekeys, REKEY_TTL_MS } from "./rekeys.ts";
 import { DEPARTED_NAME } from "./rows.ts";
 import { TripError, type TripInput, tripConfig } from "./trips.ts";
 import type { VerifiedRegistration } from "./webauthn.ts";
@@ -60,6 +50,12 @@ const GARBLED_KEY = "That key didn't come through right. Reload and try again.";
 const LAST_ORGANISER = "Someone has to be able to invite. Make another member an organiser first.";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+
+/** The first row of a query, or null: the shape of every lookup by id. */
+async function first<T>(query: PromiseLike<T[]>): Promise<T | null> {
+  const [row] = await query;
+  return row ?? null;
+}
 
 /** A sealed blob is opaque here, but it has a shape (`v1` and `parts` base64url pieces) and a size that is not a payload. */
 function checkBlob(blob: string, parts: number, maxBytes: number, message: string): void {
@@ -84,18 +80,18 @@ export interface TripContext {
 }
 
 export async function getTrip(id: string): Promise<Trip | null> {
-  const [trip] = await db.select().from(trips).where(eq(trips.id, id));
-  return trip ?? null;
+  return first(db.select().from(trips).where(eq(trips.id, id)));
 }
 
 /** The trip and the member's seat on it, or null when they have none. */
 export async function tripFor(memberId: string, tripId: string): Promise<TripContext | null> {
-  const [row] = await db
-    .select({ trip: trips, membership: memberships })
-    .from(memberships)
-    .innerJoin(trips, eq(trips.id, memberships.tripId))
-    .where(and(eq(memberships.tripId, tripId), eq(memberships.memberId, memberId)));
-  return row ?? null;
+  return first(
+    db
+      .select({ trip: trips, membership: memberships })
+      .from(memberships)
+      .innerJoin(trips, eq(trips.id, memberships.tripId))
+      .where(and(eq(memberships.tripId, tripId), eq(memberships.memberId, memberId))),
+  );
 }
 
 async function requireMembership(tripId: string, memberId: string): Promise<TripContext> {
@@ -196,6 +192,12 @@ export async function updateTrip(
     homeCurrency: trip.homeCurrency,
   });
   if (input.nameEnc) checkWrapped(input.nameEnc);
+  // Every phone applies the cap to the whole log on replay, so lowering it would refuse calls
+  // already accepted and re-settle predictions. The server cannot see which rows are calls; any
+  // row at all is the line.
+  if (maxStakePies < trip.maxStakePies && (await hasEvents(tripId))) {
+    throw new DataError("The cap can't be lowered once the game has started. Raising it is fine.");
+  }
   const [updated] = await db
     .update(trips)
     .set({ startsOn, endsOn, maxStakePies, ...(input.nameEnc ? { nameEnc: input.nameEnc } : {}) })
@@ -246,11 +248,17 @@ async function requireAnotherOrganiser(
   }
 }
 
+/**
+ * Who organises is two records that must agree: the membership row, which gates invites and
+ * recovery here, and a `member.role` event, which gates reopening and rotation on every phone.
+ * The organiser's phone seals the event and both land in one transaction.
+ */
 export async function setRole(
   actorId: string,
   tripId: string,
   memberId: string,
   role: MembershipRole,
+  envelope: string,
 ): Promise<void> {
   await requireOrganiser(tripId, actorId);
   await db.transaction(async (tx) => {
@@ -261,13 +269,15 @@ export async function setRole(
       .where(and(eq(memberships.tripId, tripId), eq(memberships.memberId, memberId)))
       .returning({ memberId: memberships.memberId });
     if (updated.length === 0) throw new DataError("No such member on this trip.");
+    await insertEvent(tx, actorId, tripId, envelope);
     logger.warn({ actorId, tripId, memberId, role }, "role changed");
   });
 }
 
 /**
- * A seat goes: the member's live key links with it, and the trip's key is due a rotation. The
- * last organiser may only go when nobody is left behind.
+ * A seat goes: the member's live key links and the invites they minted go with it (each carries
+ * the trip's key), and the trip's key is due a rotation. The last organiser may only go when
+ * nobody is left behind.
  */
 async function dropSeat(
   tx: Tx,
@@ -286,6 +296,7 @@ async function dropSeat(
     .returning({ memberId: memberships.memberId });
   if (gone.length === 0) throw new DataError("No such member on this trip.");
   await tx.delete(rekeys).where(and(eq(rekeys.tripId, tripId), eq(rekeys.forMemberId, memberId)));
+  await tx.delete(invites).where(and(eq(invites.tripId, tripId), eq(invites.invitedBy, memberId)));
   await tx
     .update(trips)
     .set({ keyStaleSince: sql`coalesce(${trips.keyStaleSince}, now())` })
@@ -556,8 +567,7 @@ export async function listCredentials(memberId: string): Promise<CredentialRow[]
 }
 
 export async function findCredential(id: string): Promise<CredentialRow | null> {
-  const [row] = await db.select().from(credentials).where(eq(credentials.id, id));
-  return row ?? null;
+  return first(db.select().from(credentials).where(eq(credentials.id, id)));
 }
 
 function credentialRow(memberId: string, credential: VerifiedRegistration) {
@@ -673,8 +683,7 @@ export async function clearAvatar(memberId: string): Promise<void> {
 export async function getAvatar(
   memberId: string,
 ): Promise<{ contentType: string; data: Buffer } | null> {
-  const [row] = await db.select().from(avatars).where(eq(avatars.memberId, memberId));
-  return row ?? null;
+  return first(db.select().from(avatars).where(eq(avatars.memberId, memberId)));
 }
 
 // ---------- invite links ----------
@@ -702,14 +711,14 @@ export async function mintInvite(
   checkWrapped(opts.preview);
 
   const isOpen = opts.isOpen ?? false;
-  const code = newInviteCode();
+  const code = newLinkCode();
   await db.insert(invites).values({
     code,
     tripId,
     label: trimmed,
     isOpen,
     invitedBy: inviterId,
-    expiresAt: expiresAtFrom(new Date(), isOpen),
+    expiresAt: expiresAtFrom(new Date()),
     wrappedKey: opts.wrappedKey,
     epoch: opts.epoch,
     preview: opts.preview,
@@ -728,8 +737,7 @@ export async function listInvites(tripId: string): Promise<InviteRow[]> {
 
 /** Callers check its state. */
 export async function findInvite(code: string): Promise<InviteRow | null> {
-  const [row] = await db.select().from(invites).where(eq(invites.code, code));
-  return row ?? null;
+  return first(db.select().from(invites).where(eq(invites.code, code)));
 }
 
 /** Spent personal invites stay on the record; an open link is shut whether or not anyone used it. */
@@ -772,18 +780,31 @@ async function requireDistinctName(tx: Tx, tripId: string, name: string) {
   if (clash) throw new DataError("Someone on this trip already goes by that name.");
 }
 
-/** Spend a link inside a transaction: checked live, row locked, count bumped. */
-async function spendInvite(tx: Tx, code: string): Promise<InviteRow> {
+/**
+ * The invite, its trip's row locked first and then its own — the order bumpEpoch takes, so a
+ * join and a rotation serialise instead of seating somebody at an epoch that is being retired.
+ * A rotation that got there first deleted the invite, and the second read finds nothing.
+ */
+async function lockInvite(tx: Tx, code: string): Promise<InviteRow> {
+  const peek = await first(
+    tx.select({ tripId: invites.tripId }).from(invites).where(eq(invites.code, code)),
+  );
+  if (!peek) throw new DataError("That invite link isn't valid.");
+  await tx.select({ id: trips.id }).from(trips).where(eq(trips.id, peek.tripId)).for("update");
   const [invite] = await tx.select().from(invites).where(eq(invites.code, code)).for("update");
   if (!invite) throw new DataError("That invite link isn't valid.");
+  return invite;
+}
+
+/** Spend a locked link: checked live, count bumped. */
+async function spendInvite(tx: Tx, invite: InviteRow): Promise<void> {
   if (inviteState(invite, new Date()) !== "live") {
     throw new DataError("That invite link has already been used or has expired.");
   }
   await tx
     .update(invites)
     .set({ useCount: invite.useCount + 1 })
-    .where(eq(invites.code, code));
-  return invite;
+    .where(eq(invites.code, invite.code));
 }
 
 /** Member, passkey, seat, and the spent link in one transaction: two openers race safely. */
@@ -796,7 +817,8 @@ export async function joinWithInvite(input: {
 }): Promise<{ member: Member; tripId: string; key: KeyHandover | null }> {
   const name = checkName(input.name);
   return db.transaction(async (tx) => {
-    const invite = await spendInvite(tx, input.code);
+    const invite = await lockInvite(tx, input.code);
+    await spendInvite(tx, invite);
     await requireDistinctName(tx, invite.tripId, name);
     const member = await insertMember(tx, { ...input, name });
     await tx.insert(memberships).values({
@@ -823,14 +845,13 @@ export async function joinTripWithInvite(
   const member = await getMember(memberId);
   if (!member) throw new DataError("Sign in first.");
   return db.transaction(async (tx) => {
-    const [invite] = await tx.select().from(invites).where(eq(invites.code, code)).for("update");
-    if (!invite) throw new DataError("That invite link isn't valid.");
+    const invite = await lockInvite(tx, code);
     const already = await tx
       .select({ tripId: memberships.tripId })
       .from(memberships)
       .where(and(eq(memberships.tripId, invite.tripId), eq(memberships.memberId, memberId)));
     if (already.length > 0) return { tripId: invite.tripId, key: handoverOf(invite) };
-    await spendInvite(tx, code);
+    await spendInvite(tx, invite);
     await requireDistinctName(tx, invite.tripId, member.name);
     await tx.insert(memberships).values({
       tripId: invite.tripId,
@@ -879,7 +900,7 @@ async function organisesWith(actorId: string, memberId: string): Promise<boolean
 async function createRecovery(memberId: string, mintedBy: string | null): Promise<string> {
   const member = await getMember(memberId);
   if (!member) throw new DataError("No such member.");
-  const code = newRecoveryCode();
+  const code = newLinkCode();
   const now = new Date();
   await db.transaction(async (tx) => {
     // One live link per member: minting a second shuts the first. Expired unused ones go too.
@@ -893,7 +914,7 @@ async function createRecovery(memberId: string, mintedBy: string | null): Promis
       );
     await tx
       .insert(recoveries)
-      .values({ code, memberId, mintedBy, expiresAt: recoveryExpiresAt(now) });
+      .values({ code, memberId, mintedBy, expiresAt: expiresAfter(now, RECOVERY_TTL_MS) });
   });
   logger.warn({ memberId, mintedBy }, "recovery link minted");
   return code;
@@ -915,8 +936,7 @@ export async function mintRecoveryFromConsole(memberId: string): Promise<string>
 }
 
 export async function findRecovery(code: string): Promise<RecoveryRow | null> {
-  const [row] = await db.select().from(recoveries).where(eq(recoveries.code, code));
-  return row ?? null;
+  return first(db.select().from(recoveries).where(eq(recoveries.code, code)));
 }
 
 /** Live links and ones walked through in the last week — read by every member, not just organisers. */
@@ -977,7 +997,7 @@ export async function recoverWithLink(input: {
       .where(eq(recoveries.code, input.code))
       .for("update");
     if (!row) throw new DataError("That recovery link isn't valid.");
-    if (recoveryState(row, new Date()) !== "live") {
+    if (linkState(row, new Date()) !== "live") {
       throw new DataError("That recovery link has already been used or has expired.");
     }
     // The ceremony was started for one seat; the row has to still name it.
@@ -1027,41 +1047,79 @@ function handoverOf(row: { wrappedKey: string | null; epoch: number | null }): K
 
 const MAX_EVENT_BYTES = 16 * 1024;
 
-/** The author is the session, never the body; an event under a rotated-away key is refused. */
-export async function appendEvent(
-  memberId: string,
+export interface Appended {
+  id: number;
+  seq: number;
+  at: Date;
+}
+
+/**
+ * One row onto the trip's log, inside `tx`: the trip row is locked so `seq` is the next number
+ * and no two writers commit out of order, and the epoch is checked under that same lock.
+ */
+async function insertEvent(
+  tx: Tx,
+  authorId: string,
   tripId: string,
   envelope: string,
-): Promise<{ id: number; at: Date }> {
-  const { trip } = await requireMembership(tripId, memberId);
-  if (trip.keyEpoch === null) throw new DataError("This trip isn't sealed yet.");
+): Promise<Appended> {
   let header: EnvelopeHeader;
   try {
     header = parseEnvelope(envelope);
   } catch {
     throw new DataError("That didn't come through right. Try again.");
   }
-  checkEpoch(trip, header.epoch);
   if (envelope.length > MAX_EVENT_BYTES) throw new DataError("That's too long to keep.");
-  const [row] = await db
+  const [trip] = await tx
+    .select({ keyEpoch: trips.keyEpoch })
+    .from(trips)
+    .where(eq(trips.id, tripId))
+    .for("update");
+  if (!trip || trip.keyEpoch === null) throw new DataError("This trip isn't sealed yet.");
+  checkEpoch(trip, header.epoch);
+  const [row] = await tx
     .insert(events)
-    .values({ tripId, authorId: memberId, epoch: header.epoch, body: envelope })
-    .returning({ id: events.id, at: events.at });
+    .values({
+      tripId,
+      authorId,
+      epoch: header.epoch,
+      body: envelope,
+      seq: sql`(select coalesce(max(${events.seq}), 0) + 1 from ${events} where ${events.tripId} = ${tripId})`,
+    })
+    .returning({ id: events.id, seq: events.seq, at: events.at });
   return row;
 }
 
-/** Every event after `afterId`, in order — ciphertext, for a phone with a seat. */
+/** The author is the session, never the body; an event under a rotated-away key is refused. */
+export async function appendEvent(
+  memberId: string,
+  tripId: string,
+  envelope: string,
+): Promise<Appended> {
+  await requireMembership(tripId, memberId);
+  return db.transaction((tx) => insertEvent(tx, memberId, tripId, envelope));
+}
+
+/** Every event after `afterSeq`, in the trip's order — ciphertext, for a phone with a seat. */
 export async function eventsSince(
   memberId: string,
   tripId: string,
-  afterId: number,
+  afterSeq: number,
 ): Promise<EventRow[]> {
   await requireMembership(tripId, memberId);
   return db
     .select()
     .from(events)
-    .where(and(eq(events.tripId, tripId), gt(events.id, afterId)))
-    .orderBy(asc(events.id));
+    .where(and(eq(events.tripId, tripId), gt(events.seq, afterSeq)))
+    .orderBy(asc(events.seq));
+}
+
+async function hasEvents(tripId: string): Promise<boolean> {
+  return Boolean(
+    await first(
+      db.select({ id: events.id }).from(events).where(eq(events.tripId, tripId)).limit(1),
+    ),
+  );
 }
 
 // ---------- rekey links ----------
@@ -1086,7 +1144,7 @@ export async function mintRekey(
   await requireMembership(tripId, forMemberId);
   checkEpoch(trip, epoch);
   checkWrapped(wrappedKey);
-  const code = newRekeyCode();
+  const code = newLinkCode();
   const now = new Date();
   await db.transaction(async (tx) => {
     // One live link per member per trip; spent and stale ones are swept.
@@ -1108,7 +1166,7 @@ export async function mintRekey(
       mintedBy: actorId,
       wrappedKey,
       epoch,
-      expiresAt: rekeyExpiresAt(now),
+      expiresAt: expiresAfter(now, REKEY_TTL_MS),
     });
   });
   logger.warn({ tripId, forMemberId, mintedBy: actorId }, "rekey link minted");
@@ -1122,7 +1180,7 @@ export async function mintRekeyFromConsole(
   wrappedKey: string,
   epoch: number,
 ): Promise<string> {
-  const code = newRekeyCode();
+  const code = newLinkCode();
   await db.insert(rekeys).values({
     code,
     tripId,
@@ -1130,15 +1188,14 @@ export async function mintRekeyFromConsole(
     mintedBy: forMemberId,
     wrappedKey,
     epoch,
-    expiresAt: rekeyExpiresAt(new Date(), CONSOLE_REKEY_TTL_MS),
+    expiresAt: expiresAfter(new Date(), CONSOLE_REKEY_TTL_MS),
   });
   logger.warn({ tripId, forMemberId }, "rekey link minted from the console");
   return code;
 }
 
 export async function findRekey(code: string): Promise<RekeyRow | null> {
-  const [row] = await db.select().from(rekeys).where(eq(rekeys.code, code));
-  return row ?? null;
+  return first(db.select().from(rekeys).where(eq(rekeys.code, code)));
 }
 
 /** Live links on a trip, for the members page. */
@@ -1172,7 +1229,7 @@ export async function spendRekey(memberId: string, code: string): Promise<RekeyR
       logger.info({ tripId: row.tripId, memberId }, "rekey link opened again by its member");
       return row;
     }
-    if (rekeyState(row, now) !== "live") {
+    if (linkState(row, now) !== "live") {
       throw new DataError("That link has already been used or has expired.");
     }
     await tx.update(rekeys).set({ usedAt: now }).where(eq(rekeys.code, code));
@@ -1243,10 +1300,18 @@ export async function publishCard(
     verdict: input.verdict,
     lines: JSON.stringify({ winners: input.winners, losers: input.losers }),
   };
-  await db
+  // The server cannot check the market id on a sealed trip, so the conflict clause is pinned to
+  // this trip: a member elsewhere cannot rewrite another trip's card by its id.
+  const [row] = await db
     .insert(cards)
     .values({ marketId: input.marketId, tripId, ...card })
-    .onConflictDoUpdate({ target: cards.marketId, set: { ...card, at: new Date() } });
+    .onConflictDoUpdate({
+      target: cards.marketId,
+      set: { ...card, at: new Date() },
+      setWhere: eq(cards.tripId, tripId),
+    })
+    .returning({ marketId: cards.marketId });
+  if (!row) throw new DataError("That prediction belongs to another trip.");
   logger.info({ tripId, marketId: input.marketId, memberId }, "card published");
 }
 

@@ -13,6 +13,7 @@ import {
   primaryKey,
   text,
   timestamp,
+  uniqueIndex,
 } from "drizzle-orm/pg-core";
 
 const bytea = customType<{ data: Buffer; driverData: Buffer }>({
@@ -242,11 +243,17 @@ export const events = pgTable(
       .notNull()
       .references(() => members.id),
     epoch: integer("epoch").notNull(),
+    /**
+     * The trip's own order, 1, 2, 3…, assigned under the trip row's lock so it is also commit
+     * order — which is what lets a phone poll "everything after N" and never miss a row. The
+     * global `id` is assigned at insert and can commit out of order.
+     */
+    seq: integer("seq").notNull(),
     /** `v1.<epoch>.<iv>.<ct>` — lib/crypto.ts. */
     body: text("body").notNull(),
   },
   (t) => [
-    index("events_trip_id_idx").on(t.tripId, t.id),
+    uniqueIndex("events_trip_seq_idx").on(t.tripId, t.seq),
     check("events_body_size", sql`length(${t.body}) <= 16384`),
   ],
 );

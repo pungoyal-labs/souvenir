@@ -9,7 +9,7 @@ import {
   parseAmount,
   type SplitMode,
 } from "@/lib/split";
-import { type BillView, billError } from "@/lib/views";
+import { type BillView, billError, type Person } from "@/lib/views";
 import { Avatar } from "./avatar";
 import { firstName, todayLocal } from "./bill-label";
 import { useOpenTrip } from "./trip-store";
@@ -47,8 +47,16 @@ export function BillForm({
   initial?: BillView;
   onDone: () => void;
 }) {
-  const { me, t, roster: members, append } = useOpenTrip();
+  const { me, t, roster, append } = useOpenTrip();
   const meId = me.id;
+  // Editing keeps everyone the bill already names, seat or no seat: a departed payer's share is
+  // still theirs, and a revision that forgot them would rewrite who owes whom.
+  const members: Person[] = initial
+    ? [
+        ...roster,
+        ...initial.entries.map((e) => e.member).filter((p) => !roster.some((m) => m.id === p.id)),
+      ]
+    : roster;
   const { pending, error, act } = useAct(t.oops);
 
   const [onDate, setOnDate] = useState(initial?.onDate ?? todayLocal());

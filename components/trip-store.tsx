@@ -16,6 +16,7 @@ import {
 } from "react";
 import type { ActionResult } from "@/app/actions";
 import { open, seal, unwrapFromMember } from "@/lib/crypto";
+import type { Appended } from "@/lib/data";
 import type { EventRow } from "@/lib/db/schema";
 import { decodeEvent, type EventPayload, encodeEvent, type OpenEvent } from "@/lib/events";
 import { type Keyring, memberPublicKey, openName, tripCryptoKey, withTripKey } from "@/lib/keys";
@@ -27,8 +28,8 @@ import { useKeyring, useTripKey } from "./keyring";
 const POLL_MS = 15_000;
 
 export interface TripStoreActions {
-  append(tripId: string, envelope: string): Promise<ActionResult & { id?: number; at?: Date }>;
-  since(tripId: string, afterId: number): Promise<ActionResult & { rows?: EventRow[] }>;
+  append(tripId: string, envelope: string): Promise<ActionResult & Partial<Appended>>;
+  since(tripId: string, afterSeq: number): Promise<ActionResult & { rows?: EventRow[] }>;
   grant(tripId: string): Promise<ActionResult & { grant?: { id: string; wrapped: string } | null }>;
   takeGrant(id: string): Promise<ActionResult>;
 }
@@ -51,7 +52,15 @@ export interface TripStoreValue {
   sealed: number;
   /** Rows that would not open on this phone. */
   unreadable: number;
+  /**
+   * Seal and post one event. The rules run here first, over the log as this phone has it, so
+   * a call the whole table would refuse is refused to the person tapping — the server cannot.
+   */
   append(payload: EventPayload): Promise<ActionResult>;
+  /** Seal an event for an action that lands it together with something the server owns. */
+  sealEvent(
+    payload: EventPayload,
+  ): Promise<{ ok: true; envelope: string } | { ok: false; error: string }>;
   refresh(): Promise<void>;
   seenAt: Date | null;
   markSeen(): void;
@@ -93,6 +102,16 @@ async function openRow(row: EventRow, key: CryptoKey): Promise<OpenEvent> {
 }
 
 const reason = (err: unknown) => (err instanceof Error ? err.message : String(err));
+
+/**
+ * Rows kept in the trip's order. `seq` is assigned under a lock on the server, so "everything
+ * after the highest seq seen" never skips a row that committed late.
+ */
+function addRows(current: EventRow[], fresh: EventRow[]): EventRow[] {
+  const have = new Set(current.map((r) => r.id));
+  const add = fresh.filter((r) => !have.has(r.id));
+  return add.length ? [...current, ...add].sort((a, b) => a.seq - b.seq) : current;
+}
 
 export function TripStoreProvider({
   tripId,
@@ -166,15 +185,11 @@ export function TripStoreProvider({
   }, [key, rows, opened, keyring.keyring, tripId, epoch]);
 
   const refresh = useCallback(async () => {
-    const last = rowsRef.current[rowsRef.current.length - 1]?.id ?? 0;
+    const last = rowsRef.current[rowsRef.current.length - 1]?.seq ?? 0;
     const res = await actions.since(tripId, last);
     const fresh = res.rows;
     if (!res.ok || !fresh?.length) return;
-    setRows((current) => {
-      const have = new Set(current.map((r) => r.id));
-      const add = fresh.filter((r) => !have.has(r.id));
-      return add.length ? [...current, ...add] : current;
-    });
+    setRows((current) => addRows(current, fresh));
   }, [actions, tripId]);
 
   // Poll while the tab is visible; catch up the moment it becomes visible again.
@@ -198,42 +213,62 @@ export function TripStoreProvider({
     };
   }, [key, refresh]);
 
-  const append = useCallback(
-    async (payload: EventPayload): Promise<ActionResult> => {
-      if (!key || epoch === null)
-        return { ok: false, error: "This phone has no key for the trip." };
-      const envelope = await seal(key, { tripId, authorId: me.id, epoch }, encodeEvent(payload));
-      const res = await actions.append(tripId, envelope);
-      if (!res.ok || res.id === undefined || res.at === undefined) {
-        return { ok: false, error: res.error };
-      }
-      const row: EventRow = {
-        id: res.id,
-        at: new Date(res.at),
-        tripId,
-        authorId: me.id,
-        epoch,
-        body: envelope,
-      };
-      setRows((current) => (current.some((r) => r.id === row.id) ? current : [...current, row]));
-      void refresh();
-      return { ok: true };
-    },
-    [actions, epoch, key, me.id, refresh, tripId],
-  );
-
+  // Rows in the trip's order; the store keeps `rows` sorted by seq.
   const events = useMemo(
-    () =>
-      rows
-        .map((r) => opened.get(r.id))
-        .filter((e): e is OpenEvent => e != null)
-        .sort((a, b) => a.id - b.id),
+    () => rows.map((r) => opened.get(r.id)).filter((e): e is OpenEvent => e != null),
     [rows, opened],
   );
 
   const state = useMemo<TripState | null | undefined>(
     () => (key ? replayTrip({ tripId, ...config }, events) : key),
     [key, tripId, config, events],
+  );
+
+  const sealEvent = useCallback(
+    async (payload: EventPayload) => {
+      if (!key || epoch === null) {
+        return { ok: false as const, error: "This phone has no key for the trip." };
+      }
+      // A dry run over the log as this phone has it: what every other phone will say to it.
+      const trial: OpenEvent = {
+        id: Number.MAX_SAFE_INTEGER,
+        at: new Date(),
+        authorId: me.id,
+        epoch,
+        payload,
+      };
+      const refused = replayTrip({ tripId, ...config }, [...events, trial]).rejected.find(
+        (r) => r.id === trial.id,
+      );
+      if (refused) return { ok: false as const, error: refused.reason };
+      const envelope = await seal(key, { tripId, authorId: me.id, epoch }, encodeEvent(payload));
+      return { ok: true as const, envelope };
+    },
+    [config, epoch, events, key, me.id, tripId],
+  );
+
+  const append = useCallback(
+    async (payload: EventPayload): Promise<ActionResult> => {
+      const sealed = await sealEvent(payload);
+      if (!sealed.ok) return sealed;
+      const res = await actions.append(tripId, sealed.envelope);
+      if (!res.ok || res.id === undefined || res.seq === undefined || res.at === undefined) {
+        return { ok: false, error: res.error };
+      }
+      const row: EventRow = {
+        id: res.id,
+        seq: res.seq,
+        at: new Date(res.at),
+        tripId,
+        authorId: me.id,
+        epoch: epoch as number,
+        body: sealed.envelope,
+      };
+      setRows((current) => addRows(current, [row]));
+      void refresh();
+      return { ok: true };
+    },
+    [actions, epoch, me.id, refresh, sealEvent, tripId],
   );
 
   const people = useMemo(
@@ -253,7 +288,10 @@ export function TripStoreProvider({
     if (!readable || !state || epoch === null || helloed.current === epoch) return;
     const hello = state.hellos.get(me.id);
     const mkPub = memberPublicKey(keyring.keyring);
-    if (hello && hello.epoch === epoch && (hello.mkPub || !mkPub)) return;
+    // Skip only when the record already carries this phone's member key: a fresh one (recovery,
+    // a second phone) has to be announced or a rotation wraps the next key to a key nobody holds.
+    const sameKey = JSON.stringify(hello?.mkPub ?? null) === JSON.stringify(mkPub);
+    if (hello && hello.epoch === epoch && sameKey) return;
     helloed.current = epoch;
     void append({ t: "member.hello", ...(mkPub ? { mkPub } : {}) });
   }, [readable, state, me.id, append, epoch, keyring.keyring]);
@@ -296,6 +334,7 @@ export function TripStoreProvider({
       sealed: rows.length,
       unreadable,
       append,
+      sealEvent,
       refresh,
       seenAt,
       markSeen,
@@ -314,6 +353,7 @@ export function TripStoreProvider({
       rows.length,
       unreadable,
       append,
+      sealEvent,
       refresh,
       seenAt,
       markSeen,

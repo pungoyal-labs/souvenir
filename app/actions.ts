@@ -18,6 +18,7 @@ import {
   takePasskeyChallenge,
 } from "@/lib/auth";
 import {
+  type Appended,
   acceptTerms,
   addCredential,
   appendEvent,
@@ -68,6 +69,7 @@ import {
 import type { EventRow, MembershipRole } from "@/lib/db/schema";
 import { inviteState, inviteUrl } from "@/lib/invites";
 import { isLingoKey, lingoOf } from "@/lib/lingo";
+import { linkState } from "@/lib/links";
 import {
   type Interpretation,
   interpret,
@@ -76,7 +78,7 @@ import {
   polishMarketDraft,
 } from "@/lib/llm";
 import { logger } from "@/lib/logger";
-import { recoveryState, recoveryUrl } from "@/lib/recovery";
+import { recoveryUrl } from "@/lib/recovery";
 import { rekeyUrl } from "@/lib/rekeys";
 import { routes } from "@/lib/routes";
 import { currentMember } from "@/lib/session";
@@ -171,13 +173,16 @@ export async function updateTripAction(tripId: string, input: TripUpdate): Promi
   );
 }
 
+/** `envelope` is the sealed `member.role` event the organiser's phone made to match. */
 export async function setRoleAction(
   tripId: string,
   memberId: string,
   role: MembershipRole,
+  envelope: string,
 ): Promise<ActionResult> {
+  if (typeof envelope !== "string") return { ok: false, error: "That didn't come through right." };
   return mutate(
-    (actorId) => setRole(actorId, tripId, memberId, role),
+    (actorId) => setRole(actorId, tripId, memberId, role, envelope),
     [routes.members(tripId), routes.member(tripId, memberId)],
   );
 }
@@ -213,17 +218,17 @@ export async function polishAction(
 export async function appendEventAction(
   tripId: string,
   envelope: string,
-): Promise<ActionResult & { id?: number; at?: Date }> {
+): Promise<ActionResult & Partial<Appended>> {
   if (typeof envelope !== "string") return { ok: false, error: "That didn't come through right." };
   return mutate((memberId) => appendEvent(memberId, tripId, envelope));
 }
 
 export async function eventsSinceAction(
   tripId: string,
-  afterId: number,
+  afterSeq: number,
 ): Promise<ActionResult & { rows?: EventRow[] }> {
-  if (!Number.isInteger(afterId) || afterId < 0) return { ok: false, error: "Bad cursor." };
-  return mutate(async (memberId) => ({ rows: await eventsSince(memberId, tripId, afterId) }));
+  if (!Number.isInteger(afterSeq) || afterSeq < 0) return { ok: false, error: "Bad cursor." };
+  return mutate(async (memberId) => ({ rows: await eventsSince(memberId, tripId, afterSeq) }));
 }
 
 export async function markInboxSeenAction(tripId: string): Promise<ActionResult> {
@@ -774,7 +779,7 @@ export async function beginRecoveryAction(
   const refused = await refuseSignedIn();
   if (refused) return refused;
   const row = await findRecovery(code);
-  if (!row || recoveryState(row, new Date()) !== "live") {
+  if (!row || linkState(row, new Date()) !== "live") {
     return { ok: false, error: "That recovery link has already been used or has expired." };
   }
   const member = await getMember(row.memberId);

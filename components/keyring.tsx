@@ -248,6 +248,9 @@ export function KeyringProvider({
         // A member key, once: the public half goes into every trip's log with the next hello.
         if (!next.mk) next = withMemberKey(next, (await newMemberKey()).privateKey);
         if (cancelled) return;
+        // Whatever update() put in the keyring meanwhile (a key just taken from a link) wins over
+        // what storage and the backup had: this effect re-runs when a sign-in flips `signedIn`.
+        next = mergeKeyrings(keyringRef.current, next);
         setKeyring(next);
         setBackup(restored?.note ?? null);
         setStatus("ready");
@@ -297,15 +300,23 @@ export function useKeyring(): KeyringContextValue {
  */
 export function useTripKey(tripId: string, epoch: number | null): CryptoKey | null | undefined {
   const { status, keyring } = useKeyring();
-  const [key, setKey] = useState<CryptoKey | null | undefined>(undefined);
+  // Tagged with what it was looked up for: after a rotation the epoch prop moves a render before
+  // the lookup lands, and the old key must not be handed out under the new epoch's name.
+  const [found, setFound] = useState<{
+    tripId: string;
+    epoch: number | null;
+    key: CryptoKey | null;
+  }>();
   useEffect(() => {
-    if (status === "loading") return setKey(undefined);
-    if (epoch === null) return setKey(null);
+    if (status === "loading") return setFound(undefined);
+    if (epoch === null) return setFound({ tripId, epoch, key: null });
     let cancelled = false;
-    tripCryptoKey(keyring, tripId, epoch).then((k) => !cancelled && setKey(k));
+    tripCryptoKey(keyring, tripId, epoch).then(
+      (key) => !cancelled && setFound({ tripId, epoch, key }),
+    );
     return () => {
       cancelled = true;
     };
   }, [status, keyring, tripId, epoch]);
-  return key;
+  return found && found.tripId === tripId && found.epoch === epoch ? found.key : undefined;
 }

@@ -1,13 +1,13 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
 import { setRoleAction } from "@/app/actions";
+import { useOpenTrip } from "./trip-store";
+import { ActError, useRefreshingAct } from "./use-act";
 
 /**
- * Who organises, as a thing organisers hand to each other on a trip. Stepping
- * yourself down is allowed; stepping the last organiser down is not
- * (lib/data.ts setRole).
+ * Who organises, as a thing organisers hand to each other on a trip. The seat row and the
+ * `member.role` event land together (lib/data.ts setRole), so the server and every phone agree.
+ * Stepping yourself down is allowed; stepping the last organiser down is not.
  */
 export function OrganiserToggle({
   tripId,
@@ -22,18 +22,10 @@ export function OrganiserToggle({
   isOrganiser: boolean;
   isMe: boolean;
 }) {
-  const router = useRouter();
-  const [pending, startTransition] = useTransition();
-  const [error, setError] = useState<string | null>(null);
-
+  const { sealEvent, refresh } = useOpenTrip();
+  const { pending, error, act } = useRefreshingAct();
   const who = isMe ? "You" : memberName;
-  const toggle = () =>
-    startTransition(async () => {
-      setError(null);
-      const res = await setRoleAction(tripId, memberId, isOrganiser ? "member" : "organiser");
-      if (!res.ok) setError(res.error ?? "That didn't work.");
-      else router.refresh();
-    });
+  const role = isOrganiser ? "member" : "organiser";
 
   return (
     <div className="card px-4 py-3">
@@ -45,7 +37,15 @@ export function OrganiserToggle({
       <button
         type="button"
         disabled={pending}
-        onClick={toggle}
+        onClick={() =>
+          act(async () => {
+            const sealed = await sealEvent({ t: "member.role", memberId, role });
+            if (!sealed.ok) return sealed;
+            const res = await setRoleAction(tripId, memberId, role, sealed.envelope);
+            if (res.ok) await refresh();
+            return res;
+          })
+        }
         className="mt-2 rounded-md border border-line px-3 py-2 text-sm font-semibold hover:bg-surface disabled:opacity-40"
       >
         {pending
@@ -56,7 +56,7 @@ export function OrganiserToggle({
               : `Step ${memberName} down`
             : `Make ${isMe ? "myself" : memberName} an organiser`}
       </button>
-      {error && <p className="mt-2 text-sm font-semibold text-no-deep">{error}</p>}
+      <ActError error={error} block />
     </div>
   );
 }
