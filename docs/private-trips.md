@@ -508,8 +508,9 @@ Migration `0022` drops `markets`, `ledger`, `market_views`,
 `market_reactions`, `comments`, `comment_mentions`, `bills`,
 `bill_revisions`, `bill_entries`, the enums they used, and the unused
 `keyrings`; `scripts/seal-trip.ts` and `pnpm private:migrate` went with
-them; `lib/rows.ts` keeps the `Market`/`LedgerRow` shapes. **The migration is
-destructive: `pg_dump` before deploying it.** `0023` adds `keyring_wraps`.
+them (the `Market`/`LedgerRow` shapes lived on in `lib/rows.ts` until
+`lib/replay` grew `MarketState.settlement` and `lib/stats` read markets
+directly). **The migration is destructive: `pg_dump` before deploying it.** `0023` adds `keyring_wraps`.
 
 Exit reached: no plaintext content column exists except the two legacy
 columns above, which carry only what predates sealing and empty themselves.
