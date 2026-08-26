@@ -1,0 +1,46 @@
+name: Speech check
+
+# Hears every language a trip can speak, with the production voice settings,
+# before a member does: `pnpm speech:check` run with the oracle-cloud
+# environment's SPEECH_* values, so nobody copies the key anywhere. The report
+# is in the log; the clips are the run's artifact, for a person to play.
+# Run it from the Actions tab after changing a voice, and before redeploying.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-24.04-arm
+    environment: oracle-cloud
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Hear every language
+        run: node scripts/speech-check.ts clips
+        env:
+          AUTH_SECRET: insecure-build-time-placeholder
+          SPEECH_BASE_URL: ${{ vars.SPEECH_BASE_URL }}
+          SPEECH_API_KEY: ${{ secrets.SPEECH_API_KEY || secrets.LLM_API_KEY }}
+          SPEECH_TTS_MODEL: ${{ vars.SPEECH_TTS_MODEL }}
+          SPEECH_GROUP_ID: ${{ vars.SPEECH_GROUP_ID }}
+          SPEECH_VOICES: ${{ vars.SPEECH_VOICES }}
+          SPEECH_VOICE_US: ${{ vars.SPEECH_VOICE_US }}
+          SPEECH_VOICE_THEM: ${{ vars.SPEECH_VOICE_THEM }}
+          SPEECH_VOICE_THEM_PITCH: ${{ vars.SPEECH_VOICE_THEM_PITCH }}
+          SPEECH_VOICE_THEM_SPEED: ${{ vars.SPEECH_VOICE_THEM_SPEED }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: clips
+          path: clips/
+          if-no-files-found: ignore
+          retention-days: 7

@@ -42,7 +42,9 @@ Read the test before changing a module; change them together.
   against the database, for when no organiser can sign in either
 - `pnpm speech:check` — asks the voice service (`SPEECH_*`) for a greeting
   in every language a trip can speak, one clip each under `clips/`, and
-  fails on any it refuses; the only way to know a destination speaks
+  fails on any it refuses; the only way to know a destination speaks. In
+  production it is the *Speech check* workflow (`.github/workflows/
+  speech-check.yml`), run by hand with the deploy's own values
 - `pnpm lingo:gen` — compile `lingo.yaml` → `lib/lingo.data.ts` (`dev` and
   `build` run it for you)
 

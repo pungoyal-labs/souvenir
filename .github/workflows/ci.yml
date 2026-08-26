@@ -102,7 +102,8 @@ jobs:
     #            SPEECH_VOICE_US, SPEECH_VOICE_THEM, SPEECH_VOICE_THEM_PITCH,
     #            SPEECH_VOICE_THEM_SPEED (all optional: blank is unset, lib/env.ts)
     #   secrets: OCI_SSH_KEY, POSTGRES_PASSWORD, AUTH_SECRET,
-    #            AUTH_GOOGLE_ID, AUTH_GOOGLE_SECRET, LLM_API_KEY, SPEECH_API_KEY
+    #            AUTH_GOOGLE_ID, AUTH_GOOGLE_SECRET, LLM_API_KEY,
+    #            SPEECH_API_KEY (optional: one vendor, so LLM_API_KEY serves)
     # The registry pull uses this run's ephemeral GITHUB_TOKEN — no PAT needed.
     environment: oracle-cloud
     permissions:
@@ -175,7 +176,7 @@ jobs:
             LLM_API_KEY=${{ secrets.LLM_API_KEY }}
             LLM_MODEL=${{ vars.LLM_MODEL }}
             SPEECH_BASE_URL=${{ vars.SPEECH_BASE_URL }}
-            SPEECH_API_KEY=${{ secrets.SPEECH_API_KEY }}
+            SPEECH_API_KEY=${{ secrets.SPEECH_API_KEY || secrets.LLM_API_KEY }}
             SPEECH_TTS_MODEL=${{ vars.SPEECH_TTS_MODEL }}
             SPEECH_GROUP_ID=${{ vars.SPEECH_GROUP_ID }}
             SPEECH_VOICES=${{ vars.SPEECH_VOICES }}

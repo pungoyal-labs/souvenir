@@ -32,16 +32,18 @@ language and puts its variables in the deploy; turning it on is optional and
 can happen after the push:
 
 - In the `oracle-cloud` environment: var `SPEECH_BASE_URL`
-  (`https://api.minimax.io`), secret `SPEECH_API_KEY` (the same key as
-  `LLM_API_KEY`), var `SPEECH_VOICES=th=Thai_male_1_sample8` (one entry per
-  language a live trip speaks), and var `SPEECH_VOICE_THEM` naming one voice
-  as the fallback for every other language — without it a language with no
-  entry gets the device's voice or none. `POST /v1/get_voice` lists the
-  account's voices. Then redeploy (re-run the deploy job, or push).
-- **Check before anyone hears it**: `pnpm speech:check` with the production
-  `SPEECH_*` in a local `.env` asks the service for a greeting in every
-  language a trip can speak, one clip per language under `clips/`, and
-  fails on any the vendor refuses. Play the clips. On the box:
+  (`https://api.minimax.io`), var `SPEECH_VOICES=th=Thai_male_1_sample8`
+  (one entry per language a live trip speaks), and var `SPEECH_VOICE_THEM`
+  naming one voice as the fallback for every other language — without it a
+  language with no entry gets the device's voice or none. The key is
+  `LLM_API_KEY` unless a `SPEECH_API_KEY` secret says otherwise: one vendor.
+  `POST /v1/get_voice` lists the account's voices.
+- **Check before anyone hears it**: run the *Speech check* workflow from the
+  Actions tab. It runs `pnpm speech:check` with the environment's values —
+  a greeting in every language a trip can speak, failing on any the vendor
+  refuses — and uploads one clip per language for a person to play. Only
+  then redeploy (re-run the last deploy job, or push). The same script runs
+  locally against a `.env`, or on the box:
   `docker compose run --rm -v "$PWD/clips:/app/clips" migrate node scripts/speech-check.ts`.
 - On the Thailand trip's `/talk`: the ครับ/ค่ะ toggle shows, a turn
   interprets, and on a phone with no Thai voice the server speaks — or the
