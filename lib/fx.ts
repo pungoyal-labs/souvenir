@@ -1,8 +1,9 @@
 // Settling the whole trip in one currency. Pure; covered by fx.test.ts.
 //
-// A trip spends two currencies and lib/split keeps them apart: baht owed is
-// baht owed, and there is no rate in there. But the group flies home, and at
-// home nobody is paying anybody in baht. This module is the bridge: the
+// A trip spends two currencies and lib/split keeps them apart: foreign owed
+// is foreign owed, and there is no rate in there. But the group flies home,
+// and at home nobody is paying anybody in the money they spent there. This
+// module is the bridge: the
 // foreign nets are read in the home currency at the day's rate, marked up by
 // the forex charge every card and exchange counter takes, and added to the
 // home nets — one balance per member, one plan, all in the money the group
@@ -82,7 +83,7 @@ export function roundToSum(values: number[], total: number): number[] {
 
 /**
  * The foreign nets read in the home currency, surcharge included, rounded so
- * they still sum to nothing: what was zero-sum in baht is zero-sum in rupees.
+ * they still sum to nothing: what was zero-sum there is zero-sum at home.
  */
 export function convertNets(
   foreign: Map<string, number>,

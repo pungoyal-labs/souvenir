@@ -1,7 +1,7 @@
 # Ideas — making Chiang Pai more useful to a travelling group
 
-Written 25 August 2026, after the mobile-responsiveness pass. Not a plan; a
-shelf. Each idea is checked against the rules in `AGENTS.md`: content is a
+Written 25 August 2026, after the mobile-responsiveness pass; struck through
+as things ship. Not a plan; a shelf. Each idea is checked against the rules in `AGENTS.md`: content is a
 sealed event and replay derives the page, the server never needs plaintext,
 and pies are never money.
 
@@ -32,9 +32,10 @@ game feeds itself.
 5. **The kitty.** Most groups have one person holding cash for taxis. Model a
    float (contributions in, spend out) inside bills — a constant real-world
    pattern the split model doesn't express.
-6. **One rate to settle across currencies.** THB and INR settle separately
-   today; on the last day, an organiser-entered rate lets the group collapse
-   to one "who owes whom" in the home currency. Still a ledger, never a rail.
+6. ~~**One rate to settle across currencies.**~~ Shipped: the bills page
+   settles the whole trip in the home currency at the day's public rate plus
+   a forex charge (`lib/fx`), and falls back to per-currency when no rate is
+   reachable. Still a ledger, never a rail.
 7. **Last-day settle sheet.** The trip knows when it ends *there*; on that
    day, surface what is still open and a shareable text card for the chat
    (like `ShareRecap` — never a payment link).
@@ -76,7 +77,7 @@ Unresolved predictions are what kill prediction games.
 ## If only five
 
 Today sheet (1), plans with the auto-prediction (2), resolve-by nudges (9),
-kitty plus one-rate settlement (5, 6), places cards (13). All are sealed-event
+the kitty (5), places cards (13). All are sealed-event
 work plus `lib/views` / `lib/stats` derivations with tests — no plaintext
 column, no server logic that needs content.
 

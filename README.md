@@ -3,7 +3,7 @@
 The app for the trip that actually happens. A friend group opens a **trip**,
 drops one link in the group chat, and puts its arguments on the record as
 zero-sum, play-money predictions about the trip itself — who books by Friday,
-who's last to the airport, who gets the tuk-tuk under a hundred baht. Virtual
+who's last to the airport, who haggles the taxi down to what they bragged. Virtual
 pies (π) only, no house: winners split exactly what losers put in, everything
 is on the record, and over the trip the leaderboard reveals who can actually
 predict things. Split bills and a two-way interpreter sit beside the game.
@@ -76,39 +76,77 @@ The full design is [`docs/private-trips.md`](docs/private-trips.md). In short:
 - **Nothing is left in the clear.** The plaintext prediction, bill, phrase
   and name columns are gone; the schema holds ciphertext, shape and roster.
 
-**The tests are the spec.** Each pure module carries its documentation as a
-test file: `lib/engine.test.ts` (settlement, fuzz-tested zero-sum),
-`lib/replay.test.ts` (the rules of a sealed trip, fuzzed over adversarial
-logs), `lib/views.test.ts` (every page derived from replayed state),
-`lib/crypto.test.ts` and `lib/keys.test.ts` (envelopes, link wraps, the
-keyring), `lib/events.test.ts` (the event codec), `lib/rekeys.test.ts`,
-`lib/stats.test.ts` (outcomes, win/loss/ROI), `lib/recommend.test.ts` (ranking
-and reason chips), `lib/pies.test.ts` (centi-pie math and formatting),
-`lib/email.test.ts` (Gmail-dot canonicalization), `lib/talk.test.ts` (the
-language pair, whose turn it is, and which voice a device can speak it with),
-`lib/trips.test.ts` (what a trip is), `lib/starters.test.ts`.
+## Where the trip goes
 
-**Talking to locals.** `/talk` is a two-way interpreter on one phone: tap your
-side, speak, and it says it out loud in the local language; hand the phone over
-and it comes back in yours. Nothing is stored — the conversation lives in the
-tab. The pair is the trip's — its home language and destination — and the
-destination also sets the currency a new bill starts in. Kept phrases are the
-trip's phrasebook.
+A trip is pointed at one of twenty-one **destinations**, and that is the only
+place the code knows about a country: one line in `lib/talk.ts`
+`DESTINATIONS` names the local language (code, BCP-47 tag, script, which
+voice to prefer, and — where the language ends a polite sentence by who is
+speaking, as Thai does — the forms and the rule the interpreter is given),
+the currency, and the IANA zone the trip's days run on. From that line:
+
+- **Two currencies, at most.** The trip settles in the group's home currency
+  (INR unless said otherwise) and spends the destination's; a domestic trip
+  has one and is never asked. `lib/split.ts` keeps them apart — shares, nets,
+  the fewest transfers per currency — and `lib/fx.ts` brings them together
+  when the group is home: the foreign nets are read at the day's public rate
+  (`lib/rates.ts`, `FX_BASE_URL`, cached an hour, the request naming only two
+  currency codes) plus the forex charge a card takes, rounded so they still
+  sum to nothing, into one plan in the home currency. No rate reachable, each
+  currency settles on its own — a rate is never guessed.
+- **The clock.** A trip ends when its last day ends *there* (`tripToday`),
+  not at anyone's home midnight; phases ("in 12 days", "last day", "home")
+  and the starters follow it.
+- **Talking to locals.** `/talk` is a two-way interpreter on one phone: tap
+  your side, speak, and it says it out loud in the local language; hand the
+  phone over and it comes back in yours. The tab is hidden when the group
+  already speaks the local language. Nothing is stored — the conversation
+  lives in the tab — except a phrase a member deliberately keeps, which lands
+  in the sealed log as the trip's phrasebook, carrying its language so it is
+  read by the right voice later or by none. Listening is the browser's own
+  recogniser; speaking is the device's own voice first, then an optional
+  server voice (`SPEECH_*`), configured per language.
+
+## The rest
+
+**Bills** are the one place real money is named: a sealed ledger of what
+members say they paid and owe, never a payment rail, and never linked to a
+prediction. **Lingo**: members pick the dialect the app speaks to them in;
+all flavored copy lives in [`lingo.yaml`](lingo.yaml), `english` is the
+reference, and a dialect missing one of its fields fails the build. Rule
+errors and buttons stay plain in every lingo. **Sign-in** is passkeys
+(verified on `node:crypto`, no library) or Google; **recovery** from losing
+every passkey is an organiser-minted 30-minute link, announced on the
+members page and in a banner to the member it names; the console
+(`pnpm recovery:link`) is the failsafe under that. **Names** are distinct per
+trip so `@mentions` resolve. **Avatars** are an upload or a monogram seeded
+by member id.
+
+**The tests are the spec.** Each pure module carries its documentation as a
+test file beside it: `engine` (settlement, fuzz-tested zero-sum), `replay`
+(the rules of a sealed trip, fuzzed over adversarial logs), `views` (every
+page derived from replayed state), `stats` (outcomes, ROI, rivalries),
+`recommend` (For-you ranking and reason chips), `pies` (centi-pie math),
+`split` and `fx` (bills and the one-currency settlement), `crypto`, `keys`,
+`events`, `links`, `invites`, `rekeys`, `recovery` (sealing and every kind
+of link), `webauthn` and `cbor` (passkeys), `email`, `mentions`, `avatar`,
+`talk` (the pair, turn-taking, voices, the server voice map), `phrases`,
+`trips`, `starters`. `pnpm test` runs pure logic only — no UI tests, by
+design.
 
 **Vocabulary.** UI: *prediction, call, resolve, pool, pie*. Code and schema:
-`market`, `stake`, `settle*`, `amountC`. Keep them apart.
-
-**Lingo.** Members pick the dialect the app speaks to them in. All flavored
-copy lives in [`lingo.yaml`](lingo.yaml); `english` is the reference and a
-dialect missing one of its fields fails the build.
+`market`, `stake`, `settle*`, `amountC`. Keep them apart. Pies are never money
+and never near money: no purchase, no cash-out, no prize, no amount on a
+prediction — that is what keeps the game a social game under India's PROGA
+2025 and off the stores' gambling ratings.
 
 ## Stack
 
 Next.js 16 (App Router, server actions) · React 19 · TypeScript 7 ·
 Tailwind CSS 4 · Google OAuth (no auth library) · Postgres 18 · Drizzle ORM ·
 Biome · Vitest · pnpm 11 · Docker. Optional LLM (any Anthropic-compatible API)
-for prediction-draft polish and Thai interpreting; optional OpenAI-compatible
-`/audio` endpoint for speech.
+for prediction-draft polish and live interpreting; optional MiniMax
+`/v1/t2a_v2` endpoint for speech.
 
 ## Local development
 
@@ -146,8 +184,9 @@ list. Highlights:
 | `RANKED_MIN_RESOLVED` | Verdicts needed to appear ranked (default 5) |
 | `CONTACT_EMAIL` | Shown on `/privacy`: grievances, and verification requests |
 | `DB_PORT` / `APP_PORT` / `APP_BIND` / `PORT` | Database and HTTP ports |
-| `LLM_BASE_URL` / `LLM_API_KEY` / `LLM_MODEL` | Optional draft-polish and Thai interpreting endpoint (hidden when unset) |
+| `LLM_BASE_URL` / `LLM_API_KEY` / `LLM_MODEL` | Optional draft-polish and live interpreting endpoint (hidden when unset) |
 | `SPEECH_BASE_URL` / `SPEECH_API_KEY` | Optional voice for phones with none: MiniMax `/v1/t2a_v2` (hidden when unset) |
+| `SPEECH_VOICES` / `SPEECH_VOICE_US` / `SPEECH_VOICE_THEM` | Which voice says which language (`th=…,hi=…`), and the fallback per side; a language with no voice gets the device's or none. `pnpm speech:check` hears every language once |
 | `FX_BASE_URL` | Where the day's exchange rate comes from, for settling the whole trip in the home currency (currency-api shape; defaults to the public mirror) |
 
 Anyone can open an account (a passkey from the front page, or Google) and a
@@ -175,7 +214,7 @@ the repository can be private.
 `pnpm test` (pure logic only — no UI tests, by design) · `pnpm lint` ·
 `pnpm tsc --noEmit`. Pre-commit runs all three; CI
 (`.github/workflows/ci.yml`) runs them, builds an arm64 image to GHCR, and
-deploys.
+deploys. `pnpm lingo:gen` compiles `lingo.yaml` (`dev` and `build` run it).
 
 ## Deployment (OCI over SSH)
 
@@ -192,18 +231,31 @@ Configure a GitHub **environment named `oracle-cloud`**:
 | var | `OCI_SSH_PORT` | optional, defaults to 22 |
 | var | `DEPLOY_DIR` | server directory holding `docker-compose.yml` + `.env` |
 | secret | `OCI_SSH_KEY` | private key for the ssh user |
+| var / secret | every name in the configuration table above | the server's `.env` is rendered from these on each deploy (`ci.yml`); a blank one is unset |
 
 No registry credentials needed: the deploy job logs the server into GHCR with
 its ephemeral `GITHUB_TOKEN` (`packages: read`).
 
-One-time server setup: install Docker, create `DEPLOY_DIR` with this repo's
-`docker-compose.yml` and a production `.env` (strong `AUTH_SECRET` and
-`POSTGRES_PASSWORD`, real `AUTH_URL`, Google credentials),
-and point your reverse proxy at `127.0.0.1:${APP_PORT:-3000}`.
+One-time server setup: install Docker, create `DEPLOY_DIR`, and point your
+reverse proxy at `127.0.0.1:${APP_PORT:-3000}`; the deploy writes
+`docker-compose.yml` and `.env` there itself.
 
+Every release follows [`docs/launch/deploy-checklist.md`](docs/launch/deploy-checklist.md).
 Console scripts run from the image, which has no pnpm:
 
 ```sh
-docker compose run --rm migrate node scripts/stats.ts
-docker compose run --rm migrate node scripts/recovery-link.ts "<member>"
+docker compose run --rm migrate node scripts/stats.ts               # pnpm stats
+docker compose run --rm migrate node scripts/recovery-link.ts "<member>"  # pnpm recovery:link
+docker compose run --rm -v "$PWD/clips:/app/clips" migrate node scripts/speech-check.ts  # pnpm speech:check
 ```
+
+## Documents
+
+- [`AGENTS.md`](AGENTS.md) — the rules of the codebase, for anyone (or
+  anything) changing it.
+- [`docs/private-trips.md`](docs/private-trips.md) — the end-to-end
+  encryption design, and what shipped differently from it.
+- [`docs/gtm.md`](docs/gtm.md) — the go-to-market plan and the numbers to
+  watch; [`docs/launch/`](docs/launch/) — the deploy checklist and launch
+  copy; [`docs/research/`](docs/research/) — the research behind the plan.
+- [`docs/ideas.md`](docs/ideas.md) — the shelf.

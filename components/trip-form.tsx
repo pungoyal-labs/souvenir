@@ -53,7 +53,8 @@ export function TripForm({
   const held = useTripKey(initial?.id ?? "", initial?.epoch ?? 0);
   const { pending, error, act } = useAct();
   const [name, setName] = useState(initial?.name ?? "");
-  const [destination, setDestination] = useState(initial?.destination ?? "TH");
+  // A new trip starts on the picker's first line, which is popularity, not policy.
+  const [destination, setDestination] = useState(initial?.destination ?? DESTINATION_LIST[0].code);
   const [homeLanguage, setHomeLanguage] = useState(initial?.homeLanguage ?? DEFAULT_HOME_LANGUAGE);
   const [homeCurrency, setHomeCurrency] = useState<Currency>(
     (initial?.homeCurrency as Currency) ?? DEFAULT_HOME_CURRENCY,

@@ -19,8 +19,22 @@ import { CURRENCIES } from "./split.ts";
 /** Whose turn it is. `them` is always the local side. */
 export type Side = "us" | "them";
 
+/** Who is speaking, as far as a voice or a polite ending can tell. */
+export type Gender = "female" | "male";
+
 /** Which of a device's several voices for a language to reach for. */
-export type VoicePreference = "female" | "male";
+export type VoicePreference = Gender;
+
+/**
+ * A polite ending that depends on who is speaking, in a language that has
+ * one. `native` and `roman` are what the toggle shows; `prompt` is the rule
+ * the interpreter is given, written for that language and nothing else.
+ */
+export interface Particle {
+  native: string;
+  roman: string;
+  prompt: string;
+}
 
 export interface Speaker {
   /** Two-letter code, for the translator. */
@@ -29,6 +43,8 @@ export interface Speaker {
   tag: string;
   /** What to call it in a prompt, a heading, and a button. */
   language: string;
+  /** A greeting in it, for `pnpm speech:check` to hear a voice say. */
+  hello: string;
   /** Unicode script name, for telling one side's transcript from the other's. */
   script: string;
   /**
@@ -39,6 +55,13 @@ export interface Speaker {
    * plenty more do not say in the name which it is.
    */
   voice: VoicePreference;
+  /**
+   * Whether a polite sentence ends differently depending on who is speaking,
+   * and how. Thai does (ครับ/ค่ะ), and it is the first thing a listener
+   * notices; most languages do not, and offering the choice would be noise —
+   * so it is offered only where a speaker names its forms.
+   */
+  particles?: Record<Gender, Particle>;
 }
 
 export interface Pair {
@@ -46,12 +69,6 @@ export interface Pair {
   them: Speaker;
   /** Where this is happening, which is what makes a translation idiomatic. */
   place: string;
-  /**
-   * Whether the local language ends a polite sentence differently depending on
-   * who is speaking. Thai does (ครับ/ค่ะ), and it is the first thing a listener
-   * notices; most languages do not, and offering the choice would be noise.
-   */
-  particles: boolean;
   /** ISO 4217 lowercased, matching the bills schema. */
   currency: string;
 }
@@ -60,6 +77,7 @@ const EN: Speaker = {
   code: "en",
   tag: "en-IN",
   language: "English",
+  hello: "Hello, how are you?",
   script: "Latin",
   voice: "female",
 };
@@ -67,6 +85,7 @@ const HI: Speaker = {
   code: "hi",
   tag: "hi-IN",
   language: "Hindi",
+  hello: "नमस्ते, आप कैसे हैं?",
   script: "Devanagari",
   voice: "female",
 };
@@ -98,8 +117,7 @@ const dest = (
   currency: string,
   tz: string,
   them: Speaker,
-  particles = false,
-): Destination => ({ code, flag, place, currency, tz, them, particles });
+): Destination => ({ code, flag, place, currency, tz, them });
 
 /**
  * Where they are. Ordered by how often an Indian friend group goes there
@@ -107,19 +125,33 @@ const dest = (
  * line here, plus a line in lib/split.ts if its money is new.
  */
 export const DESTINATIONS: Record<string, Destination> = {
-  TH: dest(
-    "TH",
-    "🇹🇭",
-    "Thailand",
-    "thb",
-    "Asia/Bangkok",
-    { code: "th", tag: "th-TH", language: "Thai", script: "Thai", voice: "male" },
-    true,
-  ),
+  TH: dest("TH", "🇹🇭", "Thailand", "thb", "Asia/Bangkok", {
+    code: "th",
+    tag: "th-TH",
+    language: "Thai",
+    hello: "สวัสดีครับ สบายดีไหม",
+    script: "Thai",
+    voice: "male",
+    particles: {
+      male: {
+        native: "ครับ",
+        roman: "khráp",
+        prompt:
+          'The speaker is a man using the polite particle ครับ. End polite sentences with it, use ผม for "I", and questions take ครับ.',
+      },
+      female: {
+        native: "ค่ะ",
+        roman: "khâ",
+        prompt:
+          'The speaker is a woman using the polite particle ค่ะ. End polite sentences with it, use ฉัน for "I", and questions take คะ.',
+      },
+    },
+  }),
   AE: dest("AE", "🇦🇪", "Dubai & the UAE", "aed", "Asia/Dubai", {
     code: "ar",
     tag: "ar-AE",
     language: "Arabic",
+    hello: "مرحباً، كيف حالك؟",
     script: "Arabic",
     voice: "male",
   }),
@@ -127,6 +159,7 @@ export const DESTINATIONS: Record<string, Destination> = {
     code: "vi",
     tag: "vi-VN",
     language: "Vietnamese",
+    hello: "Xin chào, bạn khỏe không?",
     script: "Latin",
     voice: "female",
   }),
@@ -134,6 +167,7 @@ export const DESTINATIONS: Record<string, Destination> = {
     code: "id",
     tag: "id-ID",
     language: "Indonesian",
+    hello: "Halo, apa kabar?",
     script: "Latin",
     voice: "female",
   }),
@@ -141,6 +175,7 @@ export const DESTINATIONS: Record<string, Destination> = {
     code: "ms",
     tag: "ms-MY",
     language: "Malay",
+    hello: "Hai, apa khabar?",
     script: "Latin",
     voice: "female",
   }),
@@ -148,6 +183,7 @@ export const DESTINATIONS: Record<string, Destination> = {
     code: "si",
     tag: "si-LK",
     language: "Sinhala",
+    hello: "ආයුබෝවන්, කොහොමද?",
     script: "Sinhala",
     voice: "female",
   }),
@@ -156,6 +192,7 @@ export const DESTINATIONS: Record<string, Destination> = {
     code: "ja",
     tag: "ja-JP",
     language: "Japanese",
+    hello: "こんにちは、お元気ですか？",
     script: "Han",
     voice: "female",
   }),
@@ -163,6 +200,7 @@ export const DESTINATIONS: Record<string, Destination> = {
     code: "ne",
     tag: "ne-NP",
     language: "Nepali",
+    hello: "नमस्ते, तपाईंलाई कस्तो छ?",
     script: "Devanagari",
     voice: "female",
   }),
@@ -170,6 +208,7 @@ export const DESTINATIONS: Record<string, Destination> = {
     code: "ka",
     tag: "ka-GE",
     language: "Georgian",
+    hello: "გამარჯობა, როგორ ხართ?",
     script: "Georgian",
     voice: "female",
   }),
@@ -177,6 +216,7 @@ export const DESTINATIONS: Record<string, Destination> = {
     code: "ru",
     tag: "ru-RU",
     language: "Russian",
+    hello: "Здравствуйте, как дела?",
     script: "Cyrillic",
     voice: "female",
   }),
@@ -184,6 +224,7 @@ export const DESTINATIONS: Record<string, Destination> = {
     code: "fil",
     tag: "fil-PH",
     language: "Filipino",
+    hello: "Kumusta ka?",
     script: "Latin",
     voice: "female",
   }),
@@ -192,6 +233,7 @@ export const DESTINATIONS: Record<string, Destination> = {
     code: "km",
     tag: "km-KH",
     language: "Khmer",
+    hello: "សួស្តី សុខសប្បាយទេ?",
     script: "Khmer",
     voice: "female",
   }),
@@ -199,6 +241,7 @@ export const DESTINATIONS: Record<string, Destination> = {
     code: "lo",
     tag: "lo-LA",
     language: "Lao",
+    hello: "ສະບາຍດີ, ສະບາຍດີບໍ?",
     script: "Lao",
     voice: "female",
   }),
@@ -208,6 +251,7 @@ export const DESTINATIONS: Record<string, Destination> = {
     code: "fr",
     tag: "fr-FR",
     language: "French",
+    hello: "Bonjour, comment allez-vous ?",
     script: "Latin",
     voice: "female",
   }),
@@ -215,6 +259,7 @@ export const DESTINATIONS: Record<string, Destination> = {
     code: "it",
     tag: "it-IT",
     language: "Italian",
+    hello: "Buongiorno, come sta?",
     script: "Latin",
     voice: "female",
   }),
@@ -222,6 +267,7 @@ export const DESTINATIONS: Record<string, Destination> = {
     code: "es",
     tag: "es-ES",
     language: "Spanish",
+    hello: "Hola, ¿cómo está?",
     script: "Latin",
     voice: "female",
   }),
@@ -289,13 +335,25 @@ export function speakerOf(pair: Pair, side: Side): Speaker {
   return side === "us" ? pair.us : pair.them;
 }
 
-/** The polite ending, where the local language has one. */
-export type Particle = "khrap" | "kha";
-
-export const PARTICLES: Record<Particle, { native: string; roman: string }> = {
-  khrap: { native: "ครับ", roman: "khráp" },
-  kha: { native: "ค่ะ", roman: "khâ" },
-};
+/**
+ * A deploy's server-side voices, one per language, from a spec like
+ * `th=Thai_male_1_sample8,hi=hindi_female_1_v2`. Which voice says which
+ * language is configuration: the ids are one vendor's catalogue, checked
+ * against that vendor, and nothing in code should know them. Blank and
+ * malformed entries are dropped rather than refused — a missing voice costs
+ * the server's fallback for that side, never the page.
+ */
+export function serverVoices(spec: string): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const entry of spec.split(",")) {
+    const eq = entry.indexOf("=");
+    if (eq === -1) continue;
+    const code = entry.slice(0, eq).trim().toLowerCase();
+    const voice = entry.slice(eq + 1).trim();
+    if (code && voice) out[code] = voice;
+  }
+  return out;
+}
 
 /** Longest utterance sent — about a minute of speech, well past a sentence. */
 export const MAX_UTTERANCE = 1000;
@@ -365,9 +423,9 @@ export interface Voice {
  * and nothing else — so the name is all there is to read. Chrome and Windows
  * put the word in ("Google UK English Female", "Microsoft Heera"); Apple uses
  * first names; Android frequently says neither, and those are left alone
- * rather than guessed at. Only the names for the languages this app has any
- * business speaking are listed, and being wrong about one costs a preference,
- * not a voice.
+ * rather than guessed at. The lists are the names met so far, not a catalogue:
+ * a voice whose name is not here still gets picked for its language, and being
+ * wrong about one costs a preference, not a voice.
  */
 const FEMALE_NAMES =
   /\b(veena|isha|heera|kanya|kalpana|lekha|swara|neerja|shruti|aditi|priya|raveena|ananya|premwadee|achara)\b/;
@@ -385,7 +443,7 @@ function genderOf(name: string): VoicePreference | null {
 /**
  * The best voice on this device for a language, or null when it has none.
  *
- * Browsers disagree about all of it: the tag can be `th-TH`, `th_TH` or `th`,
+ * Browsers disagree about all of it: a tag can be `xx-XX`, `xx_XX` or `xx`,
  * names differ between devices, and a phone with no voice for a language just
  * omits it. Region match first, then the language, then the voice the group
  * asked for where the device says which is which, then one that lives on the

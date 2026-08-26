@@ -62,15 +62,20 @@ const envSchema = z.object({
   SPEECH_API_KEY: z.string().optional(),
   SPEECH_TTS_MODEL: z.string().default("speech-2.6-turbo"),
   /**
-   * MiniMax's voice per side, which it can have because its
-   * voices are cross-lingual: `language_boost` says which language the words
-   * are in and the voice reads them in its own accent. So the group's own side
-   * is read by an Indian woman rather than an American one, and the local side
-   * by a Thai man — deliberately not the same person twice, because the whole
-   * point of the page is that two people are talking.
+   * Which MiniMax voice says which language: `th=Thai_male_1_sample8,hi=…`,
+   * one entry per language code a trip can speak (lib/talk.ts). Its voices
+   * are cross-lingual — `language_boost` says which language the words are in
+   * and the voice reads them in its own accent — so a language with no entry
+   * falls back to the side's voice below: the group's own side to an Indian
+   * voice rather than an American one, and the local side to whatever
+   * `SPEECH_VOICE_THEM` names, or to nothing, since a deploy serves trips to
+   * many places and no one voice is the local one everywhere. Deliberately
+   * never the same person on both sides: the whole point of the page is that
+   * two people are talking.
    */
+  SPEECH_VOICES: z.string().default(""),
   SPEECH_VOICE_US: z.string().default("hindi_female_1_v2"),
-  SPEECH_VOICE_THEM: z.string().default("Thai_male_1_sample8"),
+  SPEECH_VOICE_THEM: z.string().optional(),
   /**
    * How the local side is delivered. Semitones down and a little under speed:
    * lower and slower than the voice's own register, which is what carries
@@ -93,6 +98,11 @@ const envSchema = z.object({
     .transform((u) => u.replace(/\/+$/, "")),
 });
 
-export const env = envSchema.parse(process.env);
+// A blank line (`SPEECH_VOICE_THEM=`) is the variable not set, not set to
+// nothing: the deploy renders every known name from the GitHub environment and
+// leaves the unused ones empty, and a default or `optional()` must still hold.
+const present = Object.fromEntries(Object.entries(process.env).filter(([, v]) => v !== ""));
+
+export const env = envSchema.parse(present);
 
 export type Env = typeof env;

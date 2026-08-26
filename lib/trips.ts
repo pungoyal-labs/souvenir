@@ -25,6 +25,8 @@ export const MAX_STAKE_CEILING = 100;
 /** What an Indian group settles in, unless the organiser says otherwise. */
 export const DEFAULT_HOME_CURRENCY: Currency = "inr";
 export const DEFAULT_HOME_LANGUAGE = "en";
+/** The clock a trip's days run on when its destination is one this app no longer knows. */
+export const DEFAULT_HOME_TZ = "Asia/Kolkata";
 
 export interface TripInput {
   destination: string;
@@ -160,7 +162,7 @@ export function daysBetween(a: string, b: string): number {
  * back to home when the destination is one this app no longer knows.
  */
 export function tripToday(trip: { destination: string }, now: Date = new Date()): string {
-  return isoDay(now, DESTINATIONS[trip.destination]?.tz ?? "Asia/Kolkata");
+  return isoDay(now, DESTINATIONS[trip.destination]?.tz ?? DEFAULT_HOME_TZ);
 }
 
 /** "2026-11-06" for the member's clock — dates on trips are calendar days. */

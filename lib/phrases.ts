@@ -12,10 +12,11 @@
 // ones was saved last. It is unique per member and per member only; two people
 // keeping their own "taxi" is two phrases, not a collision.
 //
-// A saved phrase carries the language it is in, because the pair is deployment
-// configuration and configuration moves. A Thai line replayed after the group
-// flies to India must still be read by a Thai voice, or not read at all —
-// never handed to whatever voice happens to be configured now.
+// A saved phrase carries the language it is in, because the pair is the trip's
+// configuration and configuration moves. A line kept on one trip and replayed
+// on one pointed somewhere else must still be read by a voice for its own
+// language, or not read at all — never handed to whatever voice the pair
+// happens to name now.
 //
 // Pure data in, pure data out; lib/data.ts does the I/O.
 
@@ -113,7 +114,7 @@ export interface PhraseVoice {
   side: Side | null;
 }
 
-/** Browsers spell a tag `th-TH`, `th_TH` or `th`; all three mean Thai. */
+/** Browsers spell a tag `xx-XX`, `xx_XX` or `xx`; all three mean the same language. */
 function sameTag(a: string, b: string): boolean {
   const norm = (t: string) => t.toLowerCase().replace("_", "-").split("-")[0];
   return norm(a) === norm(b);

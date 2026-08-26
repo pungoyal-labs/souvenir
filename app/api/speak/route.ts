@@ -31,7 +31,7 @@ export async function POST(request: Request) {
   if (!pair) return new Response("Not on that trip.", { status: 403 });
 
   try {
-    const spoken = await say(text.slice(0, MAX_UTTERANCE), speakerOf(pair, side).language, side);
+    const spoken = await say(text.slice(0, MAX_UTTERANCE), speakerOf(pair, side), side);
     return new Response(spoken.bytes, {
       headers: {
         "Content-Type": spoken.contentType,

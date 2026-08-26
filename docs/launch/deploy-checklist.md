@@ -1,10 +1,59 @@
-# Deploy checklist for the trips release
+# Deploy checklist
 
-This release changes the schema (migrations 0017 and 0018). Pushing to `main` runs CI, builds the image, and runs the one-shot `migrate` service against the live database before the app restarts.
+Pushing to `main` is the deploy: CI runs the gates, builds one arm64 image,
+and over SSH pulls it on the box and runs `docker compose up -d` — the
+one-shot `migrate` service against the live database, then `app`
+(`README.md`, *Deployment*). The box's `.env` is **rendered on every deploy
+from the GitHub environment `oracle-cloud`** (`.github/workflows/ci.yml`):
+a variable lives there or nowhere, and editing the file on the box lasts
+until the next push. Nothing here needs a hand on the running containers;
+what needs a hand is that environment, and a backup when the schema moves.
 
-1. **Back up.** `docker exec chiang-pai-db-1 pg_dump -U chiangpai chiangpai > backup-$(date +%F).sql` on the box. The migration is forward-only.
-2. **Check the live `.env`.** Remove `FOUNDING_MEMBERS`, `MAX_STAKE_PIES`, `GROUP_LANGUAGE`, `GROUP_DESTINATION` (they are ignored now, harmless if left). `RANKED_MIN_RESOLVED` stays. `AUTH_URL` must be the public https hostname.
-3. **Push.** The migration turns the existing table into trip `chiang-mai` ("Chiang Mai", Thailand, INR home, THB foreign), founders into organisers, and everything else into that trip. Rename it from `/t/chiang-mai/settings`.
-4. **Verify.** `pnpm stats` inside the app container (or `node scripts/stats.ts`) should show 1 trip with everyone on it; the old bookmarks (`/members`, `/bills`, `/talk`) redirect to `/trips`.
-5. **Google console.** Add `/privacy` and `/terms` URLs to the OAuth consent screen.
-6. **Tell the group.** Everyone sees a one-time "I'm 18+ and I agree" bar; that is the terms gate for members who predate it.
+## Every release
+
+1. **Read the diff for two things**: a new migration under `drizzle/`, and
+   a new or changed variable in `lib/env.ts` (`.env.example` documents each).
+2. **Migration?** Back up first — `docker exec chiang-pai-db-1 pg_dump -U chiangpai chiangpai > backup-$(date +%F).sql` on the box. Migrations are forward-only, and some have been destructive (`docs/private-trips.md` §7).
+3. **New variable?** Add it to `ci.yml`'s `.env` heredoc and set it in the
+   `oracle-cloud` environment *before* pushing; a required one missing stops
+   the app at boot (`lib/env.ts` refuses to start), an optional one missing
+   silently hides its feature. A blank value is the same as unset.
+4. **Push `main`.** Watch the Actions run to the deploy job.
+5. **Verify**: the footer names the new build (`GIT_SHA`);
+   `docker compose run --rm migrate node scripts/stats.ts` still reads the
+   trips; open the live trip on a phone that holds the key.
+
+## This release — destinations, no country in code
+
+No migration. Production has never had a server voice (`SPEECH_*` was not in
+the rendered `.env`), so the talk page speaks with the phone's own voice and
+says so where a phone has none. This release makes the server voice per
+language and puts its variables in the deploy; turning it on is optional and
+can happen after the push:
+
+- In the `oracle-cloud` environment: var `SPEECH_BASE_URL`
+  (`https://api.minimax.io`), secret `SPEECH_API_KEY` (the same key as
+  `LLM_API_KEY`), var `SPEECH_VOICES=th=Thai_male_1_sample8` (one entry per
+  language a live trip speaks), and var `SPEECH_VOICE_THEM` naming one voice
+  as the fallback for every other language — without it a language with no
+  entry gets the device's voice or none. `POST /v1/get_voice` lists the
+  account's voices. Then redeploy (re-run the deploy job, or push).
+- **Check before anyone hears it**: `pnpm speech:check` with the production
+  `SPEECH_*` in a local `.env` asks the service for a greeting in every
+  language a trip can speak, one clip per language under `clips/`, and
+  fails on any the vendor refuses. Play the clips. On the box:
+  `docker compose run --rm -v "$PWD/clips:/app/clips" migrate node scripts/speech-check.ts`.
+- On the Thailand trip's `/talk`: the ครับ/ค่ะ toggle shows, a turn
+  interprets, and on a phone with no Thai voice the server speaks — or the
+  page says it couldn't.
+
+## Earlier releases, for the record
+
+- **Trips release** (migrations 0017–0018): the one table became trip
+  `chiang-mai`, founders became organisers; `FOUNDING_MEMBERS`,
+  `MAX_STAKE_PIES`, `GROUP_LANGUAGE`, `GROUP_DESTINATION` left `.env`;
+  `/privacy` and `/terms` were added to the Google OAuth consent screen; the
+  18+ bar appeared once for members who predated it.
+- **Private trips** (0019–0028): the cutovers are recorded in
+  `docs/private-trips.md` §7, including the `pg_dump` before `0022` dropped
+  the plaintext tables.

@@ -157,7 +157,7 @@ export interface BillForNets {
 /**
  * Replay bills into per-currency nets: positive means the group owes them,
  * negative means they owe the group. Zero-sum per currency by construction.
- * INR and THB never mix — there is no exchange rate here.
+ * Two currencies never mix — there is no exchange rate here (lib/fx.ts is the bridge).
  */
 export function nets(bills: BillForNets[]): Map<Currency, Map<string, number>> {
   const byCurrency = new Map<Currency, Map<string, number>>();

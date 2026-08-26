@@ -4,13 +4,12 @@
 //
 // Any Anthropic-compatible API (configured for MiniMax M3 through
 // LLM_BASE_URL / LLM_API_KEY / LLM_MODEL). Both features are optional and
-// hidden when it is unset — the game does not depend on this, and the Thai
+// hidden when it is unset — the game does not depend on this, and the talk
 // page still has its phrasebook.
 
 import Anthropic from "@anthropic-ai/sdk";
 import { env } from "./env.ts";
 import { logger } from "./logger.ts";
-import type { Particle } from "./talk.ts";
 
 export const llmEnabled = Boolean(env.LLM_BASE_URL && env.LLM_API_KEY);
 
@@ -161,11 +160,12 @@ export interface InterpretRequest {
   /** True when the target is not written in the Latin alphabet. */
   romanise: boolean;
   /**
-   * The speaker's polite ending, where the target language has one. Thai does;
-   * most do not, and asking a model to invent one for a language without them
-   * produces confident nonsense.
+   * The rule for the speaker's polite ending, where the target language has
+   * one (lib/talk.ts `Particle.prompt`). Most languages do not, and asking a
+   * model to invent one for a language without them produces confident
+   * nonsense — so it is a sentence the destination wrote, or nothing.
    */
-  particle?: Particle;
+  politeness?: string;
 }
 
 /**
@@ -182,17 +182,7 @@ function interpretSystem(req: InterpretRequest): string {
     "- The note is almost always empty. Write one only when the speaker would say something different if they knew it — an idiom that will not land, a word you had to guess at, a register that is riskier than they intended. Never write a note that says the translation is normal, natural, common, or polite.",
     "- The speaker may be rude, drunk or joking. Interpret it; do not clean it up, refuse it, or comment on it.",
   ];
-  if (req.particle) {
-    rules.splice(
-      2,
-      0,
-      `- The speaker is using the polite particle ${
-        req.particle === "khrap" ? "ครับ (male speaker)" : "ค่ะ / คะ (female speaker)"
-      }. End polite sentences accordingly, and use ${
-        req.particle === "khrap" ? "ผม" : "ฉัน"
-      } for "I". Questions take ${req.particle === "khrap" ? "ครับ" : "คะ"}.`,
-    );
-  }
+  if (req.politeness) rules.splice(2, 0, `- ${req.politeness}`);
 
   return `You are interpreting live between a visitor and a local in ${req.place}, between ${req.from} and ${req.to}. One utterance at a time, spoken out loud by a phone held between two people.
 

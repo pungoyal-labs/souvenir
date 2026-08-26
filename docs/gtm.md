@@ -29,6 +29,7 @@
 - **The growth artifact.** `/card/[marketId]`: a public verdict card with an OG image built for WhatsApp, reachable from every resolved prediction with a share-sheet button and a `wa.me` link.
 - **Legal floor.** 18+ gate at every sign-up path; `/terms` and `/privacy` drafted against PROGA 2025, DPDP 2023/Rules 2025, GDPR; account deletion that scrubs identity and keeps the append-only ledger; no third-party cookies or analytics.
 - **Private trips.** Every prediction, call, comment, bill, kept phrase and the trip's own name is encrypted on the phone under a key the server never holds; the key rides in the invite link's fragment, moves between members over short-lived key links, and is backed up under each passkey's PRF secret. The plaintext tables are gone. `/privacy` states what is sealed and what is not, plainly.
+- **Twenty-one destinations, one line each.** A trip is pointed at a place (`lib/talk` `DESTINATIONS`: Thailand, Vietnam, Bali, Dubai, Sri Lanka, Japan, Nepal, the UK, the US, Europe, India for the domestic ring…), and that line decides the local language and voice, the foreign currency, and the clock the trip's days run on. Nothing in code is about any one country. `/talk` interprets between the group's language and the local one, with a phrasebook the trip keeps; a two-currency trip settles in the home currency at the day's rate plus a forex charge, never through a payment rail.
 - **PWA.** Manifest, icons, Apple home-screen metadata. No store needed.
 - **Instrumentation.** `pnpm stats`: members, trips, mean roster, and the number that decides everything — *invited → founded* (how many people who arrived by somebody's link went on to open their own trip).
 
@@ -76,7 +77,7 @@ If founding rate is under 10% at day 90, the loop is not compounding; the fix is
 
 ### Days 0–7 — ship it (done in this commit, minus deploy)
 - [x] Multi-trip rewrite, migration, legal pages, landing, card, recap, PWA, stats.
-- [ ] **Deploy** (you): merge → push to `main`; CI builds and runs the `migrate` service against the live database. The migration was verified on a copy of the old schema with representative data. Back up the database first (`pg_dump`) — the migration is forward-only.
+- [x] **Deploy**: pushed to `main`; CI built and ran the `migrate` service against the live database, and Trip #1 was sealed on 25 Aug 2026 (`docs/private-trips.md` §7). Every later release follows `docs/launch/deploy-checklist.md`.
 - [ ] Set `AUTH_URL` to the public hostname so passkeys work (they already do on the live box).
 - [x] Grievance address: set `CONTACT_EMAIL` in the `oracle-cloud` environment; `/privacy` shows it (and uses it for verification requests).
 - [ ] Google OAuth consent screen: app name, privacy URL, terms URL.

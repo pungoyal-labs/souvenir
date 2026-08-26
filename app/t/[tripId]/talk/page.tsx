@@ -5,7 +5,7 @@ import { lingoOf } from "@/lib/lingo";
 import { llmEnabled } from "@/lib/llm";
 import { routes } from "@/lib/routes";
 import { requireTrip } from "@/lib/session";
-import { speakEnabled } from "@/lib/speech";
+import { canSay } from "@/lib/speech";
 import { pairFor } from "@/lib/talk";
 
 // The one page pointed at somebody outside the group. Nothing here is recorded
@@ -39,7 +39,11 @@ export default async function TalkPage({ params }: { params: Promise<{ tripId: s
       </h1>
       <p className="mb-6 mt-1 text-sm text-soft">{t.talkSub(pair.them.language)}</p>
       <Sealed>
-        <Talk pair={pair} canInterpret={llmEnabled} serverSpeaks={speakEnabled} />
+        <Talk
+          pair={pair}
+          canInterpret={llmEnabled}
+          serverSpeaks={{ us: canSay(pair.us, "us"), them: canSay(pair.them, "them") }}
+        />
       </Sealed>
     </div>
   );

@@ -16,9 +16,12 @@ adds to it), `lib/talk` (the language pair, turn-taking, voice choice),
 `lib/phrases` (kept phrases: slugs and which voice says one again),
 `lib/trips` (what a trip is: its two currencies, its phase, its rules),
 `lib/starters` (the first predictions a trip offers),
-`lib/crypto` (sealing: envelopes, blobs, link wraps), `lib/keys` (a member's
-keyring and the links that carry keys), `lib/events` (what a member can do on
-a sealed trip), `lib/replay` (the rules of a sealed trip, run on every phone).
+`lib/split` (bills: shares, nets, the fewest transfers), `lib/fx` (the whole
+trip settled in the home currency at the day's rate), `lib/mentions`
+(`@name` resolution), `lib/crypto` (sealing: envelopes, blobs, link wraps),
+`lib/keys` (a member's keyring and the links that carry keys), `lib/events`
+(what a member can do on a sealed trip), `lib/replay` (the rules of a sealed
+trip, run on every phone).
 Read the test before changing a module; change them together.
 
 ## Commands (pnpm 11)
@@ -37,6 +40,9 @@ Read the test before changing a module; change them together.
   derived straight from the database
 - `pnpm recovery:link "<name or id>"` — break-glass recovery link, straight
   against the database, for when no organiser can sign in either
+- `pnpm speech:check` — asks the voice service (`SPEECH_*`) for a greeting
+  in every language a trip can speak, one clip each under `clips/`, and
+  fails on any it refuses; the only way to know a destination speaks
 - `pnpm lingo:gen` — compile `lingo.yaml` → `lib/lingo.data.ts` (`dev` and
   `build` run it for you)
 
@@ -97,9 +103,10 @@ Pre-commit (husky): biome on staged files, tsc, full test suite.
   lowered once the trip has an event (`updateTrip`); raising is fine.
 - **A trip is the tenant and the season.** `trips` holds the name, the
   destination, the home language, the two currencies, the dates, and the cap;
-  `memberships` holds who is on it and with which role. Markets, ledger rows,
-  bills, invites, and phrases all carry `trip_id`; reactions and
-  comments reach the trip through their market or bill. Every read in
+  `memberships` holds who is on it and with which role. Events, invites,
+  recoveries, rekeys and cards all carry `trip_id`; everything a member
+  writes — predictions, calls, comments, reactions, bills, phrases — is an
+  event on that log. Every read in
   `lib/data.ts` takes a `tripId` or finds one through an id, and every write
   checks the caller's membership there — not in the UI, which anyone can
   bypass with a POST. Pages under `/t/[tripId]` start with `requireTrip`,
@@ -155,12 +162,12 @@ Pre-commit (husky): biome on staged files, tsc, full test suite.
   before scale. Account deletion (`deleteAccount`) scrubs everything
   identifying in one transaction and leaves the ledger rows under "Departed
   member", because append-only means a payout cannot vanish.
-- **Private trips** (end-to-end encryption) are being built to
+- **Private trips** (end-to-end encryption) were built to
   `docs/private-trips.md` — read it before touching invites, recovery, the
-  log, or `lib/data.ts`. Phases 1, 2 and 4 sealed everything a trip holds
-  and gave the keyring a passkey backup; key rotation on leaving (Phase 3)
-  and the verifiable client (Phase 5) are still to come. Do not add a
-  plaintext content column.
+  log, keys, or `lib/data.ts`. Every phase has shipped: the sealed log, the
+  sealed name and phrasebook, member keys and rotation on leaving, the
+  passkey backup, and the attested build. The document records what
+  differed from the plan and why. Do not add a plaintext content column.
 - `lib/env.ts` is the only file reading `process.env` (zod-validated).
 - Relative imports in `lib/` and `scripts/` carry explicit `.ts` extensions so
   plain `node scripts/*.ts` runs (Node type stripping).
@@ -248,8 +255,9 @@ Pre-commit (husky): biome on staged files, tsc, full test suite.
   whether a member asked for it by tapping, one row per tap. Never widen it
   into saving turns automatically.
   A kept phrase carries the language it is in (`language`, `tag`) because the
-  pair is configuration and configuration moves: a Thai line replayed after
-  the group has flown home is read by a Thai voice or by none — `voiceFor`
+  pair is configuration and configuration moves: a line kept on one trip and
+  replayed on one pointed elsewhere is read by a voice for its own language
+  or by none — `voiceFor`
   refuses the voice service a side it can no longer tell the truth about,
   since that service is told a side and looks the language up itself.
   Which two languages is the trip's configuration, not code: `homeLanguage`
@@ -266,9 +274,17 @@ Pre-commit (husky): biome on staged files, tsc, full test suite.
   Who speaks is two settings, not one. On the device, `pickVoice` reads the
   voice's *name* for a gender — the API offers no other clue — and prefers the
   one the `Speaker` asks for, below the language and never instead of it. On
-  the server, MiniMax voices are cross-lingual, so each side gets its own
-  (`SPEECH_VOICE_US` / `SPEECH_VOICE_THEM`, plus pitch and speed for the local
-  side). Check a voice id against `POST /v1/get_voice` before setting it.
+  the server, MiniMax voices are cross-lingual and one deploy serves trips to
+  many places, so the voice is per language (`SPEECH_VOICES`, `th=…,hi=…`),
+  with a fallback per side (`SPEECH_VOICE_US` / `SPEECH_VOICE_THEM`) and
+  pitch and speed for the local side; a language with no voice gets the
+  device's or none (`canSay`), and one the server tries and fails is said
+  on the page, never swallowed. `language_boost` is the vendor's own list
+  of language names (`lib/speech.ts` `BOOSTS`) and `auto` beyond it; a
+  new destination is checked by `pnpm speech:check`, which says its
+  `hello`. Check a voice id against `POST /v1/get_voice` before setting
+  it. Nothing in code names a destination: no currency, zone, voice,
+  particle or default outside its line in `DESTINATIONS`.
   Listening is the browser's own recogniser and nothing else: it is the only
   one there is, solid on Android Chrome and missing on some iPhones, and where
   it is missing the page says so and offers typing. Never add a server
@@ -278,9 +294,11 @@ Pre-commit (husky): biome on staged files, tsc, full test suite.
   `SPEECH_BASE_URL`, which is MiniMax's `/v1/t2a_v2` and nothing else; a
   deploy with no `SPEECH_*` set has only the device's voice, and the page
   says so where a phone has none.
-  Thai politeness needs the speaker's gender and this schema refuses to hold
-  it, so ครับ/ค่ะ is a toggle on the page, shown only where the destination
-  language has particles at all.
+  Some languages end a polite sentence by the speaker's gender (Thai's
+  ครับ/ค่ะ) and this schema refuses to hold it, so it is a toggle on the page,
+  shown only where the destination's speaker names its `particles` — each
+  form with the prompt line the interpreter is given, so `lib/llm` knows no
+  language.
   A lingo is how the app talks *to a member*; the destination language is how a
   member talks to a stranger. Do not add one to `lingo.yaml` — it would owe all
   47 fields and would be roasting the wrong person.

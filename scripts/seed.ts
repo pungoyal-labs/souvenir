@@ -8,6 +8,7 @@ import { db } from "../lib/db/index.ts";
 import { events, memberships } from "../lib/db/schema.ts";
 import type { EventPayload } from "../lib/events.ts";
 import { sealName } from "../lib/keys.ts";
+import type { Currency } from "../lib/split.ts";
 import { printKeyLinks, sealedRow, tripKey } from "./sealed-log.ts";
 
 async function main() {
@@ -134,7 +135,7 @@ async function main() {
     kind: "expense",
     onDate: "2026-11-06",
     description: "Hotel deposit, Nimman",
-    currency: "thb",
+    currency: (trip.foreignCurrency ?? trip.homeCurrency) as Currency,
     split: "equal",
     entries: everyone.map((m) => ({
       memberId: m.id,

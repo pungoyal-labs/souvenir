@@ -24,8 +24,8 @@ import {
 import {
   appendTurn,
   clampUtterance,
+  type Gender,
   otherSide,
-  PARTICLES,
   type Pair,
   type Particle,
   pickVoice,
@@ -74,13 +74,14 @@ export function Talk({
   pair: Pair;
   canInterpret: boolean;
   /** A voice service is configured, for phones with no voice of their own. */
-  serverSpeaks: boolean;
+  serverSpeaks: Record<Side, boolean>;
 }) {
   const { tripId, me, t, state, append } = useOpenTrip();
   // Organisers can drop anybody's phrase; everyone else only their own.
   const organiser = me.role === "organiser";
   const kept = phrasesOf(state);
-  const [particle, setParticle] = useState<Particle>("khrap");
+  // Who is speaking, for a local language whose polite ending depends on it.
+  const [speaking, setSpeaking] = useState<Gender>("male");
   const [turns, setTurns] = useState<Turn[]>([]);
   const [listening, setListening] = useState<Side | null>(null);
   const [partial, setPartial] = useState("");
@@ -110,7 +111,7 @@ export function Talk({
 
   const deviceVoice = pickVoice(voices, pair.them.tag, pair.them.voice);
   const note = warning(
-    { listen: canListen, speak: deviceVoice !== null || serverSpeaks },
+    { listen: canListen, speak: deviceVoice !== null || serverSpeaks.them },
     pair.them.language,
   );
   const busy = listening !== null || thinking;
@@ -135,18 +136,23 @@ export function Talk({
       return;
     }
     // The voice service is told a side and looks the language up itself, so a
-    // phrase kept somewhere this deploy no longer goes has nothing true to tell it.
-    if (!serverSpeaks || !target.side) return;
-    const response = await fetch("/api/speak", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ tripId, text, side: target.side }),
-    });
-    if (!response.ok) return;
-    const url = URL.createObjectURL(await response.blob());
-    const audio = new Audio(url);
-    audio.onended = () => URL.revokeObjectURL(url);
-    await audio.play().catch(() => URL.revokeObjectURL(url));
+    // phrase kept somewhere this trip no longer goes has nothing true to tell it.
+    if (!target.side || !serverSpeaks[target.side]) return;
+    try {
+      const response = await fetch("/api/speak", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tripId, text, side: target.side }),
+      });
+      if (!response.ok) throw new Error(String(response.status));
+      const url = URL.createObjectURL(await response.blob());
+      const audio = new Audio(url);
+      audio.onended = () => URL.revokeObjectURL(url);
+      await audio.play().catch(() => URL.revokeObjectURL(url));
+    } catch {
+      // Silence would look like nothing was said; the words are on screen.
+      setError("Couldn't say that out loud. Show them the screen.");
+    }
   };
 
   const replay = (turn: Turn) => speak(turn.said, sideVoice(otherSide(turn.side)));
@@ -162,7 +168,7 @@ export function Talk({
     const to = otherSide(from);
     setThinking(true);
     try {
-      const result = await interpretAction(tripId, utterance, to, particle);
+      const result = await interpretAction(tripId, utterance, to, speaking);
       if (!result.ok || !result.said) {
         setError(result.error ?? "That didn't come back.");
         return;
@@ -347,27 +353,29 @@ export function Talk({
 
   return (
     <div className="space-y-4">
-      {pair.particles && (
+      {pair.them.particles && (
         <div className="flex flex-wrap items-center justify-center gap-2">
           <span className="text-[11px] font-semibold uppercase tracking-wider text-soft">
             You end sentences with
           </span>
           <div className="flex overflow-hidden rounded-md border border-line">
-            {(Object.keys(PARTICLES) as Particle[]).map((key) => (
-              <button
-                key={key}
-                type="button"
-                onClick={() => setParticle(key)}
-                className={`px-3 py-1.5 text-sm ${
-                  particle === key ? "bg-felt text-[#f1eee4]" : "bg-surface hover:bg-paper"
-                }`}
-              >
-                <span lang={pair.them.code} className="font-semibold">
-                  {PARTICLES[key].native}
-                </span>
-                <span className="mono ml-1.5 text-xs opacity-70">{PARTICLES[key].roman}</span>
-              </button>
-            ))}
+            {(Object.entries(pair.them.particles) as [Gender, Particle][]).map(
+              ([who, particle]) => (
+                <button
+                  key={who}
+                  type="button"
+                  onClick={() => setSpeaking(who)}
+                  className={`px-3 py-1.5 text-sm ${
+                    speaking === who ? "bg-felt text-[#f1eee4]" : "bg-surface hover:bg-paper"
+                  }`}
+                >
+                  <span lang={pair.them.code} className="font-semibold">
+                    {particle.native}
+                  </span>
+                  <span className="mono ml-1.5 text-xs opacity-70">{particle.roman}</span>
+                </button>
+              ),
+            )}
           </div>
         </div>
       )}

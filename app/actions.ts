@@ -84,7 +84,7 @@ import { routes } from "@/lib/routes";
 import { currentMember } from "@/lib/session";
 import {
   clampUtterance,
-  type Particle,
+  type Gender,
   pairFor,
   type Side as TalkSide,
   worthSaying,
@@ -308,7 +308,7 @@ export async function interpretAction(
   tripId: string,
   text: string,
   to: TalkSide,
-  particle: Particle,
+  speaking: Gender,
 ): Promise<ActionResult & { said?: Interpretation }> {
   const memberId = await requireMemberId();
   if (!llmEnabled) {
@@ -330,7 +330,8 @@ export async function interpretAction(
       from: source.language,
       place: pair.place,
       romanise: target.script !== "Latin",
-      particle: to === "them" && pair.particles ? particle : undefined,
+      // The polite ending is the destination's, keyed by who is speaking.
+      politeness: to === "them" ? pair.them.particles?.[speaking]?.prompt : undefined,
     });
     return { ok: true, said };
   } catch (err) {

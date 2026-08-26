@@ -15,6 +15,7 @@ import {
   pickVoice,
   resolvePair,
   type Side,
+  serverVoices,
   sideOf,
   speakerOf,
   type Turn,
@@ -35,7 +36,22 @@ describe("the pair", () => {
     expect(THAI.them.tag).toBe("th-TH");
     expect(THAI.place).toBe("Thailand");
     expect(THAI.currency).toBe("thb");
-    expect(THAI.particles).toBe(true);
+    expect(THAI.them.particles?.male.native).toBe("ครับ");
+    expect(THAI.them.particles?.female.native).toBe("ค่ะ");
+  });
+
+  it("offers a polite ending only where the speaker names its forms", () => {
+    const withParticles = DESTINATION_LIST.filter((d) => d.them.particles);
+    expect(withParticles.map((d) => d.code)).toEqual(["TH"]);
+    for (const d of withParticles) {
+      for (const form of Object.values(d.them.particles ?? {})) {
+        expect(form.native).not.toBe("");
+        expect(form.roman).not.toBe("");
+        // The interpreter is given the rule as a sentence, not a language name.
+        expect(form.prompt).toMatch(/\.$/);
+        expect(form.prompt).toContain(form.native);
+      }
+    }
   });
 
   it("does not care how the codes were typed", () => {
@@ -84,6 +100,7 @@ describe("the pair", () => {
       ...Object.values(DESTINATIONS).map((d) => d.them),
     ]) {
       expect(speaker.tag.startsWith(`${speaker.code}-`)).toBe(true);
+      expect(speaker.hello.trim().length).toBeGreaterThan(2);
     }
   });
 });
@@ -259,5 +276,28 @@ describe("warning", () => {
     expect(warning({ listen: false, speak: true }, "Thai")).toContain("Type");
     expect(warning({ listen: true, speak: false }, "Hindi")).toContain("No Hindi voice");
     expect(warning({ listen: false, speak: false }, "Thai")).toContain("written");
+  });
+});
+
+describe("serverVoices", () => {
+  it("reads one voice per language code", () => {
+    expect(serverVoices("th=Thai_male_1_sample8, hi = hindi_female_1_v2")).toEqual({
+      th: "Thai_male_1_sample8",
+      hi: "hindi_female_1_v2",
+    });
+  });
+
+  it("does not care how the code was typed", () => {
+    expect(serverVoices("TH=x")).toEqual({ th: "x" });
+  });
+
+  it("drops what it cannot read rather than refusing the deploy", () => {
+    expect(serverVoices("")).toEqual({});
+    expect(serverVoices("th")).toEqual({});
+    expect(serverVoices("=x,th=,,vi=y")).toEqual({ vi: "y" });
+  });
+
+  it("keeps a voice id that itself contains an equals sign", () => {
+    expect(serverVoices("th=a=b")).toEqual({ th: "a=b" });
   });
 });
