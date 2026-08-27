@@ -33,8 +33,10 @@ jobs:
           # running server always gets its real secret from the deploy .env.
           AUTH_SECRET: insecure-build-time-placeholder
 
+  # Runs beside `verify`, not after it: the two builds are independent, and
+  # nothing unverified can ship because `deploy` waits on both. A commit that
+  # fails lint or a test still pushes an image — it just never leaves ghcr.
   image:
-    needs: verify
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-24.04-arm
     permissions:
@@ -64,6 +66,14 @@ jobs:
       # from so /privacy can name it. The attestation below is what a member
       # checks: `gh attestation verify oci://<image>:<tag> --owner <owner>`
       # proves the image was built by this workflow from that commit.
+      #
+      # No layer cache on purpose. `rewrite-timestamp` stamps every layer this
+      # build makes with the commit's date, so no exported layer is ever
+      # reusable by the next commit — `cache-to: type=gha,mode=max` spent 51s a
+      # run writing blobs that no run ever restored (zero CACHED layers since
+      # the timestamps went in). Reproducible layers are worth more here than
+      # the ~10s a warm `pnpm install` would save; don't re-add the cache
+      # without checking the log for `CACHED`.
       - name: Build & push image (arm64, matching the OCI host)
         id: build
         uses: docker/build-push-action@v7
@@ -80,8 +90,6 @@ jobs:
             ${{ steps.meta.outputs.image }}:latest
           provenance: mode=max
           sbom: true
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
       - name: Attest the image (Sigstore, signed with this run's OIDC identity)
         uses: actions/attest-build-provenance@v3
         with:
@@ -90,7 +98,7 @@ jobs:
           push-to-registry: true
 
   deploy:
-    needs: image
+    needs: [verify, image]
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04-arm
     # Everything host-specific comes from the "oracle-cloud" GitHub environment,
