@@ -18,9 +18,14 @@ import { routes } from "@/lib/routes";
 import { currentMember } from "@/lib/session";
 import "./globals.css";
 
+// Next has no metrics for Big Shoulders and warns every build that it is
+// skipping the fallback it cannot synthesise. Name one — it lands in
+// `--font-big-shoulders`, which is the whole stack globals.css then uses.
 const display = Big_Shoulders({
   subsets: ["latin"],
   variable: "--font-big-shoulders",
+  fallback: ["Arial Narrow", "sans-serif"],
+  adjustFontFallback: false,
 });
 const body = Instrument_Sans({
   subsets: ["latin"],

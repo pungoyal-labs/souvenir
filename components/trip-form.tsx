@@ -14,6 +14,8 @@ import {
   DEFAULT_HOME_LANGUAGE,
   DEFAULT_MAX_STAKE_PIES,
   MAX_STAKE_CEILING,
+  MAX_TRIP_NAME,
+  MIN_TRIP_NAME,
   TripError,
   tripName,
 } from "@/lib/trips";
@@ -132,7 +134,7 @@ export function TripForm({
         <input
           value={name}
           onChange={(e) => setName(e.target.value)}
-          maxLength={60}
+          maxLength={MAX_TRIP_NAME}
           placeholder="Chiang Mai, Diwali"
           className={field}
         />
@@ -253,7 +255,7 @@ export function TripForm({
       <button
         type="button"
         onClick={submit}
-        disabled={pending || name.trim().length < 2}
+        disabled={pending || name.trim().length < MIN_TRIP_NAME}
         className="btn btn-felt display block w-full py-3 text-lg font-bold uppercase"
       >
         {pending ? "One moment…" : initial ? "Save" : "Open the trip"}

@@ -27,7 +27,7 @@
 /* Fonts stay inline: they reference next/font variables set on <body>,
    which don't exist at :root. */
 @theme inline {
-  --font-display: var(--font-big-shoulders), "Arial Narrow", sans-serif;
+  --font-display: var(--font-big-shoulders);
   --font-sans: var(--font-instrument), system-ui, sans-serif;
   --font-mono: var(--font-spline-mono), ui-monospace, monospace;
 }
@@ -100,7 +100,7 @@ body {
 }
 
 .display {
-  font-family: var(--font-big-shoulders), "Arial Narrow", sans-serif;
+  font-family: var(--font-display);
   letter-spacing: 0.01em;
 }
 

@@ -26,7 +26,7 @@ export const MAX_STAKE_CEILING = 100;
 export const DEFAULT_HOME_CURRENCY: Currency = "inr";
 export const DEFAULT_HOME_LANGUAGE = "en";
 /** The clock a trip's days run on when its destination is one this app no longer knows. */
-export const DEFAULT_HOME_TZ = "Asia/Kolkata";
+const DEFAULT_HOME_TZ = "Asia/Kolkata";
 
 export interface TripInput {
   destination: string;

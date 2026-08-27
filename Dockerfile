@@ -17,10 +17,17 @@ COPY . .
 ARG GIT_SHA=dev
 ENV GIT_SHA=$GIT_SHA
 ENV NEXT_TELEMETRY_DISABLED=1
-# Satisfies lib/env.ts validation during page-data collection. Build-stage
-# only — the runner stage starts FROM a fresh base and reads the real .env.
-ENV AUTH_SECRET=insecure-build-time-placeholder
-RUN pnpm build
+# `AUTH_SECRET` is a placeholder for lib/env.ts during page-data collection; on
+# the command, so it never enters the stage's environment. The trace then drags
+# the TypeScript compiler and every test into `.next/standalone` and an
+# `outputFileTracingExcludes` entry would be ignored (Turbopack reads only the
+# include half), so they go here. `test -d` first: if the compiler ever moves,
+# the build fails instead of quietly regaining 23MB. `./scripts/**` stays — the
+# README sends operators there, and Node strips its types itself.
+RUN AUTH_SECRET=insecure-build-time-placeholder pnpm build \
+    && test -d .next/standalone/node_modules/@typescript \
+    && rm -rf .next/standalone/node_modules/@typescript .next/standalone/node_modules/typescript \
+    && find .next/standalone/lib -name '*.test.ts' -delete
 
 # The single runtime image. Serves the app, and also runs the one-shot
 # `migrate` compose service: next.config.ts bundles the migrate script,

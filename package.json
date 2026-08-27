@@ -2,6 +2,7 @@
   "name": "chiang-pai",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
   "scripts": {
     "dev": "node scripts/gen-lingo.ts && next dev",
     "dev:https": "node scripts/gen-lingo.ts && next dev --experimental-https -H 0.0.0.0",
