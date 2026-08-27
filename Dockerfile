@@ -19,15 +19,21 @@ ENV GIT_SHA=$GIT_SHA
 ENV NEXT_TELEMETRY_DISABLED=1
 # `AUTH_SECRET` is a placeholder for lib/env.ts during page-data collection; on
 # the command, so it never enters the stage's environment. The trace then drags
-# the TypeScript compiler and every test into `.next/standalone` and an
-# `outputFileTracingExcludes` entry would be ignored (Turbopack reads only the
-# include half), so they go here. `test -d` first: if the compiler ever moves,
-# the build fails instead of quietly regaining 23MB. `./scripts/**` stays — the
-# README sends operators there, and Node strips its types itself.
+# the TypeScript compiler into `.next/standalone`, and the `**` includes in
+# next.config.ts copy their packages whole — declarations, source maps, tests
+# and all. None of it is reachable at runtime: Node executes no `.d.ts`, and
+# reads a `.map` only under --enable-source-maps, where a missing one costs a
+# stack frame's mapping and nothing else. An `outputFileTracingExcludes` entry
+# would be ignored (Turbopack reads only the include half), so they go here.
+# `test -d` first: if the compiler ever moves, the build fails instead of
+# quietly regaining 23MB. `./scripts/**` stays whole — the README sends
+# operators there, and Node strips its types itself.
 RUN AUTH_SECRET=insecure-build-time-placeholder pnpm build \
     && test -d .next/standalone/node_modules/@typescript \
     && rm -rf .next/standalone/node_modules/@typescript .next/standalone/node_modules/typescript \
-    && find .next/standalone/lib -name '*.test.ts' -delete
+    && find .next/standalone \
+        \( -name '*.test.ts' -o -name '*.d.ts' -o -name '*.d.cts' -o -name '*.d.mts' -o -name '*.map' \) \
+        -delete
 
 # The single runtime image. Serves the app, and also runs the one-shot
 # `migrate` compose service: next.config.ts bundles the migrate script,
