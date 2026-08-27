@@ -21,7 +21,8 @@ trip settled in the home currency at the day's rate), `lib/mentions`
 (`@name` resolution), `lib/crypto` (sealing: envelopes, blobs, link wraps),
 `lib/keys` (a member's keyring and the links that carry keys), `lib/events`
 (what a member can do on a sealed trip), `lib/replay` (the rules of a sealed
-trip, run on every phone).
+trip, run on every phone), `lib/format` (how a moment reads: an age, a
+deadline, a date).
 Read the test before changing a module; change them together.
 
 ## Commands (pnpm 11)
