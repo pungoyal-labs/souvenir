@@ -18,22 +18,22 @@ export default function TermsPage() {
       <h1 className="display text-4xl font-extrabold uppercase tracking-wide">The terms</h1>
       <p className="text-sm text-soft">Last updated 22 August 2026.</p>
 
-      <Section title="1. What Chiang Pai is">
-        Chiang Pai ("the app", "we") is a private game and organiser for groups of friends
-        travelling together. Members open predictions about their own trip, back them with virtual
-        points called pies (π), split real-world bills among themselves, and use a two-way
-        interpreter. It is provided as-is, free of charge, by an individual operator.
+      <Section title="1. What Souvenir is">
+        Souvenir ("the app", "we") is a private game and organiser for groups of friends travelling
+        together. Members open predictions about their own trip, back them with virtual points
+        called stamps, split real-world bills among themselves, and use a two-way interpreter. It is
+        provided as-is, free of charge, by an individual operator.
       </Section>
 
-      <Section title="2. Pies are not money">
-        Pies have no monetary value. They cannot be bought, sold, exchanged, transferred for value,
-        withdrawn, or redeemed for anything. The app never charges an entry fee, never takes a cut,
-        never holds, records, links, or settles money in connection with any prediction, and offers
-        no prize of any value. Any arrangement members make among themselves outside the app is
-        theirs alone, is not part of the service, and must not be recorded in the app as a condition
-        of a prediction. The app is an online social game within the meaning of the Promotion and
-        Regulation of Online Gaming Act, 2025 (India) and is not a gambling, betting, or wagering
-        service in any jurisdiction.
+      <Section title="2. Stamps are not money">
+        Stamps have no monetary value. They cannot be bought, sold, exchanged, transferred for
+        value, withdrawn, or redeemed for anything. The app never charges an entry fee, never takes
+        a cut, never holds, records, links, or settles money in connection with any prediction, and
+        offers no prize of any value. Any arrangement members make among themselves outside the app
+        is theirs alone, is not part of the service, and must not be recorded in the app as a
+        condition of a prediction. The app is an online social game within the meaning of the
+        Promotion and Regulation of Online Gaming Act, 2025 (India) and is not a gambling, betting,
+        or wagering service in any jurisdiction.
       </Section>
 
       <Section title="3. Who may use it">

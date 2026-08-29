@@ -68,7 +68,7 @@ export interface AssertionResponse {
 export interface Expectations {
   /** The registrable domain the credential is scoped to (no scheme, no port). */
   rpId: string;
-  /** Exact origin string, e.g. "https://chiang.example" or "http://localhost:3000". */
+  /** Exact origin string, e.g. "https://souvenir.example" or "http://localhost:3000". */
   origin: string;
   /** The base64url challenge this server issued, as issued. */
   challenge: string;

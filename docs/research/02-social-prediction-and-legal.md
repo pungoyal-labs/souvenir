@@ -4,7 +4,7 @@
 
 Real-money "bet your friends" apps have almost all died, been acquired, or converted into regulated exchanges.
 
-- **Betcha (2019–21)** — DFS-style props; acquired by Vivid Seats Dec 2021 ($25M + earnout), rebranded Vivid Picks, shut to new play in 2025. The name has since been recycled; the relevant one is **"Betcha: Dumb Bets with Friends" (2026, iOS/Android)**: no money, voice-to-bet, share-to-iMessage/WhatsApp with one-tap join, a running scoreboard and head-to-head "nemesis" records. Positioning: "not a sportsbook, not a prediction market — no house, no odds." That is a near-exact description of the category Chiang Pai is in.
+- **Betcha (2019–21)** — DFS-style props; acquired by Vivid Seats Dec 2021 ($25M + earnout), rebranded Vivid Picks, shut to new play in 2025. The name has since been recycled; the relevant one is **"Betcha: Dumb Bets with Friends" (2026, iOS/Android)**: no money, voice-to-bet, share-to-iMessage/WhatsApp with one-tap join, a running scoreboard and head-to-head "nemesis" records. Positioning: "not a sportsbook, not a prediction market — no house, no odds." That is a near-exact description of the category Souvenir is in.
 - **Wager (wager.app)** — no-money social bets; tiny.
 - **WagerLab** — the best-documented no-money survivor: virtual units, $800K pre-seed (Stadia Ventures, 2023), "1 millionth game"; monetises via sponsored cash-prize contests and sportsbook affiliate. Still small after 5+ years — the niche has produced no breakout.
 - **Dare / Xdares, Klash** — challenge apps spike on novelty and churn.
@@ -38,7 +38,7 @@ What keeps no-money games alive (Duolingo/Strava/Snap data):
 - **Online social game**: for entertainment/recreation/skill development, no staking in expectation of monetary gain; a **subscription or one-time access fee is expressly not a stake**. Under the 2026 Rules social games get deemed approval; registration is voluntary unless the Centre notifies a category.
 - **Offences**: offering money games up to 3 yrs / ₹1 cr; advertising 2 yrs / ₹50 lakh; banks/payment facilitation 3 yrs / ₹1 cr; cognizable and non-bailable. The *user* is not criminalised; the operator and the payment rail are.
 - **Courts**: constitutional challenges consolidated before a three-judge SC bench, pending. 27 May 2026 (Gameskraft GST): real-money games on uncertain outcomes are "betting and gambling" for GST regardless of skill — nothing in it touches no-money play.
-- **Exposure of a play-money app whose users settle side bets offline**: low on the statute's text — no fee, no coin sales, no cash-out, pies not "purchased". Exposure rises if (a) the app ever sells pies or anything convertible, (b) it records, enforces or facilitates an off-app money settlement (a "loser pays ₹500" field, UPI deep links on a prediction, IOU tracking), (c) it advertises with money language.
+- **Exposure of a play-money app whose users settle side bets offline**: low on the statute's text — no fee, no coin sales, no cash-out, stamps not "purchased". Exposure rises if (a) the app ever sells stamps or anything convertible, (b) it records, enforces or facilitates an off-app money settlement (a "loser pays ₹500" field, UPI deep links on a prediction, IOU tracking), (c) it advertises with money language.
 
 ### United States
 No federal issue for no-money play. Real-money betting between friends is governed by state "social gambling" exceptions (bona fide social relationship, no house cut); ~a dozen states have none. The app takes no rake and holds no money, so it is at most a scorekeeper.
@@ -66,9 +66,9 @@ Duolingo leagues (weekly cohort, promotion/demotion); Strava segments (local, wi
 **Can a play-money prediction game be the hook for a friend-trip app?** Yes, with a caveat: play money by itself does not retain strangers, but retains very well inside a **closed group with a season**. A trip is a natural season — fixed roster, start and end, a daily stream of cheap resolvable questions, and a final leaderboard that is also the story of the trip. That is the fantasy-league shape, not the Manifold shape.
 
 **Safest framing — three rules:**
-1. Nothing in the app is ever purchased or cashed out. No IAP for pies, no "top-up", no sponsor cash prizes. Any subscription must be clearly for the app, not for entry to a contest.
+1. Nothing in the app is ever purchased or cashed out. No IAP for stamps, no "top-up", no sponsor cash prizes. Any subscription must be clearly for the app, not for entry to a contest.
 2. The app must not *facilitate* a money settlement on a prediction: no rupee/dollar fields, no UPI/Venmo links, no IOU ledger. Let the group settle in dinner or dares; if a stake is recorded at all, record it as free-text social forfeit.
-3. Vocabulary: *prediction, call, pie, leaderboard*; avoid *wager, stake (money sense), odds, payout, cash*. Answer store questionnaires as *Contests*, not *Simulated Gambling*. Consider presenting pies as points rather than a currency.
+3. Vocabulary: *prediction, call, stamp, leaderboard*; avoid *wager, stake (money sense), odds, payout, cash*. Answer store questionnaires as *Contests*, not *Simulated Gambling*. Consider presenting stamps as points rather than a currency.
 
 **Platform.** Ship as a **PWA first**: no store review, no age-rating questionnaire, no 5.3 rejection risk, no legal difference. Go to the stores only when iOS push or discoverability is the measured blocker; submit as a social/Contests app; expect Google Play easier than Apple. Never pursue the Polymarket/Kalshi path or any sweepstakes model — in India those are closed.
 

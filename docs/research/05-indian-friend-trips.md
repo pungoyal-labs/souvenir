@@ -66,7 +66,7 @@
 
 1. **The wedge is commitment, not itineraries.** The trip dies between "chalte hain" and booking. A core loop that makes backing out *visible and costly* — predictions on "who actually shows", "will Rohan book by Friday" — attacks the real failure, and is something Paytm, Splitwise, and MMT structurally cannot do.
 2. **Be the planner's weapon.** One person does 10–40 hours unthanked. Design for that person: their authority (organiser role), their receipts (append-only ledger), their ability to shame gently. "75% emotional labour of avoiding conflict" is the roast-tone brief — the app says what the planner can't.
-3. **Money: don't compete, settle in UPI.** Splitting is commoditised free by Paytm. Keep pies as play money; never a wallet; never store balances.
+3. **Money: don't compete, settle in UPI.** Splitting is commoditised free by Paytm. Keep stamps as play money; never a wallet; never store balances.
 4. **Thailand first, pair-as-config is right.** Thailand is 2.49M Indians, +17%, 7 nights, ~₹1L/head — and its visa rules flipped three times in 2026. Vietnam, Bali, Sri Lanka, Malaysia are the next pairs; Georgia/Kazakhstan/Uzbekistan the rising set.
 5. **Hinglish with a regional safety valve.** Hinglish roast wins in the 22–35 metro cohort and loses on crude, Hindi-as-default, and tender moments. Lingo-per-member already handles this — keep "unhinged" opt-in and never let the roast touch money errors.
 6. **Free to the user; monetise the trip, not the tool.** Indian tolerance for a ₹149/mo utility is demonstrably nil. Revenue, if ever, is affiliate/commission on what the group books or card partnerships (Scapia/Niyo co-marketing), not subscriptions.

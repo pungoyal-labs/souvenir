@@ -1,10 +1,10 @@
-# Chiang Pai
+# Souvenir
 
 The app for the trip that actually happens. A friend group opens a **trip**,
 drops one link in the group chat, and puts its arguments on the record as
 zero-sum, play-money predictions about the trip itself — who books by Friday,
 who's last to the airport, who haggles the taxi down to what they bragged. Virtual
-pies (π) only, no house: winners split exactly what losers put in, everything
+stamps only, no house: winners split exactly what losers put in, everything
 is on the record, and over the trip the leaderboard reveals who can actually
 predict things. Split bills and a two-way interpreter sit beside the game.
 
@@ -33,7 +33,7 @@ neither can anyone with the database.
   "calibrating". No odds are ever displayed. The **recap** sums the season up:
   the table, the rivalries, the biggest swings — and shares as text.
 - A resolved prediction has a public **verdict card** (`/card/[id]`, an
-  unguessable id, first names and pies only) with an image built for WhatsApp.
+  unguessable id, first names and stamps only) with an image built for WhatsApp.
   Invite links show the table before anyone sits down. Those two pages are the
   whole growth loop; `pnpm stats` reads it.
 - The **inbox** and the home page's **"Picked for you"** rail (open predictions
@@ -134,8 +134,8 @@ of link), `webauthn` and `cbor` (passkeys), `email`, `mentions`, `avatar`,
 `trips`, `starters`. `pnpm test` runs pure logic only — no UI tests, by
 design.
 
-**Vocabulary.** UI: *prediction, call, resolve, pool, pie*. Code and schema:
-`market`, `stake`, `settle*`, `amountC`. Keep them apart. Pies are never money
+**Vocabulary.** UI: *prediction, call, resolve, pool, stamp*. Code and schema:
+`market`, `stake`, `settle*`, `amountC`. Keep them apart. Stamps are never money
 and never near money: no purchase, no cash-out, no prize, no amount on a
 prediction — that is what keeps the game a social game under India's PROGA
 2025 and off the stores' gambling ratings.
@@ -205,7 +205,7 @@ commit, with the commit baked in (`GIT_SHA`, shown in the footer) and a
 Sigstore provenance attestation signed by the workflow's identity. A member
 who wants to check writes to `CONTACT_EMAIL` naming the build in the footer
 and gets the source for that commit and the attestation
-(`gh attestation verify oci://ghcr.io/pungoyal/chiang-pai:<sha7> --owner pungoyal`
+(`gh attestation verify oci://ghcr.io/pungoyal-labs/souvenir:<sha7> --owner pungoyal-labs`
 proves the image came from it). Verification is on request, not public, so
 the repository can be private.
 

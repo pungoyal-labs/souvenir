@@ -52,11 +52,11 @@ Commodity. Google Translate has >1B monthly users and conversation mode in 70 la
 - **Menu OCR**: commodity via Lens; the group version is "what did we order, who owes what", which is the bill.
 - **Currency converter** defaulting to the trip's destination.
 
-## Implications for Chiang Pai
+## Implications for Souvenir
 
 1. **Do not compete with Google on interpretation.** Keep `/talk` as a thin tap-to-talk that works in Safari today; spend no more on STT/TTS plumbing.
 2. **The thin slice that beats Google is everything Google does not know about the group**: the shared phrasebook (voice and particle already chosen), address/destination cards, a haggle/number-speaker tied to the bill's currency, and the bill itself. Google is per-person; the group's phrases, places, and money are the moat.
 3. If a server voice is kept, Cartesia/Google Chirp are cheaper than MiniMax for Thai; at these volumes it is irrelevant. Gemini Live Translate API is the only audio-to-audio option covering the four languages if S2S ever comes back.
-4. Guard the existing constraints: politeness toggle (Google guesses gender, Chiang Pai asks), no stored turns, `voiceFor` refusal for a language the pair no longer covers.
+4. Guard the existing constraints: politeness toggle (Google guesses gender, Souvenir asks), no stored turns, `voiceFor` refusal for a language the pair no longer covers.
 
 Sources: Google blog (Gemini 3.5 Live Translate, 9 Jun 2026); Apple Translate App Store listing and iOS 26.2 support note; Samsung Galaxy AI language guide; WhistleOut (Microsoft Translator, iTranslate); Lemmy thread on SayHi shutdown; Apple developer forums on webkitSpeechRecognition in standalone mode; Chrome 139 release notes; Chrome Translator API docs; WWDC25 SpeechAnalyzer; vendor pricing pages (Deepgram, AssemblyAI, ElevenLabs, Sarvam, Cartesia, MiniMax, OpenAI); CloudPrice for Gemini Live Translate; Boostlingo/SAN AirPods tests.

@@ -135,7 +135,7 @@ export function TripForm({
           value={name}
           onChange={(e) => setName(e.target.value)}
           maxLength={MAX_TRIP_NAME}
-          placeholder="Chiang Mai, Diwali"
+          placeholder="Bangkok, Diwali"
           className={field}
         />
       </label>
@@ -232,7 +232,7 @@ export function TripForm({
 
       {more || initial ? (
         <label className="block">
-          <span className={label}>Most pies anyone can put on one prediction</span>
+          <span className={label}>Most stamps anyone can put on one prediction</span>
           <input
             type="number"
             min={1}

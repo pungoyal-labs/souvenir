@@ -53,8 +53,8 @@ describe("expiresAtFrom", () => {
 
 describe("inviteUrl", () => {
   it("puts the code in the path, where it is never sent to an analytics query string", () => {
-    expect(inviteUrl("https://pai.example.com", "abc123")).toBe(
-      "https://pai.example.com/join/abc123",
+    expect(inviteUrl("https://souvenir.example.com", "abc123")).toBe(
+      "https://souvenir.example.com/join/abc123",
     );
   });
 });

@@ -40,14 +40,14 @@ export const metadata: Metadata = {
   // Without a base, Next resolves og:image and friends against localhost —
   // this deploy is standalone, so no platform env fills one in.
   metadataBase: new URL(env.AUTH_URL),
-  title: { default: "Chiang Pai", template: "%s · Chiang Pai" },
+  title: { default: "Souvenir", template: "%s · Souvenir" },
   description:
-    "The app for the trip that actually happens. Call who shows up, who's late, who pays — play-money pies, real bragging rights.",
+    "The app for the trip that actually happens. Call who shows up, who's late, who pays — play-money stamps, real bragging rights.",
   manifest: "/manifest.webmanifest",
-  appleWebApp: { capable: true, title: "Chiang Pai", statusBarStyle: "black-translucent" },
+  appleWebApp: { capable: true, title: "Souvenir", statusBarStyle: "black-translucent" },
   openGraph: {
-    siteName: "Chiang Pai",
-    title: "Chiang Pai",
+    siteName: "Souvenir",
+    title: "Souvenir",
     description: "The app for the trip that actually happens.",
     type: "website",
   },
@@ -91,7 +91,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             <Link href={member ? routes.trips : routes.home} className="flex items-center gap-2.5">
               <Logo size={30} className="rounded-[22%] ring-1 ring-white/20" />
               <span className="display text-2xl font-extrabold uppercase tracking-wide">
-                Chiang&nbsp;Pai
+                Souvenir
               </span>
             </Link>
             <div className="ml-auto flex items-center gap-3">

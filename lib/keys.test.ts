@@ -131,7 +131,7 @@ describe("links", () => {
 
   it("carries the join preview under the same secret, apart from the key", async () => {
     const s = newLinkSecret();
-    const preview = { name: "Chiang Pai", names: ["A", "B"], questions: ["Will it rain?"] };
+    const preview = { name: "Souvenir", names: ["A", "B"], questions: ["Will it rain?"] };
     const blob = await wrapPreview(s, preview);
     expect(await unwrapPreview(s, blob)).toEqual(preview);
     await expect(unwrapTripKey(s, "invite", blob)).rejects.toThrow(CryptoError);
@@ -160,8 +160,8 @@ describe("merging", () => {
 describe("the trip's name", () => {
   it("seals under the trip key, bound to the trip", async () => {
     const tk = await newKey();
-    const blob = await sealName(tk, "t1", "Chiang Mai");
-    expect(await openName(tk, "t1", blob)).toBe("Chiang Mai");
+    const blob = await sealName(tk, "t1", "Bangkok");
+    expect(await openName(tk, "t1", blob)).toBe("Bangkok");
     await expect(openName(tk, "t2", blob)).rejects.toThrow(CryptoError);
     await expect(openName(await newKey(), "t1", blob)).rejects.toThrow(CryptoError);
   });

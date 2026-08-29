@@ -1,4 +1,4 @@
-# Chiang Pai — agent notes
+# Souvenir — agent notes
 
 The app for the trip that actually happens: friend groups open a *trip*, join
 by link, and play a zero-sum play-money prediction game about the trip itself,
@@ -90,7 +90,7 @@ Pre-commit (husky): biome on staged files, tsc, full test suite.
   it holds the key for the one moment it exists in the clear.
 - Each replayed market carries its positions and the settlement that stands
   (`MarketState.settlement`), and that is what `lib/stats` reads; the
-  `ledger` is the same story as a feed — every pie movement in order, for
+  `ledger` is the same story as a feed — every stamp movement in order, for
   the pages that show what happened. Never store a balance, score, or
   profile.
 - Pure math lives in tested modules (`engine`, `stats`, `recommend`);
@@ -99,7 +99,7 @@ Pre-commit (husky): biome on staged files, tsc, full test suite.
   inline logic there is untestable.
 - Zero-sum is the invariant: payouts sum exactly to the pool
   (largest-remainder rounding, fuzz-tested).
-- Pies are integer centi-pies end to end; format only at the edge (`lib/pies.ts`).
+- Amounts are integer centi-pies end to end (UI: stamps); format only at the edge (`lib/pies.ts`).
 - Infinite bank: no grant, net can go negative; the per-prediction exposure
   cap (`trips.max_stake_pies`) is the only brake — never gate the call UI on
   balance. The cap is applied to the whole log on replay, so it cannot be
@@ -116,7 +116,7 @@ Pre-commit (husky): biome on staged files, tsc, full test suite.
   which redirects a member with no seat. A member can be on many trips; the
   leaderboard, the inbox cursor, the net, the cap are all per trip. Names are
   distinct per trip (mentions), not across the world.
-- **Pies are never money, and never near money.** That is what keeps the game
+- **Stamps are never money, and never near money.** That is what keeps the game
   an "online social game" under India's PROGA 2025 and off the store
   questionnaires' gambling ratings: no purchase, no cash-out, no prize, and
   the app never records, links, or settles money on a prediction. A UPI link,
@@ -131,7 +131,7 @@ Pre-commit (husky): biome on staged files, tsc, full test suite.
   the page; the request names the two currencies and nothing else. Without a
   rate the page falls back to settling each currency on its own — never
   guess one. UI vocabulary is *prediction / call / resolve /
-  pool / pie / points*; never *bet, wager, stake (as money), odds, payout,
+  pool / stamp / points*; never *bet, wager, stake (as money), odds, payout,
   cash*. Code keeps `market/stake/settle*/amountC`. Don't half-rename either.
 - Inbox and the For-you rail are derived on the phone from the replayed trip
   (`lib/views` `inbox`/`listMarkets`). Stored state is only
@@ -148,7 +148,7 @@ Pre-commit (husky): biome on staged files, tsc, full test suite.
 - **Growth is the product's own artifacts, not a marketing surface.** Two
   pages are reachable by URL alone, on purpose: `/join/[code]` shows the table
   before anyone sits down (trip, roster names, a few open questions), and
-  `/card/[marketId]` is one prediction's verdict with first names and pies,
+  `/card/[marketId]` is one prediction's verdict with first names and stamps,
   with an OG image for the group chat — and on a sealed trip it is literally
   what a member's phone put in `cards` when they tapped share
   (`publishCard`), since the server can draw nothing else; anyone on the trip
@@ -243,7 +243,7 @@ Pre-commit (husky): biome on staged files, tsc, full test suite.
 - Avatars are an upload or a generated monogram — initials on a gradient seeded
   by member id, never the name, so a rename keeps the same face. Nothing reads
   `members.image` any more.
-- Vocabulary: UI says *prediction/call/resolve/pool/pie*; code says
+- Vocabulary: UI says *prediction/call/resolve/pool/stamp*; code says
   `market/stake/settle*/amountC`. Don't half-rename either side.
 - `/talk` is the one page pointed *outward*, at somebody who is not in the
   group: tap a side, speak, and the phone says it in the other language.

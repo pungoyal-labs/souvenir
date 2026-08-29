@@ -226,7 +226,7 @@ export async function openName(tk: CryptoKey, tripId: string, blob: string): Pro
 // --- passkey backup -------------------------------------------------------------
 
 /** What every passkey's PRF is evaluated on; the authenticator's own secret makes the output its own. */
-export const PRF_SALT = utf8("chiang-pai keyring v1");
+export const PRF_SALT = utf8("souvenir keyring v1");
 
 /** The key a passkey's PRF output opens this member's keyring backup with. */
 export function prfKeyringKey(prf: Uint8Array): Promise<CryptoKey> {

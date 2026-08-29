@@ -18,11 +18,11 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { marketId } = await params;
   const card = await cardOf(marketId);
-  if (!card) return { title: "Chiang Pai" };
+  if (!card) return { title: "Souvenir" };
   const verdict = card.verdict === "refunded" ? "Voided" : card.verdict.toUpperCase();
   return {
     title: card.question,
-    description: `${verdict} · ${card.tripName} · Chiang Pai`,
+    description: `${verdict} · ${card.tripName} · Souvenir`,
     openGraph: { title: card.question, description: `${verdict} on ${card.tripName}` },
   };
 }
@@ -46,7 +46,7 @@ export default async function CardPage({ params }: { params: Promise<{ marketId:
         </div>
         <div className="px-5 py-4">
           <p className="display text-xl font-bold uppercase tracking-wide">
-            {card.verdict === "refunded" && "Voided — everyone got their pies back"}
+            {card.verdict === "refunded" && "Voided — everyone got their stamps back"}
             {settled && (
               <>
                 Resolved{" "}
@@ -94,7 +94,7 @@ export default async function CardPage({ params }: { params: Promise<{ marketId:
           )}
           {poolC > 0 && (
             <p className="mono mt-3 text-xs text-soft">
-              <Pies c={poolC} /> changed hands · pies are play money, always
+              <Pies c={poolC} /> changed hands · stamps are play money, always
             </p>
           )}
         </div>
@@ -103,7 +103,7 @@ export default async function CardPage({ params }: { params: Promise<{ marketId:
       <div className="mt-6 flex items-center gap-3 rounded-lg border border-line bg-surface p-4">
         <Logo size={40} className="rounded-xl" />
         <div className="min-w-0 flex-1 text-sm">
-          <p className="font-semibold">Chiang Pai — the app for the trip that actually happens.</p>
+          <p className="font-semibold">Souvenir — the app for the trip that actually happens.</p>
           <p className="text-xs text-soft">
             Call who shows up, who's late, who pays. Free, no money, ever.
           </p>

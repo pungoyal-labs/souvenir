@@ -1,14 +1,23 @@
-import { fmtPies, PIE } from "@/lib/pies";
+import { fmtPies, stampsWord } from "@/lib/pies";
 
 /**
- * An amount with the π suffix. The symbol is pinned to the sans face (the
- * .pie class): Big Shoulders and Spline Sans Mono draw π like a capital Π.
+ * An amount with the stamp glyph — a tiny perforated frame in the text color,
+ * sized to the surrounding font. Screen readers get the word instead.
  */
 export function Pies({ c, sign }: { c: number; sign?: boolean }) {
   return (
     <>
       {fmtPies(c, { sign })}
-      <span className="pie">{PIE}</span>
+      <svg
+        viewBox="0 0 12 12"
+        width="0.6em"
+        height="0.6em"
+        aria-hidden="true"
+        className="ml-[0.14em] inline-block align-[-0.02em]"
+      >
+        <path fill="currentColor" fillRule="evenodd" d="M1 1h10v10H1Z M3.4 3.4v5.2h5.2V3.4Z" />
+      </svg>
+      <span className="sr-only"> {stampsWord(c)}</span>
     </>
   );
 }

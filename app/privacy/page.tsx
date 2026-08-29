@@ -83,8 +83,8 @@ export default function PrivacyPage() {
           </li>
           <li>
             <b>A verdict card</b>, only when a member taps share on a resolved prediction: their
-            phone publishes the question, the outcome, first names and pies as a public page for the
-            group chat. Anyone on the trip can take it down.
+            phone publishes the question, the outcome, first names and stamps as a public page for
+            the group chat. Anyone on the trip can take it down.
           </li>
           <li>
             <b>Server logs</b> with request metadata, kept for a short period for security and

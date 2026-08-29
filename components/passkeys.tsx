@@ -39,7 +39,7 @@ function ceremonyError(err: unknown, verb: string): string {
   if (name === "NotAllowedError") {
     return `Cancelled or timed out — nothing was ${verb}. If no prompt appeared, your passkey manager may be locked.`;
   }
-  if (name === "InvalidStateError") return "This device already has a passkey for Chiang Pai.";
+  if (name === "InvalidStateError") return "This device already has a passkey for Souvenir.";
   if (name === "SecurityError") {
     // The server already refuses an IP or an insecure host, so this is something subtler: name it.
     return `This site can't offer passkeys from this address (${err instanceof Error ? err.message : name}).`;

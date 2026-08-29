@@ -49,7 +49,7 @@ export function TripHome({
     <div className="grid gap-8 lg:grid-cols-[1fr_270px]">
       <div>
         <div className="grid grid-cols-3 gap-2 sm:gap-3">
-          <StatTile label="Net pies" value={<Pies c={netC} sign />} mono />
+          <StatTile label="Net stamps" value={<Pies c={netC} sign />} mono />
           <StatTile
             label="Open calls"
             value={<Pies c={committedC} />}

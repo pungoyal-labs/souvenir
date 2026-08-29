@@ -100,7 +100,7 @@ export function MemberPage({
       </div>
 
       <div className="mt-5 grid grid-cols-2 gap-2 sm:grid-cols-5 sm:gap-3">
-        <Stat label="Net pies" value={<Pies c={netC} sign />} />
+        <Stat label="Net stamps" value={<Pies c={netC} sign />} />
         <Stat
           label="Trip P/L"
           value={<Pies c={stats.profitC} sign />}
@@ -261,7 +261,7 @@ export function MemberPage({
       <section className="mt-7">
         <h2 className={heading}>The full ledger</h2>
         <p className="text-xs text-soft">
-          Every pie movement, newest first. The balance column is derived by replaying the whole
+          Every stamp movement, newest first. The balance column is derived by replaying the whole
           history — nothing is ever overwritten.
         </p>
         {/* On a phone the "when" goes under the "what" rather than in a column of its own. */}
@@ -271,7 +271,7 @@ export function MemberPage({
               <tr className="border-b border-line text-left text-[11px] uppercase tracking-wider text-soft">
                 <th className="hidden px-4 py-2 sm:table-cell">When</th>
                 <th className="px-3 py-2 sm:px-2">What</th>
-                <th className="px-2 py-2 text-right">Δ pies</th>
+                <th className="px-2 py-2 text-right">Δ stamps</th>
                 <th className="px-3 py-2 text-right sm:px-4">Balance</th>
               </tr>
             </thead>

@@ -19,7 +19,7 @@ export function ShareRecap({
   const text = [
     `${tripName} — who could actually predict things`,
     ...lines,
-    `${verdicts} verdicts, play-money pies, all bragging rights. π Chiang Pai`,
+    `${verdicts} verdicts, play-money stamps, all bragging rights. Souvenir`,
   ].join("\n");
   const share = async () => {
     try {

@@ -1,10 +1,14 @@
-// Pies are stored as integer centi-pies ("cents") so settlement math is
-// exact. 1 pie = 100 cents. Display always derives from cents.
+// The play currency. UI calls them stamps; code keeps its own vocabulary
+// (pies, like market/stake/settle*) — don't half-rename either side. Amounts
+// are stored as integer centi-pies ("cents") so settlement math is exact.
+// 1 stamp = 100 cents. Display always derives from cents.
 
 export const CENTS = 100;
 
-/** The pie symbol shown after amounts — π, for (Chiang) Pai. */
-export const PIE = "π";
+/** The unit as UI copy writes it, pluralized the way an amount reads. */
+export function stampsWord(cents: number): string {
+  return Math.abs(cents) === CENTS ? "stamp" : "stamps";
+}
 
 export function toCents(pies: number): number {
   return Math.round(pies * CENTS);
@@ -19,9 +23,9 @@ export function fmtPies(cents: number, opts?: { sign?: boolean }): string {
   return `${sign}${whole}.${String(frac).padStart(2, "0").replace(/0$/, "")}`;
 }
 
-/** An amount with its symbol, for the places that need a plain string. */
+/** An amount with its unit, for the places that need a plain string. */
 export function piesText(cents: number, opts?: { sign?: boolean }): string {
-  return `${fmtPies(cents, opts)}${PIE}`;
+  return `${fmtPies(cents, opts)} ${stampsWord(cents)}`;
 }
 
 export function fmtPct(x: number): string {

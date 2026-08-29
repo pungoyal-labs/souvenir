@@ -18,7 +18,7 @@ export function TermsNudge() {
         <div className="min-w-64 flex-1">
           <p className="font-semibold">One tick before you carry on.</p>
           <p className="text-sm text-soft">
-            Chiang Pai is for adults, pies are never money, and we keep only what the game needs.
+            Souvenir is for adults, stamps are never money, and we keep only what the game needs.
             Read the{" "}
             <Link href={routes.terms} className="text-felt hover:underline">
               terms

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { type StarterContext, starters } from "./starters.ts";
 
 const base: StarterContext = {
-  name: "Chiang Mai",
+  name: "Bangkok",
   place: "Thailand",
   destination: "TH",
   homeCurrency: "inr",

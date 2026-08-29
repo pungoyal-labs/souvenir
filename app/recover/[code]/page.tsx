@@ -43,7 +43,7 @@ export default async function RecoverPage({ params }: { params: Promise<{ code: 
       <p className="mt-3 text-sm text-soft">
         This link puts a new passkey on{" "}
         <span className="font-semibold text-ink">{member.name}</span>
-        's seat — their pies, their bills, their word in the comments.
+        's seat — their stamps, their bills, their word in the comments.
       </p>
       <p className="mt-3 rounded-md bg-gold/10 px-3 py-2 text-left text-xs text-soft">
         {mintedBy ? `${mintedBy.name} minted it` : "It was minted from the console"} · expires{" "}

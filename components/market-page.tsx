@@ -101,7 +101,7 @@ export function MarketPage({
                 Resolved <SideChip side={market.status} />
               </span>
             ) : (
-              "Voided — all pies returned"
+              "Voided — all stamps returned"
             )}
           </p>
           <p className="mt-1 text-xs text-soft">

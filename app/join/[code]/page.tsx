@@ -47,7 +47,7 @@ export default async function JoinPage({ params }: { params: Promise<{ code: str
         <JoinPreview code={code} sealed={invite.preview} />
       </div>
       <p className="mt-3 text-sm text-soft">
-        Call who shows up, who's late, who pays. Play-money pies, real bragging rights.
+        Call who shows up, who's late, who pays. Play-money stamps, real bragging rights.
       </p>
 
       {me && seated ? (

@@ -32,7 +32,7 @@ import {
   withMemberKey,
 } from "@/lib/keys";
 
-const DB_NAME = "chiang-pai-keys";
+const DB_NAME = "souvenir-keys";
 const STORE = "keys";
 const KK_ID = "kk";
 const BLOB_ID = "keyring";

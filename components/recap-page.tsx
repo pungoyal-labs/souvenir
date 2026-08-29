@@ -37,7 +37,7 @@ export function RecapPage({ eyebrow, minResolved }: { eyebrow: string; minResolv
               value={String(recap.resolvedCount)}
               sub={`${recap.openCount} still open`}
             />
-            <StatTile label="Pies in play" value={piesText(recap.totalPoolC)} />
+            <StatTile label="Stamps in play" value={piesText(recap.totalPoolC)} />
             <StatTile
               label="Champion"
               value={champion ? champion.member.name : "—"}

@@ -3,8 +3,8 @@ import type { MetadataRoute } from "next";
 /** Installable on a home screen: the trip is what people open ten times a day. */
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "Chiang Pai",
-    short_name: "Chiang Pai",
+    name: "Souvenir",
+    short_name: "Souvenir",
     description: "The app for the trip that actually happens.",
     start_url: "/trips",
     display: "standalone",

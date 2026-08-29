@@ -46,7 +46,7 @@ describe("tripConfig", () => {
   it("refuses what it cannot make a trip of", () => {
     expect(() => tripName("x")).toThrow(TripError);
     expect(() => tripName("a".repeat(61))).toThrow(/under/);
-    expect(tripName("  Chiang  Mai  ")).toBe("Chiang Mai");
+    expect(tripName("  Kuala  Lumpur  ")).toBe("Kuala Lumpur");
     expect(() => tripConfig({ destination: "XX" })).toThrow(/destination/);
     expect(() => tripConfig({ destination: "TH", homeLanguage: "xx" })).toThrow(/home language/);
     expect(() => tripConfig({ destination: "TH", homeCurrency: "xyz" })).toThrow(/home currency/);

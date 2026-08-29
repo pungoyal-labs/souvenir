@@ -25,7 +25,7 @@ async function main() {
   const tripId = randomUUID();
   const trip = await createTrip(priya.id, {
     id: tripId,
-    nameEnc: await sealName(key, tripId, "Chiang Mai, Diwali"),
+    nameEnc: await sealName(key, tripId, "Bangkok, Diwali"),
     destination: "TH",
     startsOn: "2026-11-06",
     endsOn: "2026-11-10",

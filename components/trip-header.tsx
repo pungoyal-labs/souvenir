@@ -42,7 +42,7 @@ export function TripHeader({
           <Link
             href={routes.member(tripId, me.id)}
             className="mono rounded-full bg-felt-tint px-3 py-1 text-sm font-semibold text-felt"
-            title="Your pies on this trip"
+            title="Your stamps on this trip"
           >
             <Pies c={netC} sign />
           </Link>
