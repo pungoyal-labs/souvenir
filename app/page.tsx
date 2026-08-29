@@ -60,7 +60,7 @@ export default async function Landing() {
       <section className="mt-14 grid gap-4 sm:grid-cols-3">
         <Feature
           title="Call it"
-          body="Anyone opens a prediction with plain rules for what counts. Everyone backs YES or NO with pies. When it resolves, the winning side splits exactly what the other side put in — no house, just who read the group best. The leaderboard ranks the season."
+          body="Anyone opens a prediction with plain rules for what counts. Everyone backs YES or NO with stamps. When it resolves, the winning side splits exactly what the other side put in — no house, just who read the group best. The leaderboard ranks the season."
         />
         <Feature
           title="Split it"
@@ -100,8 +100,8 @@ export default async function Landing() {
 
       <section className="mt-6 grid gap-4 sm:grid-cols-2">
         <Feature
-          title="Pies, not money"
-          body="Pies (π) are points. Everyone starts at zero, calls cost pies, and the winners' pies come from the losers'. Nothing is bought, sold or cashed out; the bills are the only place real money appears, and that's just a record of what you told each other. For adults, 18 and over."
+          title="Stamps, not money"
+          body="Stamps are points. Everyone starts at zero, calls cost stamps, and the winners' stamps come from the losers'. Nothing is bought, sold or cashed out; the bills are the only place real money appears, and that's just a record of what you told each other. For adults, 18 and over."
           small
         />
         <Feature

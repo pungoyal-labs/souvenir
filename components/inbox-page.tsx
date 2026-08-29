@@ -131,7 +131,7 @@ function Line({ item, t }: { item: InboxItem; t: Lingo }) {
           {item.myProfitC !== null && (
             <span className={`mono ml-1.5 font-bold ${tone(item.myProfitC)}`}>
               {item.myProfitC === 0
-                ? "(pies returned)"
+                ? "(stamps returned)"
                 : `(${(item.myProfitC > 0 ? t.youWon : t.youLost)(piesText(Math.abs(item.myProfitC)))})`}
             </span>
           )}

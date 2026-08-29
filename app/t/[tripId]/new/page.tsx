@@ -23,7 +23,7 @@ export default async function NewMarketPage({
       <p className="mt-1 text-sm text-soft">
         One binary question. Say exactly how you'll decide YES or NO — you're the one who resolves
         it, and the criteria go on the permanent record. Everyone can put up to {trip.maxStakePies}{" "}
-        pies on either side.
+        stamps on either side.
       </p>
       <div className="mt-5">
         <Sealed>

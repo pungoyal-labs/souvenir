@@ -16,10 +16,8 @@ export function SignedOutCard({
       <div className="p-8">
         <Logo size={64} className="mx-auto rounded-2xl" />
         <p className="eyebrow mt-5">{eyebrow}</p>
-        <p className="display mt-1 text-5xl font-extrabold uppercase leading-none tracking-wide">
-          Chiang
-          <br />
-          Pai
+        <p className="display mt-1 text-4xl font-extrabold uppercase leading-none tracking-wide">
+          Souvenir
         </p>
         {children}
       </div>

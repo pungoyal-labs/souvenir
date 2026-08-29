@@ -101,7 +101,7 @@ export function JoinForm({ code, label }: { code?: string; label?: string }) {
           <Link href={routes.privacy} className="text-felt hover:underline" target="_blank">
             privacy note
           </Link>
-          . Pies are never money.
+          . Stamps are never money.
         </span>
       </label>
 

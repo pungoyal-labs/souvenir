@@ -33,9 +33,10 @@ describe("fmtPies", () => {
 });
 
 describe("piesText", () => {
-  it("appends the pie symbol", () => {
-    expect(piesText(150)).toBe("1.5π");
-    expect(piesText(-100, { sign: true })).toBe(`${MINUS}1π`);
+  it("appends the unit, pluralized by the amount", () => {
+    expect(piesText(150)).toBe("1.5 stamps");
+    expect(piesText(-100, { sign: true })).toBe(`${MINUS}1 stamp`);
+    expect(piesText(0)).toBe("0 stamps");
   });
 });
 

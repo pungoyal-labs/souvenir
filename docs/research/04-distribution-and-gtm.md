@@ -22,7 +22,7 @@
 
 **Short video.** Travel creators are the most expensive category (India 10–50K followers ₹5–15K/Reel; 50–200K ₹15–50K/Reel). The cheap version is the NGL playbook: $50–100 to many micro-creators, <$10K total. The organic unit for a trip app is the group's own "who won the bets" recap reel: build a shareable result card so the content is made by users (how Locket grew on TikTok).
 
-**WhatsApp-native in India.** ~89% of Indian smartphone owners use WhatsApp; the highest-conversion organic channel. The invite link's OG card is the ad; the "resolved — X won 40 pies" message is the retention hook; a WhatsApp deep link with a pre-filled message beats a generic share sheet. UPI cash referrals beat coupons 3x in India — but are irrelevant (and poisonous) for a play-money app.
+**WhatsApp-native in India.** ~89% of Indian smartphone owners use WhatsApp; the highest-conversion organic channel. The invite link's OG card is the ad; the "resolved — X won 40 stamps" message is the retention hook; a WhatsApp deep link with a pre-filled message beats a generic share sheet. UPI cash referrals beat coupons 3x in India — but are irrelevant (and poisonous) for a play-money app.
 
 **SEO.** "Trip planner with friends" is crowded. The defensible long tail: "prediction game for friends", "bets with friends no money", "trip bets app", and destination-specific pages ("Chiang Mai group trip").
 
@@ -45,7 +45,7 @@ Pattern: group apps charge the *organiser*. Nobody charges per member. Sensible 
 
 ## 4. Legal/ops basics
 
-- **Play money is the whole ballgame in India** (PROGA 2025, in force 1 May 2026). No pie purchases, no cash-out, no prizes, no rupee side-bets in the app; say so in the Terms.
+- **Play money is the whole ballgame in India** (PROGA 2025, in force 1 May 2026). No stamp purchases, no cash-out, no prizes, no rupee side-bets in the app; say so in the Terms.
 - **DPDP Act 2023 + Rules (notified 13 Nov 2025; full compliance by 13 May 2027).** Notice + consent per purpose, a grievance contact, erasure when purpose ends, breach notification, and for under-18s verifiable parental consent. The cheap route is an 18+ gate.
 - **GDPR** applies if any EU member joins. Voice in `/talk` is not stored — state it.
 - **Cookie consent:** none needed with only strictly-necessary cookies and no third-party analytics.

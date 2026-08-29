@@ -157,12 +157,6 @@ body {
   text-decoration: underline;
 }
 
-/* The π pie symbol always keeps the sans face — the display and mono
-   faces draw π like a capital Π. */
-.pie {
-  font-family: var(--font-instrument), system-ui, sans-serif;
-}
-
 :focus-visible {
   outline: 2px solid var(--color-felt);
   outline-offset: 2px;

@@ -1,10 +1,10 @@
-# Chiang Pai — go-to-market plan
+# Souvenir — go-to-market plan
 
 *Written 22 August 2026. The research behind every claim is in `docs/research/`.*
 
 ## The one-line thesis
 
-**The app for the trip that actually happens.** Friend groups don't fail for lack of itineraries or split apps — those are free and everywhere. They fail between "chalte hain" and booking (42% of Indian outbound trips are booked inside 7 days; "Goa plan" is a meme for the trip that never happens), and they fall out over money afterwards (1 in 5 friendships ended over a trip's money, per Experian 2025). Chiang Pai is the only product that attacks *commitment* and *awkwardness* directly: a zero-sum, play-money prediction game about the trip itself, with the bills and the interpreter riding alongside.
+**The app for the trip that actually happens.** Friend groups don't fail for lack of itineraries or split apps — those are free and everywhere. They fail between "chalte hain" and booking (42% of Indian outbound trips are booked inside 7 days; "Goa plan" is a meme for the trip that never happens), and they fall out over money afterwards (1 in 5 friendships ended over a trip's money, per Experian 2025). Souvenir is the only product that attacks *commitment* and *awkwardness* directly: a zero-sum, play-money prediction game about the trip itself, with the bills and the interpreter riding alongside.
 
 ## Decisions already taken (22 Aug 2026)
 
@@ -13,9 +13,9 @@
 | Spine | Commitment game first; bills and talk supporting | Itineraries and splitting are commoditised (Airbnb, Paytm Split Bills 29 Jul 2026); the social mechanic has no incumbent |
 | Market | Indian friend groups going abroad, built global-ready | 32.7M departures, Thailand +17% / Vietnam +49%, WhatsApp- and UPI-native, zero purpose-built tools |
 | Price | Free; instrument; decide at day 90 | Nobody in this category grew on per-seat pricing; Indian tolerance for a ₹149/mo utility is nil |
-| Name | Keep "Chiang Pai" for now | Renaming is low business value right now |
-| Vocabulary | *prediction / call / pool / pie*; never *bet, wager, odds, payout* | India's PROGA 2025 and the stores pattern-match on words |
-| Money | Pies are never bought, sold, or cashed out; the app never records or links money on a prediction | This is what keeps it an "online social game" under PROGA and off the gambling ratings |
+| Name | Renamed to "Souvenir" (Aug 2026) | Travel-first name for the fresh launch; the play currency became stamps with it |
+| Vocabulary | *prediction / call / pool / stamp*; never *bet, wager, odds, payout* | India's PROGA 2025 and the stores pattern-match on words |
+| Money | Stamps are never bought, sold, or cashed out; the app never records or links money on a prediction | This is what keeps it an "online social game" under PROGA and off the gambling ratings |
 | Bills | Exactly two currencies per trip (destination + home), one for domestic, set at creation, never asked again | Matches the real trip; kills the Splitwise currency confusion |
 | Migration | The existing group becomes Trip #1 | Dogfood history is the first case study |
 | Age | 18+, India + global terms | Avoids DPDP parental-consent machinery |
@@ -36,14 +36,14 @@
 ## Positioning
 
 **For** the one friend who always ends up planning the trip,
-**Chiang Pai** is the group game that makes backing out visible and settling up painless,
+**Souvenir** is the group game that makes backing out visible and settling up painless,
 **unlike** Splitwise, Wanderlog, or the group chat,
-**because** it turns "are you actually coming" into a call with pies on it — and the leaderboard remembers.
+**because** it turns "are you actually coming" into a call with stamps on it — and the leaderboard remembers.
 
 Tagline: *The trip that actually happens.*
-Secondary: *Call who shows up, who's late, who pays. Play-money pies, real bragging rights.*
+Secondary: *Call who shows up, who's late, who pays. Play-money stamps, real bragging rights.*
 
-Copy rules: Hinglish is a member's choice (lingo), never the default; no crude roast outside the opt-in "unhinged" lingo; never roast a money error; "pies are never money" appears on every public surface.
+Copy rules: Hinglish is a member's choice (lingo), never the default; no crude roast outside the opt-in "unhinged" lingo; never roast a money error; "stamps are never money" appears on every public surface.
 
 ## Who, exactly
 
@@ -120,14 +120,14 @@ If founding rate is under 10% at day 90, the loop is not compounding; the fix is
 2. **An entity and a grievance address.** DPDP wants a named contact; Razorpay wants an Indian entity (sole prop + GST is enough). Neither is needed to launch free.
 3. **A lawyer's read of `/terms` and `/privacy`** before the creator push. They are drafted carefully and cite the right statutes; they are not legal advice.
 4. **Google OAuth app verification** if you expect >100 Google sign-ins (Google caps unverified apps). Passkeys sidestep this entirely.
-5. **The name.** Deferred by your call. "Chiang Pai" works for an Indian audience (it sounds like a place and a pun); it will need a second look before the global ring.
+5. **The name.** Settled: "Souvenir" (Aug 2026), with the play currency renamed to stamps. Travel-first, reads the same to an Indian and a global audience; trademark clearance (classes 9, 42) and domain still pending.
 
 ## Risks, honestly
 
 - **Absorption.** WhatsApp polls + Paytm splits + Airbnb group itineraries cover 80% of "coordination". The defensible 20% is the game and the group's own history; never drift into the 80%.
 - **Play money fatigue.** Manifold-style drift to ~900 daily users is what happens to play money without a season. The trip *is* the season; the recap and the rivalries are the retention, and the nemesis line is the re-engagement hook. If a trip's predictions stop at 2–3, the starters need to be better.
-- **Regulatory drift.** PROGA's "other stakes" hinges on *purchased*. The moment anyone proposes selling pies, cosmetic or not, the answer is no. The Supreme Court challenge is pending; the social-game carve-out is the stable ground.
-- **Store risk if wrapped.** A reviewer seeing "pool" and a currency may rate it 18+ simulated gambling. Words matter; so does presenting pies as points.
+- **Regulatory drift.** PROGA's "other stakes" hinges on *purchased*. The moment anyone proposes selling stamps, cosmetic or not, the answer is no. The Supreme Court challenge is pending; the social-game carve-out is the stable ground.
+- **Store risk if wrapped.** A reviewer seeing "pool" and a currency may rate it 18+ simulated gambling. Words matter; so does presenting stamps as points.
 - **Tone risk.** One screenshot of an "unhinged" line next to a money error is #RejectZomato. Lingo is opt-in per member and never touches rule errors — keep it that way.
 
 ## Appendix — what the research settled

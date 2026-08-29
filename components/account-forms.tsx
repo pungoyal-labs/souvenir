@@ -50,10 +50,10 @@ export function AccountForms({ name: initialName }: { name: string }) {
         </h2>
         <p className="mt-1 text-xs text-soft">
           Your name, email, picture, passkeys, key backups, and seats go at once, and nothing can
-          sign in as you again. What stays is the record every trip keeps of its own game — the pies
-          you won and lost, the bills you were on, the comments you wrote — under "Departed member",
-          because an append-only ledger can't forget a win without breaking everybody else's
-          numbers. Type DELETE to confirm.
+          sign in as you again. What stays is the record every trip keeps of its own game — the
+          stamps you won and lost, the bills you were on, the comments you wrote — under "Departed
+          member", because an append-only ledger can't forget a win without breaking everybody
+          else's numbers. Type DELETE to confirm.
         </p>
         <div className="mt-3 flex flex-wrap gap-2">
           <input

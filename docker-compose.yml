@@ -13,16 +13,16 @@ services:
     image: postgres:18-alpine
     restart: unless-stopped
     environment:
-      POSTGRES_USER: chiangpai
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-chiangpai}
-      POSTGRES_DB: chiangpai
+      POSTGRES_USER: souvenir
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-souvenir}
+      POSTGRES_DB: souvenir
     volumes:
       - pgdata:/var/lib/postgresql
     # Loopback only — never expose Postgres to the network.
     ports:
       - "127.0.0.1:${DB_PORT:-5566}:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U chiangpai -d chiangpai"]
+      test: ["CMD-SHELL", "pg_isready -U souvenir -d souvenir"]
       interval: 5s
       timeout: 3s
       retries: 20
@@ -30,7 +30,7 @@ services:
   # Runs pending migrations and exits. The app only starts after this succeeds.
   # Same image as the app — the standalone build bundles the migrate script.
   migrate:
-    image: ${APP_IMAGE:-chiang-pai:local}
+    image: ${APP_IMAGE:-souvenir:local}
     build:
       context: .
     command: ["node", "scripts/migrate.ts"]
@@ -39,14 +39,14 @@ services:
     env_file:
       - .env
     environment:
-      DATABASE_URL: postgres://chiangpai:${POSTGRES_PASSWORD:-chiangpai}@db:5432/chiangpai
+      DATABASE_URL: postgres://souvenir:${POSTGRES_PASSWORD:-souvenir}@db:5432/souvenir
     depends_on:
       db:
         condition: service_healthy
     restart: "no"
 
   app:
-    image: ${APP_IMAGE:-chiang-pai:local}
+    image: ${APP_IMAGE:-souvenir:local}
     build:
       context: .
     restart: unless-stopped
@@ -59,7 +59,7 @@ services:
     env_file:
       - .env
     environment:
-      DATABASE_URL: postgres://chiangpai:${POSTGRES_PASSWORD:-chiangpai}@db:5432/chiangpai
+      DATABASE_URL: postgres://souvenir:${POSTGRES_PASSWORD:-souvenir}@db:5432/souvenir
     depends_on:
       db:
         condition: service_healthy

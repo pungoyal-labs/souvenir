@@ -9,7 +9,7 @@ Status: decisions settled 2026-08-24; Phases 0, 1, 2 and 4 merged (#4, #5, #6) a
 
 **Protected** (every phone on the trip can read it; the server and anyone with
 its database cannot): predictions, criteria, resolution notes, every call —
-side and pies — results, the leaderboard, comments and mentions, reactions,
+side and stamps — results, the leaderboard, comments and mentions, reactions,
 page views, bills and every amount in them, kept phrases, the trip's name.
 
 **Protected against**: a database dump, a backup, a compromised host, an
@@ -301,7 +301,7 @@ historical key. That is the state to document until Phase 3 ships.
 ### 4.11 The two deliberate disclosures
 
 - `/card/[marketId]`: the share button now first posts a plaintext snapshot
-  (question, verdict, first names, pies) to `cards`; the page and OG image
+  (question, verdict, first names, stamps) to `cards`; the page and OG image
   render from it. Unpublish by the publisher or an organiser. Nothing is on
   that page a member did not choose to put there — which is what the rule in
   `AGENTS.md` already asks.
@@ -319,7 +319,7 @@ resolved on the client from the trip's pair (still configuration, still
 
 | The server still does | The server can no longer do |
 |---|---|
-| sign-in, sessions, passkey verification, Google | read a question, a call, a pie, a comment, a bill, a phrase |
+| sign-in, sessions, passkey verification, Google | read a question, a call, a stamp, a comment, a bill, a phrase |
 | seats, roles, name distinctness, terms, 18+ | enforce the cap, one-side, zero-sum, resolution authority |
 | order events, cap size, rate-limit, enforce epoch | render a card or a join preview unaided |
 | invites, recoveries, rekeys: TTL, single use, revocation | seat a *reading* intruder by itself |
@@ -413,7 +413,7 @@ What differs from the plan, and why:
 
 1. Deploy `main` with this phase; the migration adds the tables and leaves
    the plaintext ones in place.
-2. Back up: `docker compose exec db pg_dump -U chiangpai chiangpai > before-seal.sql`.
+2. Back up: `docker compose exec db pg_dump -U souvenir souvenir > before-seal.sql`.
 3. `docker compose run --rm migrate node scripts/seal-trip.ts "<trip id>"`
    — by id, not name, if a test trip could share it. The script prints one
    key link per member, with their name; it commits nothing if a replayed
@@ -523,7 +523,7 @@ provenance and an SBOM, and signs a Sigstore provenance attestation with the
 workflow's OIDC identity. The footer names the build; `/privacy` says how a
 member checks it: write to `CONTACT_EMAIL` naming the build and receive the
 source for that commit and the attestation (`gh attestation verify
-oci://<image>:<sha7> --owner pungoyal` ties the image to it).
+oci://<image>:<sha7> --owner pungoyal-labs` ties the image to it).
 
 Decided against, 2026-08-25: public verification (the repository may go
 private; a member who asks is the audience that matters), a public crypto
@@ -582,5 +582,5 @@ third-party sites in any client, as of August 2026.
 - Members page: *Rahul hasn't got the key yet.* — *Send the key*
 - Rotation: *Rahul's off the trip. The lock's been changed — share a fresh
   group link.*
-- Share card: *This puts the verdict on a public page, first names and pies.
+- Share card: *This puts the verdict on a public page, first names and stamps.
   Everything else stays sealed.*

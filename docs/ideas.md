@@ -1,9 +1,9 @@
-# Ideas — making Chiang Pai more useful to a travelling group
+# Ideas — making Souvenir more useful to a travelling group
 
 Written 25 August 2026, after the mobile-responsiveness pass; struck through
 as things ship. Not a plan; a shelf. Each idea is checked against the rules in `AGENTS.md`: content is a
 sealed event and replay derives the page, the server never needs plaintext,
-and pies are never money.
+and stamps are never money.
 
 The lens: the app already has the three things a trip group lacks in the
 group chat — a roster, a sealed shared record, and a per-trip clock

@@ -4,7 +4,7 @@
 
 import type { EventRow } from "@/lib/db/schema";
 
-const DB_NAME = "chiang-pai-log";
+const DB_NAME = "souvenir-log";
 const STORE = "rows";
 
 let db: Promise<IDBDatabase> | null = null;

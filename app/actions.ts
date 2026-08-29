@@ -467,7 +467,7 @@ export async function joinAsMemberAction(
 // back. The challenge lives in a signed cookie between the two (lib/auth.ts); the checking is
 // lib/webauthn.ts. Every field a finish action receives is a string of unknown provenance.
 
-const RP = { id: RP_ID, name: "Chiang Pai" } as const;
+const RP = { id: RP_ID, name: "Souvenir" } as const;
 const RP_CHECK = { rpId: RP_ID, origin: RP_ORIGIN } as const;
 
 const NOT_CONFIGURED =

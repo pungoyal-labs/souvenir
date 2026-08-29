@@ -44,7 +44,7 @@ export function BetPanel({
             <div className="flex items-center rounded-md border border-line">
               <button
                 type="button"
-                aria-label="One pie less"
+                aria-label="One stamp less"
                 className="px-3 py-2 text-lg leading-none text-soft hover:text-ink disabled:opacity-30"
                 disabled={clamped <= 1 || pending}
                 onClick={() => setPies(clamped - 1)}
@@ -54,7 +54,7 @@ export function BetPanel({
               <span className="mono w-10 text-center text-lg font-bold">{clamped}</span>
               <button
                 type="button"
-                aria-label="One pie more"
+                aria-label="One stamp more"
                 className="px-3 py-2 text-lg leading-none text-soft hover:text-ink disabled:opacity-30"
                 disabled={clamped >= maxPies || pending}
                 onClick={() => setPies(clamped + 1)}
@@ -63,7 +63,7 @@ export function BetPanel({
               </button>
             </div>
             <span className="text-xs text-soft">
-              pies · room for <Pies c={roomC} /> more here
+              stamps · room for <Pies c={roomC} /> more here
             </span>
           </div>
 

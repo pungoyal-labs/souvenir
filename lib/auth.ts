@@ -28,8 +28,8 @@ const GOOGLE_ISSUERS = new Set(["https://accounts.google.com", "accounts.google.
 /** Must match the authorised redirect URI registered in the Google console. */
 const CALLBACK_PATH = "/api/auth/callback/google";
 
-const SESSION_COOKIE = "chiang_pai_session";
-const HANDSHAKE_COOKIE = "chiang_pai_oauth";
+const SESSION_COOKIE = "souvenir_session";
+const HANDSHAKE_COOKIE = "souvenir_oauth";
 const SESSION_MAX_AGE_S = 60 * 60 * 24 * 30; // 30 days
 const HANDSHAKE_MAX_AGE_S = 60 * 10; // long enough to pick an account, no longer
 
@@ -136,7 +136,7 @@ export async function destroySession(): Promise<void> {
 // "I'm 18+ and agree" tick from the sign-in page rides over in a short signed
 // cookie, so the member row carries the moment they agreed.
 
-const CONSENT_COOKIE = "chiang_pai_consent";
+const CONSENT_COOKIE = "souvenir_consent";
 
 export async function noteSignInIntent(intent: { agreed: boolean; next: string }): Promise<void> {
   await setSigned(
@@ -324,7 +324,7 @@ if (!passkeysConfigured) {
   );
 }
 
-const PASSKEY_COOKIE = "chiang_pai_passkey";
+const PASSKEY_COOKIE = "souvenir_passkey";
 const PASSKEY_MAX_AGE_S = 60 * 5; // long enough for a fingerprint prompt
 
 /**

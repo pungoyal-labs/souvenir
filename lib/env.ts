@@ -10,7 +10,7 @@ const envSchema = z.object({
 
   // 127.0.0.1, not localhost: the compose port bind is IPv4-only, and
   // localhost can resolve to ::1 first and refuse the connection.
-  DATABASE_URL: z.string().default("postgres://chiangpai:chiangpai@127.0.0.1:5566/chiangpai"),
+  DATABASE_URL: z.string().default("postgres://souvenir:souvenir@127.0.0.1:5566/souvenir"),
 
   /** Pino level. Defaults to info in production, debug otherwise (lib/logger.ts). */
   LOG_LEVEL: z.enum(["fatal", "error", "warn", "info", "debug", "trace", "silent"]).optional(),

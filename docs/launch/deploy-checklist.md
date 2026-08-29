@@ -13,7 +13,7 @@ what needs a hand is that environment, and a backup when the schema moves.
 
 1. **Read the diff for two things**: a new migration under `drizzle/`, and
    a new or changed variable in `lib/env.ts` (`.env.example` documents each).
-2. **Migration?** Back up first — `docker exec chiang-pai-db-1 pg_dump -U chiangpai chiangpai > backup-$(date +%F).sql` on the box. Migrations are forward-only, and some have been destructive (`docs/private-trips.md` §7).
+2. **Migration?** Back up first — `docker exec souvenir-db-1 pg_dump -U souvenir souvenir > backup-$(date +%F).sql` on the box. Migrations are forward-only, and some have been destructive (`docs/private-trips.md` §7).
 3. **New variable?** Add it to `ci.yml`'s `.env` heredoc and set it in the
    `oracle-cloud` environment *before* pushing; a required one missing stops
    the app at boot (`lib/env.ts` refuses to start), an optional one missing
@@ -23,7 +23,30 @@ what needs a hand is that environment, and a backup when the schema moves.
    `docker compose run --rm migrate node scripts/stats.ts` still reads the
    trips; open the live trip on a phone that holds the key.
 
-## This release — destinations, no country in code
+## This release — Souvenir, a fresh start
+
+The rebrand (Aug 2026): the product is **Souvenir**, the play currency is
+**stamps**, and the deploy is a new box with a fresh database — the old
+Chiang Pai deploy is left running untouched until its trip ends, then
+retired. Nothing migrates; that is the point. What this release needs is
+the new repo's plumbing, not a data cutover:
+
+- Repo: `github.com/pungoyal-labs/souvenir`; images land at
+  `ghcr.io/pungoyal-labs/souvenir` automatically.
+- A new `oracle-cloud` environment, everything fresh: new `AUTH_SECRET`,
+  new `POSTGRES_PASSWORD`, `AUTH_URL` naming the new domain, new Google
+  OAuth client (consent screen lists `/terms` and `/privacy`; redirect URI
+  `{AUTH_URL}/api/auth/callback/google`), `OCI_*` pointing at the new VM,
+  `DEPLOY_DIR=/opt/souvenir` (the compose project name — the console
+  commands below assume `souvenir-db-1`).
+- Safe-only renames rode along because no phone and no row predates them:
+  the PRF salt (`souvenir keyring v1`), the IndexedDB names, the cookie
+  names, the `souvenir` Postgres role. None of these can ever be renamed
+  again once a member exists.
+- First deploy: `migrate` builds the schema from zero; verify the footer
+  names the build, register a passkey, `stats.ts` reads zero trips.
+
+## Earlier release — destinations, no country in code
 
 No migration. Production has never had a server voice (`SPEECH_*` was not in
 the rendered `.env`), so the talk page speaks with the phone's own voice and

@@ -16,8 +16,8 @@ describe("RECOVERY_TTL_MS", () => {
 
 describe("recoveryUrl", () => {
   it("puts the code in the path, and nowhere near /join", () => {
-    expect(recoveryUrl("https://pai.example.com", "abc123")).toBe(
-      "https://pai.example.com/recover/abc123",
+    expect(recoveryUrl("https://souvenir.example.com", "abc123")).toBe(
+      "https://souvenir.example.com/recover/abc123",
     );
   });
 });

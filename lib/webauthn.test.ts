@@ -21,8 +21,8 @@ import {
 // without a browser. The CBOR here is written by hand (lib/cbor.ts only reads),
 // which keeps the encoder that builds fixtures independent of the decoder.
 
-const RP_ID = "chiang.example";
-const ORIGIN = "https://chiang.example";
+const RP_ID = "souvenir.example";
+const ORIGIN = "https://souvenir.example";
 
 const FLAG_UP = 0x01;
 const FLAG_UV = 0x04;
@@ -217,7 +217,7 @@ describe("verifyRegistration", () => {
     response.clientDataJSON = clientData({
       type: "webauthn.create",
       challenge: expected.challenge,
-      origin: "https://chiang.example.evil.test",
+      origin: "https://souvenir.example.evil.test",
     });
     expect(() => verifyRegistration(response, expected)).toThrow(/is not ours/);
   });
@@ -417,7 +417,7 @@ describe("parseAuthenticatorData", () => {
 
 describe("registrationOptions", () => {
   const base = {
-    rp: { id: RP_ID, name: "Chiang Pai" },
+    rp: { id: RP_ID, name: "Souvenir" },
     origin: ORIGIN,
     challenge: "Q0hBTExFTkdF",
     memberId: "8f14e45f-ea8d-4c2a-9f1b-000000000000",
@@ -472,9 +472,9 @@ describe("signInOptions", () => {
 
 describe("relyingPartyFrom", () => {
   it("takes the hostname, without scheme or port", () => {
-    const rp = relyingPartyFrom("https://pai.example.com:8443");
-    expect(rp.rpId).toBe("pai.example.com");
-    expect(rp.origin).toBe("https://pai.example.com:8443");
+    const rp = relyingPartyFrom("https://souvenir.example.com:8443");
+    expect(rp.rpId).toBe("souvenir.example.com");
+    expect(rp.origin).toBe("https://souvenir.example.com:8443");
     expect(rp.usable).toBe(true);
   });
 
@@ -494,7 +494,7 @@ describe("relyingPartyFrom", () => {
   });
 
   it("refuses plain http anywhere else", () => {
-    const rp = relyingPartyFrom("http://pai.example.com");
+    const rp = relyingPartyFrom("http://souvenir.example.com");
     expect(rp.usable).toBe(false);
     expect(rp.reason).toMatch(/https/);
   });
