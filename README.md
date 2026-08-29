@@ -244,9 +244,6 @@ ambiguous on a shared network), or `127.0.0.1:${APP_PORT:-3000}` from the
 host; the deploy writes `docker-compose.yml` and `.env` there itself.
 
 Every release follows [`docs/launch/deploy-checklist.md`](docs/launch/deploy-checklist.md).
-The box, the environment names, and the pipeline are conventions shared by
-every app on the host — [`docs/deploy-conventions.md`](docs/deploy-conventions.md)
-is the portable write-up, meant to be followed from another app's repo.
 Console scripts run from the image, which has no pnpm:
 
 ```sh
