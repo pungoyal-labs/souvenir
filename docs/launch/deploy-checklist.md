@@ -36,7 +36,7 @@ the new repo's plumbing, not a data cutover:
 - A new `oracle-cloud` environment, everything fresh: new `AUTH_SECRET`,
   new `POSTGRES_PASSWORD`, `AUTH_URL` naming the new domain, new Google
   OAuth client (consent screen lists `/terms` and `/privacy`; redirect URI
-  `{AUTH_URL}/api/auth/callback/google`), `OCI_*` pointing at the new VM,
+  `{AUTH_URL}/api/auth/callback/google`), `SSH_*` pointing at the new VM (host, user, private key, and `SSH_KNOWN_HOSTS` pinning its host keys),
   `DEPLOY_DIR=/opt/souvenir` (the compose project name — the console
   commands below assume `souvenir-db-1`).
 - Safe-only renames rode along because no phone and no row predates them:
