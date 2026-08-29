@@ -107,13 +107,15 @@ jobs:
     runs-on: ubuntu-24.04-arm
     # Everything host-specific comes from the "oracle-cloud" GitHub environment,
     # which is the single source of truth for the server's .env:
-    #   vars:    OCI_HOST, OCI_USER, OCI_SSH_PORT (optional), DEPLOY_DIR,
+    #   vars:    SSH_HOST, SSH_USER, SSH_PORT (optional), SSH_KNOWN_HOSTS
+    #            (the box's host keys, `ssh-keyscan` format — the deploy
+    #            refuses a host that doesn't match), DEPLOY_DIR,
     #            APP_PORT, APP_BIND, DB_PORT, AUTH_URL,
     #            RANKED_MIN_RESOLVED, CONTACT_EMAIL, LLM_BASE_URL, LLM_MODEL,
     #            SPEECH_BASE_URL, SPEECH_TTS_MODEL, SPEECH_GROUP_ID, SPEECH_VOICES,
     #            SPEECH_VOICE_US, SPEECH_VOICE_THEM, SPEECH_VOICE_THEM_PITCH,
     #            SPEECH_VOICE_THEM_SPEED (all optional: blank is unset, lib/env.ts)
-    #   secrets: OCI_SSH_KEY, POSTGRES_PASSWORD, AUTH_SECRET,
+    #   secrets: SSH_PRIVATE_KEY, POSTGRES_PASSWORD, AUTH_SECRET,
     #            AUTH_GOOGLE_ID, AUTH_GOOGLE_SECRET, LLM_API_KEY,
     #            SPEECH_API_KEY (optional: one vendor, so LLM_API_KEY serves)
     # The registry pull uses this run's ephemeral GITHUB_TOKEN — no PAT needed.
@@ -125,12 +127,15 @@ jobs:
       group: deploy-oracle-cloud
       cancel-in-progress: false
     steps:
-      # A single SSH step does the whole deploy, so the connection inputs
-      # (host/user/port/key) are written once rather than repeated per step.
-      # The host needs no checkout: it pulls the compose file for this exact
-      # commit straight from the API, and renders .env from the environment.
+      # A single SSH step does the whole deploy, so the connection inputs are
+      # written once rather than repeated per step. Plain ssh, not an action:
+      # SSH_KNOWN_HOSTS pins the box's host keys and StrictHostKeyChecking
+      # refuses anything else, so the deploy cannot be redirected to a host
+      # that isn't ours. The host needs no checkout: it pulls the compose file
+      # for this exact commit straight from the API, and renders .env from the
+      # environment. The `export %q` prelude is how the runner's env crosses
+      # the wire without a remote shell re-parsing unquoted values.
       - name: Deploy over SSH
-        uses: appleboy/ssh-action@v1
         env:
           APP_IMAGE: ${{ needs.image.outputs.image }}:${{ needs.image.outputs.tag }}
           APP_PORT: ${{ vars.APP_PORT }}
@@ -139,88 +144,100 @@ jobs:
           GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REPO: ${{ github.repository }}
           SHA: ${{ github.sha }}
-        with:
-          host: ${{ vars.OCI_HOST }}
-          username: ${{ vars.OCI_USER }}
-          port: ${{ vars.OCI_SSH_PORT || 22 }}
-          key: ${{ secrets.OCI_SSH_KEY }}
-          envs: APP_IMAGE,APP_PORT,DEPLOY_DIR,GHCR_USER,GHCR_TOKEN,REPO,SHA
-          script: |
-            set -euo pipefail
+          SSH_HOST: ${{ vars.SSH_HOST }}
+          SSH_USER: ${{ vars.SSH_USER }}
+          SSH_PORT: ${{ vars.SSH_PORT || 22 }}
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          SSH_KNOWN_HOSTS: ${{ vars.SSH_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh && chmod 700 ~/.ssh
+          printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          {
+            printf 'export APP_IMAGE=%q APP_PORT=%q DEPLOY_DIR=%q GHCR_USER=%q GHCR_TOKEN=%q REPO=%q SHA=%q\n' \
+              "$APP_IMAGE" "$APP_PORT" "$DEPLOY_DIR" "$GHCR_USER" "$GHCR_TOKEN" "$REPO" "$SHA"
+            cat <<'DEPLOY_SCRIPT'
+          set -euo pipefail
 
-            # DEPLOY_DIR may not exist on a fresh host. Parents like /opt are
-            # root-owned, so fall back to sudo and hand the dir to the SSH user.
-            if [ ! -d "$DEPLOY_DIR" ]; then
-              mkdir -p "$DEPLOY_DIR" 2>/dev/null || {
-                sudo mkdir -p "$DEPLOY_DIR"
-                sudo chown "$(id -u):$(id -g)" "$DEPLOY_DIR"
-              }
+          # DEPLOY_DIR may not exist on a fresh host. Parents like /opt are
+          # root-owned, so fall back to sudo and hand the dir to the SSH user.
+          if [ ! -d "$DEPLOY_DIR" ]; then
+            mkdir -p "$DEPLOY_DIR" 2>/dev/null || {
+              sudo mkdir -p "$DEPLOY_DIR"
+              sudo chown "$(id -u):$(id -g)" "$DEPLOY_DIR"
+            }
+          fi
+          cd "$DEPLOY_DIR"
+
+          # Take the compose file from the exact commit being deployed, so the
+          # host can never drift from the repo. The run's own GITHUB_TOKEN
+          # authenticates, which keeps working if the repo goes private.
+          curl -fsSL \
+            -H "Authorization: Bearer $GHCR_TOKEN" \
+            -H "Accept: application/vnd.github.raw" \
+            "https://api.github.com/repos/$REPO/contents/docker-compose.yml?ref=$SHA" \
+            -o docker-compose.yml
+
+          # .env is rendered fresh on every deploy from the oracle-cloud
+          # environment — edit a var/secret there and redeploy, never edit the
+          # server by hand. Quoted heredoc: values are written verbatim, and
+          # GitHub masks the secret values in the run log.
+          umask 077
+          cat > .env <<'ENV_EOF'
+          APP_PORT=${{ vars.APP_PORT }}
+          APP_BIND=${{ vars.APP_BIND }}
+          DB_PORT=${{ vars.DB_PORT }}
+          POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}
+          AUTH_SECRET=${{ secrets.AUTH_SECRET }}
+          AUTH_URL=${{ vars.AUTH_URL }}
+          AUTH_GOOGLE_ID=${{ secrets.AUTH_GOOGLE_ID }}
+          AUTH_GOOGLE_SECRET=${{ secrets.AUTH_GOOGLE_SECRET }}
+          AUTH_DEV_LOGIN=false
+          RANKED_MIN_RESOLVED=${{ vars.RANKED_MIN_RESOLVED }}
+          CONTACT_EMAIL=${{ vars.CONTACT_EMAIL }}
+          LLM_BASE_URL=${{ vars.LLM_BASE_URL }}
+          LLM_API_KEY=${{ secrets.LLM_API_KEY }}
+          LLM_MODEL=${{ vars.LLM_MODEL }}
+          SPEECH_BASE_URL=${{ vars.SPEECH_BASE_URL }}
+          SPEECH_API_KEY=${{ secrets.SPEECH_API_KEY || secrets.LLM_API_KEY }}
+          SPEECH_TTS_MODEL=${{ vars.SPEECH_TTS_MODEL }}
+          SPEECH_GROUP_ID=${{ vars.SPEECH_GROUP_ID }}
+          SPEECH_VOICES=${{ vars.SPEECH_VOICES }}
+          SPEECH_VOICE_US=${{ vars.SPEECH_VOICE_US }}
+          SPEECH_VOICE_THEM=${{ vars.SPEECH_VOICE_THEM }}
+          SPEECH_VOICE_THEM_PITCH=${{ vars.SPEECH_VOICE_THEM_PITCH }}
+          SPEECH_VOICE_THEM_SPEED=${{ vars.SPEECH_VOICE_THEM_SPEED }}
+          ENV_EOF
+
+          echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
+          export APP_IMAGE
+          docker compose pull app
+          docker compose up -d --no-build app
+
+          # `up -d` returns once the container has STARTED, which is not the
+          # same as serving: an app that boots and crashes (bad env, failed
+          # DB connect) would otherwise deploy green. Poll until it answers,
+          # and fail the run with its logs if it never does. /signin is the
+          # one page that needs no session.
+          probe="http://127.0.0.1:${APP_PORT:-3000}/signin"
+          for attempt in $(seq 1 30); do
+            if curl -fsS --max-time 5 -o /dev/null "$probe"; then
+              echo "app is serving ($probe)"
+              break
             fi
-            cd "$DEPLOY_DIR"
+            if [ "$attempt" -eq 30 ]; then
+              echo "app never served $probe after 60s; last 50 log lines:" >&2
+              docker compose logs --tail=50 app >&2
+              exit 1
+            fi
+            sleep 2
+          done
 
-            # Take the compose file from the exact commit being deployed, so the
-            # host can never drift from the repo. The run's own GITHUB_TOKEN
-            # authenticates, which keeps working if the repo goes private.
-            curl -fsSL \
-              -H "Authorization: Bearer $GHCR_TOKEN" \
-              -H "Accept: application/vnd.github.raw" \
-              "https://api.github.com/repos/$REPO/contents/docker-compose.yml?ref=$SHA" \
-              -o docker-compose.yml
-
-            # .env is rendered fresh on every deploy from the oracle-cloud
-            # environment — edit a var/secret there and redeploy, never edit the
-            # server by hand. Quoted heredoc: values are written verbatim, and
-            # GitHub masks the secret values in the run log.
-            umask 077
-            cat > .env <<'ENV_EOF'
-            APP_PORT=${{ vars.APP_PORT }}
-            APP_BIND=${{ vars.APP_BIND }}
-            DB_PORT=${{ vars.DB_PORT }}
-            POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}
-            AUTH_SECRET=${{ secrets.AUTH_SECRET }}
-            AUTH_URL=${{ vars.AUTH_URL }}
-            AUTH_GOOGLE_ID=${{ secrets.AUTH_GOOGLE_ID }}
-            AUTH_GOOGLE_SECRET=${{ secrets.AUTH_GOOGLE_SECRET }}
-            AUTH_DEV_LOGIN=false
-            RANKED_MIN_RESOLVED=${{ vars.RANKED_MIN_RESOLVED }}
-            CONTACT_EMAIL=${{ vars.CONTACT_EMAIL }}
-            LLM_BASE_URL=${{ vars.LLM_BASE_URL }}
-            LLM_API_KEY=${{ secrets.LLM_API_KEY }}
-            LLM_MODEL=${{ vars.LLM_MODEL }}
-            SPEECH_BASE_URL=${{ vars.SPEECH_BASE_URL }}
-            SPEECH_API_KEY=${{ secrets.SPEECH_API_KEY || secrets.LLM_API_KEY }}
-            SPEECH_TTS_MODEL=${{ vars.SPEECH_TTS_MODEL }}
-            SPEECH_GROUP_ID=${{ vars.SPEECH_GROUP_ID }}
-            SPEECH_VOICES=${{ vars.SPEECH_VOICES }}
-            SPEECH_VOICE_US=${{ vars.SPEECH_VOICE_US }}
-            SPEECH_VOICE_THEM=${{ vars.SPEECH_VOICE_THEM }}
-            SPEECH_VOICE_THEM_PITCH=${{ vars.SPEECH_VOICE_THEM_PITCH }}
-            SPEECH_VOICE_THEM_SPEED=${{ vars.SPEECH_VOICE_THEM_SPEED }}
-            ENV_EOF
-
-            echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
-            export APP_IMAGE
-            docker compose pull app
-            docker compose up -d --no-build app
-
-            # `up -d` returns once the container has STARTED, which is not the
-            # same as serving: an app that boots and crashes (bad env, failed
-            # DB connect) would otherwise deploy green. Poll until it answers,
-            # and fail the run with its logs if it never does. /signin is the
-            # one page that needs no session.
-            probe="http://127.0.0.1:${APP_PORT:-3000}/signin"
-            for attempt in $(seq 1 30); do
-              if curl -fsS --max-time 5 -o /dev/null "$probe"; then
-                echo "app is serving ($probe)"
-                break
-              fi
-              if [ "$attempt" -eq 30 ]; then
-                echo "app never served $probe after 60s; last 50 log lines:" >&2
-                docker compose logs --tail=50 app >&2
-                exit 1
-              fi
-              sleep 2
-            done
-
-            docker image prune -f
-            docker compose ps
+          docker image prune -f
+          docker compose ps
+          DEPLOY_SCRIPT
+          } | ssh -i ~/.ssh/deploy_key -p "$SSH_PORT" \
+                -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes \
+                "$SSH_USER@$SSH_HOST" bash -s

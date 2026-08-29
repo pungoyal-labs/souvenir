@@ -226,11 +226,12 @@ Configure a GitHub **environment named `oracle-cloud`**:
 
 | Kind | Name | Value |
 | --- | --- | --- |
-| var | `OCI_HOST` | server hostname/IP |
-| var | `OCI_USER` | ssh user |
-| var | `OCI_SSH_PORT` | optional, defaults to 22 |
+| var | `SSH_HOST` | server hostname/IP |
+| var | `SSH_USER` | ssh user |
+| var | `SSH_PORT` | optional, defaults to 22 |
+| var | `SSH_KNOWN_HOSTS` | the box's host keys (`ssh-keyscan <host>`); the deploy refuses a host that doesn't match |
 | var | `DEPLOY_DIR` | server directory holding `docker-compose.yml` + `.env` |
-| secret | `OCI_SSH_KEY` | private key for the ssh user |
+| secret | `SSH_PRIVATE_KEY` | private key for the ssh user |
 | var / secret | every name in the configuration table above | the server's `.env` is rendered from these on each deploy (`ci.yml`); a blank one is unset |
 
 No registry credentials needed: the deploy job logs the server into GHCR with
