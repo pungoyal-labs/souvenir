@@ -110,7 +110,9 @@ jobs:
     #   vars:    SSH_HOST, SSH_USER, SSH_PORT (optional), SSH_KNOWN_HOSTS
     #            (the box's host keys, `ssh-keyscan` format — the deploy
     #            refuses a host that doesn't match), DEPLOY_DIR,
-    #            APP_PORT, APP_BIND, DB_PORT, AUTH_URL,
+    #            APP_PORT, APP_BIND, DB_PORT, AUTH_URL, DOCKER_NETWORK
+    #            (repo-level: the external network the app joins so the
+    #            box's proxy can reach it),
     #            RANKED_MIN_RESOLVED, CONTACT_EMAIL, LLM_BASE_URL, LLM_MODEL,
     #            SPEECH_BASE_URL, SPEECH_TTS_MODEL, SPEECH_GROUP_ID, SPEECH_VOICES,
     #            SPEECH_VOICE_US, SPEECH_VOICE_THEM, SPEECH_VOICE_THEM_PITCH,
@@ -189,6 +191,7 @@ jobs:
           APP_PORT=${{ vars.APP_PORT }}
           APP_BIND=${{ vars.APP_BIND }}
           DB_PORT=${{ vars.DB_PORT }}
+          DOCKER_NETWORK=${{ vars.DOCKER_NETWORK }}
           POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}
           AUTH_SECRET=${{ secrets.AUTH_SECRET }}
           AUTH_URL=${{ vars.AUTH_URL }}

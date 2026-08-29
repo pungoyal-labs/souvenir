@@ -65,6 +65,18 @@ services:
         condition: service_healthy
       migrate:
         condition: service_completed_successfully
+    # Also on the box's proxy network, so the reverse proxy reaches the app by
+    # service name without the app ever binding a public port itself.
+    networks:
+      - default
+      - edge
 
 volumes:
   pgdata:
+
+networks:
+  # Pre-existing on the box (the proxy lives there); DOCKER_NETWORK names it.
+  # For a full local stack, `docker network create edge` once.
+  edge:
+    external: true
+    name: ${DOCKER_NETWORK:-edge}
