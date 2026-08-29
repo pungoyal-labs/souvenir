@@ -65,11 +65,16 @@ services:
         condition: service_healthy
       migrate:
         condition: service_completed_successfully
-    # Also on the box's proxy network, so the reverse proxy reaches the app by
-    # service name without the app ever binding a public port itself.
+    # Also on the box's proxy network, so the reverse proxy reaches the app
+    # without the app ever binding a public port itself. The network is shared,
+    # and every compose project calls its service `app` — so the name there is
+    # ours alone: the proxy targets souvenir:3000. (The generic `app` alias
+    # still exists on that network; nothing should use it.)
     networks:
-      - default
-      - edge
+      default: null
+      edge:
+        aliases:
+          - souvenir
 
 volumes:
   pgdata:

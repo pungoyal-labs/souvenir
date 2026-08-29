@@ -238,8 +238,10 @@ No registry credentials needed: the deploy job logs the server into GHCR with
 its ephemeral `GITHUB_TOKEN` (`packages: read`).
 
 One-time server setup: install Docker, create `DEPLOY_DIR`, and point your
-reverse proxy at `127.0.0.1:${APP_PORT:-3000}`; the deploy writes
-`docker-compose.yml` and `.env` there itself.
+reverse proxy at the app — `souvenir:3000` if the proxy shares the
+`DOCKER_NETWORK` network (the app's alias there; the generic `app` name is
+ambiguous on a shared network), or `127.0.0.1:${APP_PORT:-3000}` from the
+host; the deploy writes `docker-compose.yml` and `.env` there itself.
 
 Every release follows [`docs/launch/deploy-checklist.md`](docs/launch/deploy-checklist.md).
 Console scripts run from the image, which has no pnpm:
