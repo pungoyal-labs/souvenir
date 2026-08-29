@@ -3,15 +3,16 @@ import { Big_Shoulders, Instrument_Sans, Spline_Sans_Mono } from "next/font/goog
 import Link from "next/link";
 import { signOutAction } from "@/app/actions";
 import { Avatar } from "@/components/avatar";
+import { BackupNudge } from "@/components/backup-nudge";
 import { KeyringProvider } from "@/components/keyring";
 import { Logo } from "@/components/logo";
 import { PasskeyNudge } from "@/components/passkey-nudge";
 import { RecoveryNotice } from "@/components/recovery-notice";
 import { TermsNudge } from "@/components/terms-nudge";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { passkeysConfigured } from "@/lib/auth";
+import { passkeysConfigured, RP_ID } from "@/lib/auth";
 import { build } from "@/lib/build";
-import { hasPasskey, recoveryNoticeFor } from "@/lib/data";
+import { passkeyBackups, recoveryNoticeFor } from "@/lib/data";
 import { env } from "@/lib/env";
 import { lingoOf } from "@/lib/lingo";
 import { routes } from "@/lib/routes";
@@ -62,12 +63,12 @@ export const viewport: Viewport = {
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const member = await currentMember();
-  const [enrolled, recoveries] = member
-    ? await Promise.all([hasPasskey(member.id), recoveryNoticeFor(member.id)])
-    : [true, null];
+  const [passkeys, recoveries] = member
+    ? await Promise.all([passkeyBackups(member.id), recoveryNoticeFor(member.id)])
+    : [[], null];
   const liveRecovery = recoveries?.live[0] ?? null;
   const usedRecovery = recoveries?.used[0] ?? null;
-  const needsPasskey = passkeysConfigured && member != null && !enrolled;
+  const needsPasskey = passkeysConfigured && member != null && passkeys.length === 0;
   const needsTerms = member != null && member.termsAcceptedAt == null;
   const t = lingoOf(member?.lingo ?? "english");
 
@@ -143,6 +144,13 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           <PasskeyNudge memberId={member.id} needsPicture={member.avatarUpdatedAt == null} />
         )}
         <KeyringProvider signedIn={member != null}>
+          {member && !needsTerms && passkeys.length > 0 && (
+            <BackupNudge
+              rpId={RP_ID}
+              held={passkeys.map((p) => p.id)}
+              wrapped={passkeys.filter((p) => p.wrapped).map((p) => p.id)}
+            />
+          )}
           <main className="mx-auto max-w-5xl px-4 py-6">{children}</main>
         </KeyringProvider>
         <footer className="mx-auto flex max-w-5xl flex-wrap items-center gap-x-4 gap-y-1 px-4 pb-[calc(2rem+env(safe-area-inset-bottom))] pt-4 text-xs text-soft">

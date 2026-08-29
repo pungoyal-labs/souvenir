@@ -21,6 +21,7 @@ import {
   openKeyring,
   openName,
   parseKeyring,
+  passkeysToFetch,
   prfKeyringKey,
   sealKeyring,
   sealName,
@@ -177,6 +178,13 @@ describe("passkey backup", () => {
       openKeyring(await prfKeyringKey(new Uint8Array(32).fill(8)), blob),
     ).rejects.toThrow(CryptoError);
     await expect(prfKeyringKey(new Uint8Array(16))).rejects.toThrow(CryptoError);
+  });
+
+  it("asks for a secret only from passkeys with neither a secret here nor a backup anywhere", () => {
+    expect(passkeysToFetch(["a", "b", "c", "d"], ["a"], ["b"])).toEqual(["c", "d"]);
+    expect(passkeysToFetch(["a"], [], [])).toEqual(["a"]);
+    expect(passkeysToFetch([], ["a"], ["b"])).toEqual([]);
+    expect(passkeysToFetch(["a", "b"], ["a", "b"], [])).toEqual([]);
   });
 });
 

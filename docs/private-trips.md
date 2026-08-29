@@ -542,6 +542,24 @@ join preview stays. The keyless card now names password managers as the
 usual reason a passkey backup is unavailable — Bitwarden returns no PRF to
 third-party sites in any client, as of August 2026.
 
+### The backup that was never written — 2026-08-29
+
+The restore side of Phase 4 worked; the write side often had nothing to
+write. A backup is sealed by a phone holding both the trip keys and a PRF
+secret, and the phone that enrolled the passkey — the one with the keys —
+got a secret only if `create()` evaluated the PRF, which Chrome and Google
+Password Manager do not (they answer `enabled: true` and evaluate on
+`get()`), and which no passkey enrolled before Phase 4 ever did. A new
+device then signed in, derived its secret, and found no backup: the keyless
+card's *sign in with this passkey once on a phone that has the key* was the
+only way out. Now `createCredential` follows a `create()` that withheld the
+secret with a local `get()` on the new credential (`fetchPrf`: random
+challenge, assertion discarded), and a phone that holds keys is nudged, once
+per passkey with no backup anywhere (`lib/keys` `passkeysToFetch`,
+`components/backup-nudge.tsx`), to do the same; the account page shows per
+passkey whether a backup exists and offers the tap. Nothing about the
+server changed: it still stores a blob per credential it cannot open.
+
 ## 8. Decisions — settled 2026-08-24
 
 1. **Destination, dates, currencies, cap stay plaintext in v1.** They drive

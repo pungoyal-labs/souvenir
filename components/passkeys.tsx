@@ -15,7 +15,7 @@ import { fromBase64Url, toBase64Url } from "@/lib/crypto";
 import { fmtDate, timeAgo } from "@/lib/format";
 import { PRF_SALT } from "@/lib/keys";
 import type { PasskeyRegistrationOptions, PasskeySignInOptions } from "@/lib/webauthn";
-import { rememberPrf } from "./keyring";
+import { prfWithheld, rememberPrf, useKeyring } from "./keyring";
 import { ActError, useAct } from "./use-act";
 
 const toBase64url = (bytes: ArrayBuffer) => toBase64Url(new Uint8Array(bytes));
@@ -55,6 +55,36 @@ function ceremonyError(err: unknown, verb: string): string {
 const prfExtension = () =>
   ({ prf: { eval: { first: PRF_SALT } } }) as AuthenticationExtensionsClientInputs;
 
+/**
+ * A `get()` whose only point is the PRF secret: the challenge is local and the assertion is
+ * dropped, since nobody is being signed in. The authenticator evaluates the PRF on `get()`
+ * where it would not on `create()`, and this phone may already hold the keys a backup wants
+ * without ever having signed in here with the passkey. True when a secret was kept.
+ */
+export async function fetchPrf(rpId: string, credentialIds: string[]): Promise<boolean> {
+  if (!window.PublicKeyCredential || credentialIds.length === 0) return false;
+  let credential: Credential | null;
+  try {
+    credential = await navigator.credentials.get({
+      publicKey: {
+        challenge: crypto.getRandomValues(new Uint8Array(32)),
+        rpId,
+        allowCredentials: credentialIds.map((id) => ({
+          type: "public-key",
+          id: fromBase64url(id),
+        })),
+        userVerification: "preferred",
+        timeout: 60_000,
+        extensions: prfExtension(),
+      },
+    });
+  } catch (err) {
+    console.warn("no PRF secret from this passkey", err);
+    return false;
+  }
+  return credential ? rememberPrf(credential as PublicKeyCredential) : false;
+}
+
 type Begun<O> = ActionResult & { options?: O };
 
 /**
@@ -71,7 +101,7 @@ async function ceremony<O extends { origin: string }>(
   ) => Promise<Credential | null>,
   verb: string,
   absent: string,
-): Promise<{ credential: PublicKeyCredential } | { error: string }> {
+): Promise<{ credential: PublicKeyCredential; options: O } | { error: string }> {
   if (!window.PublicKeyCredential) return { error: "This browser doesn't support passkeys." };
   const begun = await begin();
   if (!begun.ok || !begun.options) return { error: begun.error ?? "Couldn't start. Try again." };
@@ -85,7 +115,7 @@ async function ceremony<O extends { origin: string }>(
   }
   if (!credential) return { error: absent };
   await rememberPrf(credential);
-  return { credential };
+  return { credential, options: begun.options };
 }
 
 /** The wire shape a finish action expects; see lib/webauthn.ts. */
@@ -134,7 +164,11 @@ export async function createCredential(
     `No passkey was ${verb}.`,
   );
   if ("error" in made) return made;
-  const { credential } = made;
+  const { credential, options } = made;
+  // Chrome enables the PRF on create() and evaluates it only on get(): ask once more, now, so
+  // the phone that enrolled the passkey — the one with the keys — is the one that backs them up.
+  // A refusal here costs the backup, never the passkey.
+  if (prfWithheld(credential)) await fetchPrf(options.rp.id, [credential.id]);
   const response = credential.response as AuthenticatorAttestationResponse;
   return {
     wire: {
@@ -223,10 +257,54 @@ export interface PasskeySummary {
   createdAt: Date;
   lastUsedAt: Date | null;
   backedUp: boolean;
+  /** A keyring backup exists under this passkey's secret. */
+  wrapped: boolean;
+}
+
+/**
+ * Whether this passkey backs the keys up, and the one thing to do about it when it does not:
+ * hand over its secret here, on a phone that holds keys. Sealed under a passkey this phone has
+ * no secret for, a backup cannot be refreshed from here either — the same tap fixes that.
+ */
+function KeyBackup({ passkey, rpId }: { passkey: PasskeySummary; rpId: string }) {
+  const router = useRouter();
+  const { status, keyring, passkeys, backUpNow } = useKeyring();
+  const { pending, error, act } = useAct();
+  const holdsKeys = status === "ready" && Object.keys(keyring.trips).length > 0;
+  const secretHere = passkeys.includes(passkey.id);
+  const label = passkey.wrapped ? "Backs up your keys" : "No key backup yet";
+  return (
+    <span className="inline-flex flex-wrap items-center gap-x-2 text-xs text-soft">
+      <span>{label}</span>
+      {holdsKeys && !secretHere && (
+        <button
+          type="button"
+          disabled={pending}
+          onClick={() =>
+            act(async () => {
+              if (!(await fetchPrf(rpId, [passkey.id]))) {
+                return { ok: false, error: "This passkey didn't hand over its secret here." };
+              }
+              const written = await backUpNow();
+              if (!written.includes(passkey.id)) {
+                return { ok: false, error: "The backup didn't go through. Try again." };
+              }
+              router.refresh();
+              return { ok: true };
+            })
+          }
+          className="btn btn-link px-1 py-0 text-xs text-felt"
+        >
+          {pending ? "Waiting for your device…" : "Back up keys here"}
+        </button>
+      )}
+      <ActError error={error} />
+    </span>
+  );
 }
 
 /** Shown on your own member page: the keys that can sign in as you. */
-export function PasskeyManager({ passkeys }: { passkeys: PasskeySummary[] }) {
+export function PasskeyManager({ passkeys, rpId }: { passkeys: PasskeySummary[]; rpId: string }) {
   const router = useRouter();
   const { pending, error, act } = useAct();
 
@@ -251,6 +329,7 @@ export function PasskeyManager({ passkeys }: { passkeys: PasskeySummary[] }) {
                     ? ` · last used ${timeAgo(passkey.lastUsedAt)}`
                     : " · not used yet"}
                 </p>
+                <KeyBackup passkey={passkey} rpId={rpId} />
               </div>
               <button
                 type="button"

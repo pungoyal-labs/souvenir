@@ -3,6 +3,7 @@ import { Avatar } from "@/components/avatar";
 import { AvatarPicker } from "@/components/avatar-picker";
 import { LingoPicker } from "@/components/lingo-picker";
 import { PasskeyManager } from "@/components/passkeys";
+import { RP_ID } from "@/lib/auth";
 import { listPasskeySummaries, listTrips } from "@/lib/data";
 import { fmtDate } from "@/lib/format";
 import { requireMember } from "@/lib/session";
@@ -41,7 +42,7 @@ export default async function AccountPage() {
           never locks you out.
         </p>
         <div className="mt-3">
-          <PasskeyManager passkeys={passkeys} />
+          <PasskeyManager passkeys={passkeys} rpId={RP_ID} />
         </div>
       </section>
 

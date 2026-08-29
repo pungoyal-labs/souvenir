@@ -79,7 +79,11 @@ Pre-commit (husky): biome on staged files, tsc, full test suite.
   (`keyring_wraps`, `lib/keys` `prfKeyringKey`): the authenticator derives
   the same secret on every device the passkey syncs to, so a sign-in with
   that passkey restores the keys by itself, and dropping the passkey drops
-  the backup. A rotated key (`lib/data` `bumpEpoch`,
+  the backup. The secret comes only from a ceremony, and `create()` may
+  withhold it (Chrome does), so enrolment follows up with a local `get()`
+  (`fetchPrf`) and a phone that holds keys is nudged to do the same for a
+  passkey no backup exists under (`BackupNudge`, `passkeysToFetch`) — the
+  backup is written by the phone with the keys, never waited for. A rotated key (`lib/data` `bumpEpoch`,
   `components/rotate-key.tsx`) reaches each seat wrapped to the member key
   that seat announced *in the log* (`member.hello` `mkPub`, `HelloState`),
   never to anything the server supplied, and the server turns the epoch only

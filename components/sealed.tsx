@@ -108,7 +108,7 @@ const BACKUP_NOTES = {
   "no-secret":
     "This passkey didn't hand over the secret a backup is sealed under, so it can't fetch one. Passkeys kept in iCloud Keychain or Google Password Manager do; most password managers (Bitwarden among them) don't yet. Here, use a key link.",
   "no-backup":
-    "Your passkey can open a backup, but none has been written yet. Sign in with this passkey once on a phone that has the key, and the next visit here restores it.",
+    "Your passkey can open a backup, but none has been written yet. Open the app on a phone that has the key — it offers to back your keys up under this passkey — then reload here.",
   "would-not-open":
     "A backup exists for your passkey but its secret didn't open it here — it was sealed under a different one. Sign in with that passkey, or use a key link.",
   offline: "The backup couldn't be fetched just now. Reload to try again.",

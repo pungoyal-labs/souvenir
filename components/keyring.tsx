@@ -92,23 +92,36 @@ function openStore() {
 
 // --- passkeys -------------------------------------------------------------------
 
-/** After a ceremony: keep the key this credential's PRF output derives, if it gave one. */
-export async function rememberPrf(credential: PublicKeyCredential): Promise<void> {
-  const results = credential.getClientExtensionResults() as {
-    prf?: { results?: { first?: ArrayBuffer } };
-  };
+interface PrfResults {
+  prf?: { enabled?: boolean; results?: { first?: ArrayBuffer } };
+}
+
+/**
+ * True when the authenticator said this credential can evaluate the PRF but did not do so in
+ * this ceremony — what Chrome answers on `create()`. A `get()` on the same credential will.
+ */
+export function prfWithheld(credential: PublicKeyCredential): boolean {
+  const results = credential.getClientExtensionResults() as PrfResults;
+  return results.prf?.enabled === true && !results.prf.results?.first;
+}
+
+/** After a ceremony: keep the key this credential's PRF output derives. True when it gave one. */
+export async function rememberPrf(credential: PublicKeyCredential): Promise<boolean> {
+  const results = credential.getClientExtensionResults() as PrfResults;
   const prf = results.prf?.results?.first;
   if (!prf) {
     console.info("this passkey returned no PRF secret: the keyring cannot be backed up under it");
-    return;
+    return false;
   }
   try {
     const { db } = await openStore();
     await idbPut(db, prfId(credential.id), await prfKeyringKey(new Uint8Array(prf)));
     const ids = (await idbGet<string[]>(db, PRF_IDS)) ?? [];
     if (!ids.includes(credential.id)) await idbPut(db, PRF_IDS, [...ids, credential.id]);
+    return true;
   } catch {
     // No storage: nothing to back up into, and nothing to restore from.
+    return false;
   }
 }
 
@@ -125,16 +138,19 @@ async function prfKeys(db: IDBDatabase): Promise<PrfKeys> {
 
 const same = (a: Keyring, b: Keyring) => encodeKeyring(a).join() === encodeKeyring(b).join();
 
-/** The keyring sealed under each passkey key, to the server. Best effort. */
-async function backUp(kr: Keyring, keys: PrfKeys): Promise<void> {
+/** The keyring sealed under each passkey key, to the server. Best effort; the ids that landed. */
+async function backUp(kr: Keyring, keys: PrfKeys): Promise<string[]> {
+  const written: string[] = [];
   for (const [id, key] of keys) {
     try {
       const res = await saveKeyringWrapAction(id, await sealKeyring(key, kr));
-      if (!res.ok) console.warn(`keyring backup refused: ${res.error}`);
+      if (res.ok) written.push(id);
+      else console.warn(`keyring backup refused: ${res.error}`);
     } catch (err) {
       console.warn(`keyring backup failed: ${err instanceof Error ? err.message : err}`);
     }
   }
+  return written;
 }
 
 /** Why the passkey backup did or did not come back on this phone — the keyless card says it. */
@@ -204,6 +220,13 @@ export interface KeyringContextValue {
   update(next: (current: Keyring) => Keyring): Promise<void>;
   /** What the passkey backup did on this phone; null until known, or signed out. */
   backup: BackupNote | null;
+  /** The passkeys this phone holds a PRF secret for, by credential id. */
+  passkeys: string[];
+  /**
+   * Back the keyring up again under every passkey secret this phone now holds — after a
+   * `get()` handed one over (`fetchPrf`). The credential ids whose backup landed.
+   */
+  backUpNow(): Promise<string[]>;
 }
 
 const KeyringContext = createContext<KeyringContextValue | null>(null);
@@ -222,6 +245,7 @@ export function KeyringProvider({
   const [status, setStatus] = useState<KeyringStatus>("loading");
   const [keyring, setKeyring] = useState<Keyring>(emptyKeyring);
   const [backup, setBackup] = useState<BackupNote | null>(null);
+  const [passkeys, setPasskeys] = useState<string[]>([]);
   const keyringRef = useRef(keyring);
   keyringRef.current = keyring;
   const signedInRef = useRef(signedIn);
@@ -242,6 +266,7 @@ export function KeyringProvider({
           }
         }
         const keys = await prfKeys(db);
+        if (!cancelled) setPasskeys([...keys.keys()]);
         const restored = signedIn ? await restore(kr, keys) : null;
         let next = restored?.keyring ?? kr;
         const stale = restored?.stale ?? keys;
@@ -279,9 +304,23 @@ export function KeyringProvider({
     if (signedInRef.current) void backUp(kr, await prfKeys(db));
   }, []);
 
+  const backUpNow = useCallback(async () => {
+    let db: IDBDatabase;
+    try {
+      ({ db } = await openStore());
+    } catch {
+      return [];
+    }
+    const keys = await prfKeys(db);
+    setPasskeys([...keys.keys()]);
+    const kr = keyringRef.current;
+    if (!signedInRef.current || Object.keys(kr.trips).length === 0) return [];
+    return backUp(kr, keys);
+  }, []);
+
   const value = useMemo<KeyringContextValue>(
-    () => ({ status, keyring, update, backup }),
-    [status, keyring, update, backup],
+    () => ({ status, keyring, update, backup, passkeys, backUpNow }),
+    [status, keyring, update, backup, passkeys, backUpNow],
   );
 
   return <KeyringContext.Provider value={value}>{children}</KeyringContext.Provider>;

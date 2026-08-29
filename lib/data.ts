@@ -631,13 +631,28 @@ export async function passkeyHolders(tripId: string): Promise<Set<string>> {
 
 /** What the passkey manager renders. Key material never leaves this module. */
 export async function listPasskeySummaries(memberId: string) {
-  const held = await listCredentials(memberId);
+  const [held, wrapped] = await Promise.all([listCredentials(memberId), passkeyBackups(memberId)]);
+  const wraps = new Set(wrapped.filter((p) => p.wrapped).map((p) => p.id));
   return held.map(({ id, createdAt, lastUsedAt, backedUp }) => ({
     id,
     createdAt,
     lastUsedAt,
     backedUp,
+    wrapped: wraps.has(id),
   }));
+}
+
+/** Every passkey of a member and whether a keyring backup exists under it — one query, for the layout. */
+export async function passkeyBackups(
+  memberId: string,
+): Promise<{ id: string; wrapped: boolean }[]> {
+  const rows = await db
+    .select({ id: credentials.id, wrap: keyringWraps.credentialId })
+    .from(credentials)
+    .leftJoin(keyringWraps, eq(keyringWraps.credentialId, credentials.id))
+    .where(eq(credentials.memberId, memberId))
+    .orderBy(asc(credentials.createdAt));
+  return rows.map((r) => ({ id: r.id, wrapped: r.wrap != null }));
 }
 
 /** A member by id — null once they have deleted their account. */

@@ -233,6 +233,17 @@ export function prfKeyringKey(prf: Uint8Array): Promise<CryptoKey> {
   return deriveKey(prf, "keyring:prf");
 }
 
+/**
+ * The passkeys a phone that holds keys should be asked to hand over a PRF secret for: the
+ * member's, minus those this phone already has a secret for, minus those a backup already
+ * exists under. Only `create()` withholds a secret (Chrome does, Safari does not) — a `get()`
+ * on the same passkey gives it — so this is the list one such ceremony is offered for.
+ */
+export function passkeysToFetch(held: string[], local: string[], wrapped: string[]): string[] {
+  const have = new Set([...local, ...wrapped]);
+  return held.filter((id) => !have.has(id));
+}
+
 // --- the member key ------------------------------------------------------------
 
 export function withMemberKey(kr: Keyring, privateKey: JsonWebKey): Keyring {
