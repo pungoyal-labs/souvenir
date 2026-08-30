@@ -4,6 +4,7 @@ import Link from "next/link";
 import { signOutAction } from "@/app/actions";
 import { Avatar } from "@/components/avatar";
 import { BackupNudge } from "@/components/backup-nudge";
+import { ErrorReporter } from "@/components/error-reporter";
 import { KeyringProvider } from "@/components/keyring";
 import { Logo } from "@/components/logo";
 import { PasskeyNudge } from "@/components/passkey-nudge";
@@ -86,6 +87,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       <body
         className={`${display.variable} ${body.variable} ${mono.variable} min-h-screen antialiased`}
       >
+        <ErrorReporter />
         {/* Installed to a home screen, the page runs under the status bar: pad the header down by the notch. */}
         <header className="bg-felt-deep pt-[env(safe-area-inset-top)] text-[#f1eee4]">
           <div className="mx-auto flex max-w-5xl flex-wrap items-center gap-x-4 gap-y-1 px-4 py-3">

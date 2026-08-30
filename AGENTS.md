@@ -176,6 +176,18 @@ Pre-commit (husky): biome on staged files, tsc, full test suite.
   passkey backup, and the attested build. The document records what
   differed from the plan and why. Do not add a plaintext content column.
 - `lib/env.ts` is the only file reading `process.env` (zod-validated).
+- **Logs are JSON lines through `lib/logger`, and nothing else.** pino on
+  stdout, one record per line, `level` as a word, the build's short sha on
+  every line. In production `instrumentation.ts` routes `console` through it
+  too — Next reports its own errors that way — and `onRequestError` logs each
+  request failure with its route template and digest. A line names ids,
+  roles, counts, timings and errors; never an email, a link code, a key, a
+  cookie, or anything from a sealed trip, and `redact` backstops the keys a
+  secret would arrive under. A phone reports a crash through
+  `reportClientErrorAction` only (`app/error.tsx`, `app/global-error.tsx`,
+  `components/error-reporter.tsx`): name, message, stack, digest and the path
+  with its code segment masked (`lib/report`), capped and rate-limited. Scripts
+  print to the console on purpose — that is their UI.
 - Relative imports in `lib/` and `scripts/` carry explicit `.ts` extensions so
   plain `node scripts/*.ts` runs (Node type stripping).
 - Every flavored string lives in `lingo.yaml`, never in a component; all

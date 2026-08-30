@@ -80,6 +80,7 @@ import {
 import { logger } from "@/lib/logger";
 import { recoveryUrl } from "@/lib/recovery";
 import { rekeyUrl } from "@/lib/rekeys";
+import { reportBudget, tidyReport } from "@/lib/report";
 import { routes } from "@/lib/routes";
 import { currentMember } from "@/lib/session";
 import {
@@ -113,12 +114,12 @@ async function requireMemberId(): Promise<string> {
   return member.id;
 }
 
-function failure(err: unknown): ActionResult {
+function failure(err: unknown, memberId?: string): ActionResult {
   if (err instanceof DataError) {
-    logger.debug({ reason: err.message }, "action rejected");
+    logger.debug({ memberId, reason: err.message }, "action rejected");
     return { ok: false, error: err.message };
   }
-  logger.error({ err }, "action failed");
+  logger.error({ err, memberId }, "action failed");
   return { ok: false, error: "Something went wrong. Try again." };
 }
 
@@ -143,13 +144,31 @@ async function mutate<T extends object>(
   try {
     result = ((await run(memberId)) ?? {}) as T;
   } catch (err) {
-    return failure(err) as ActionResult & Partial<T>;
+    return failure(err, memberId) as ActionResult & Partial<T>;
   }
   for (const path of typeof paths === "function" ? paths(result) : paths) {
     if (path === LAYOUT) revalidatePath("/", "layout");
     else revalidatePath(path);
   }
   return { ok: true, ...result };
+}
+
+// ---------- what a phone reports ----------
+
+/** Reports a process takes per minute; past that they are dropped, not queued. */
+const takeReport = reportBudget(120, 60_000);
+
+/**
+ * A phone that broke — an error boundary, an uncaught error, a promise nobody
+ * awaited — says so here and nowhere else (components/error-reporter). Signed
+ * out is fine: the root boundary can fire before anyone is. Nothing comes
+ * back, so nothing can be learned by sending one.
+ */
+export async function reportClientErrorAction(raw: unknown): Promise<void> {
+  const report = tidyReport(raw);
+  if (!report || !takeReport(Date.now())) return;
+  const member = await currentMember();
+  logger.error({ memberId: member?.id ?? null, client: report }, "client error");
 }
 
 // ---------- trips ----------

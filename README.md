@@ -197,6 +197,16 @@ in that flow. The link carries the trip's key in its fragment, so copy it
 whole. Members are 18+ and accept the terms at sign-up; accounts can be
 deleted from the account page.
 
+## Logs
+
+JSON lines on stdout (pino, `LOG_LEVEL`), one record per line, with the
+build's commit on each. In production Next's own output and its
+uncaught-error handlers go through the same logger, so a collector never
+meets a bare line; every request failure carries its route template and
+digest, and a phone that breaks reports the error's name, message, stack and a
+masked path through one server action. No line carries an email, a link code,
+a key, or anything from a sealed trip.
+
 ## Verifying what runs
 
 The promise on `/privacy` rests on the code that runs on the phone, which the

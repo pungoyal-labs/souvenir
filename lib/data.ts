@@ -427,7 +427,7 @@ export async function ensureMember(
     return { member: created, created: true };
   } catch {
     // Concurrent first sign-in: the unique email constraint fired; re-read.
-    logger.debug({ email: normalized }, "concurrent first sign-in, re-reading member");
+    logger.debug("concurrent first sign-in, re-reading member");
     const [raced] = await db.select().from(members).where(eq(members.email, normalized));
     if (!raced) throw new DataError("Something went wrong signing you in. Try again.");
     return { member: raced, created: false };
