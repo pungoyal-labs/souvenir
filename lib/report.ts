@@ -81,13 +81,16 @@ export function describeError(
 
 /**
  * Not worth a line: a cross-origin script's error the browser has already
- * blanked, a fetch the page itself cancelled, and the observer warning
- * browsers raise on a busy layout.
+ * blanked, a fetch the page itself cancelled, the observer warning browsers
+ * raise on a busy layout, and an action called from a bundle a deploy has
+ * replaced — the server writes its own line for that one, and a deploy can
+ * put it in front of every phone at once (components/stale-build).
  */
 export function isNoise({ name, message }: { name: string; message: string }): boolean {
   return (
     message === "Script error." ||
     name === "AbortError" ||
+    name === "UnrecognizedActionError" ||
     message.startsWith("ResizeObserver loop")
   );
 }

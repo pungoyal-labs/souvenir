@@ -25,6 +25,7 @@ import { type ReplayConfig, replayTrip, type TripState } from "@/lib/replay";
 import { type Person, peopleOf, type RosterMember } from "@/lib/views";
 import { useKeyring, useTripKey } from "./keyring";
 import { loadRows, saveRows } from "./log-cache";
+import { isStaleBuild, markStaleBuild, useStaleBuild } from "./stale-build";
 
 const POLL_MS = 15_000;
 
@@ -198,9 +199,21 @@ export function TripStoreProvider({
     };
   }, [key, rows, opened, keyring.keyring, tripId, epoch]);
 
+  const stale = useStaleBuild();
+
   const refresh = useCallback(async () => {
     const last = rowsRef.current[rowsRef.current.length - 1]?.seq ?? 0;
-    const res = await actions.since(tripId, last);
+    let res: Awaited<ReturnType<typeof actions.since>>;
+    try {
+      res = await actions.since(tripId, last);
+    } catch (err) {
+      // A deploy has moved under this tab: every further poll can only 404 the
+      // same way, four times a minute for as long as the trip is left open. Stop
+      // knocking and let <StaleBuild> ask for the reload that is the only fix.
+      if (!isStaleBuild(err)) throw err;
+      markStaleBuild();
+      return;
+    }
     setSynced(true);
     const fresh = res.rows;
     if (!res.ok || !fresh?.length) return;
@@ -209,9 +222,10 @@ export function TripStoreProvider({
   }, [actions, tripId]);
 
   // Poll while the tab is visible, once the phone's own copy is in; catch up the moment it
-  // becomes visible again.
+  // becomes visible again. A stale build ends it: the effect re-runs, the cleanup clears the
+  // interval, and this tab is done until it is reloaded.
   useEffect(() => {
-    if (!key || !cached) return;
+    if (!key || !cached || stale) return;
     let timer: ReturnType<typeof setInterval> | null = null;
     const stop = () => {
       if (timer) clearInterval(timer);
@@ -228,7 +242,7 @@ export function TripStoreProvider({
       stop();
       document.removeEventListener("visibilitychange", onVisibility);
     };
-  }, [key, cached, refresh]);
+  }, [key, cached, stale, refresh]);
 
   // Rows in the trip's order; the store keeps `rows` sorted by seq.
   const events = useMemo(
@@ -266,7 +280,20 @@ export function TripStoreProvider({
     async (payload: EventPayload): Promise<ActionResult> => {
       const sealed = await sealEvent(payload);
       if (!sealed.ok) return sealed;
-      const res = await actions.append(tripId, sealed.envelope);
+      let res: Awaited<ReturnType<typeof actions.append>>;
+      try {
+        res = await actions.append(tripId, sealed.envelope);
+      } catch (err) {
+        // The envelope is sealed and the rules passed it; only the deploy is in the
+        // way. The tap gets a reason instead of a rejected promise nobody catches,
+        // and the same tap works after the reload.
+        if (!isStaleBuild(err)) throw err;
+        markStaleBuild();
+        return {
+          ok: false,
+          error: "Souvenir updated while this page was open. Reload, then try again.",
+        };
+      }
       if (!res.ok || res.id === undefined || res.seq === undefined || res.at === undefined) {
         return { ok: false, error: res.error };
       }

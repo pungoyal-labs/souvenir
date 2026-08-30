@@ -9,6 +9,7 @@ import { KeyringProvider } from "@/components/keyring";
 import { Logo } from "@/components/logo";
 import { PasskeyNudge } from "@/components/passkey-nudge";
 import { RecoveryNotice } from "@/components/recovery-notice";
+import { StaleBuild } from "@/components/stale-build";
 import { TermsNudge } from "@/components/terms-nudge";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { passkeysConfigured, RP_ID } from "@/lib/auth";
@@ -135,6 +136,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           </div>
         </header>
         <div aria-hidden className="zari" />
+        <StaleBuild />
         {member && (liveRecovery || usedRecovery) && (
           <RecoveryNotice
             live={liveRecovery && { code: liveRecovery.code, expiresAt: liveRecovery.expiresAt }}

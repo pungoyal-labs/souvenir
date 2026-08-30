@@ -94,6 +94,15 @@ describe("isNoise", () => {
     expect(isNoise({ name: "Error", message: "ResizeObserver loop limit exceeded" })).toBe(true);
   });
 
+  it("drops a call to a build the deploy replaced", () => {
+    expect(
+      isNoise({
+        name: "UnrecognizedActionError",
+        message: 'Server Action "abc" was not found on the server.',
+      }),
+    ).toBe(true);
+  });
+
   it("keeps a real one", () => {
     expect(isNoise({ name: "TypeError", message: "x is not a function" })).toBe(false);
   });
