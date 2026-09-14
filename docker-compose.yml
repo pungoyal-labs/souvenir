@@ -10,7 +10,7 @@
 
 services:
   db:
-    image: postgres:18-alpine
+    image: postgres:18-bookworm
     restart: unless-stopped
     environment:
       POSTGRES_USER: souvenir
