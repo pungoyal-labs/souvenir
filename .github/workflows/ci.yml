@@ -95,7 +95,7 @@ jobs:
           sbom: ${{ env.PUSH }}
       - name: Attest the image (Sigstore, signed with this run's OIDC identity)
         if: env.PUSH == 'true'
-        uses: actions/attest-build-provenance@v3
+        uses: actions/attest-build-provenance@v4
         with:
           subject-name: ${{ steps.meta.outputs.image }}
           subject-digest: ${{ steps.build.outputs.digest }}

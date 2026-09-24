@@ -37,7 +37,7 @@ jobs:
           SPEECH_VOICE_THEM: ${{ vars.SPEECH_VOICE_THEM }}
           SPEECH_VOICE_THEM_PITCH: ${{ vars.SPEECH_VOICE_THEM_PITCH }}
           SPEECH_VOICE_THEM_SPEED: ${{ vars.SPEECH_VOICE_THEM_SPEED }}
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: clips

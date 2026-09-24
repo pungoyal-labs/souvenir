@@ -25,7 +25,7 @@ trip, run on every phone), `lib/format` (how a moment reads: an age, a
 deadline, a date).
 Read the test before changing a module; change them together.
 
-## Commands (pnpm 11)
+## Commands (pnpm 12)
 
 - `pnpm dev` — dev server (needs `docker compose up -d db` and a `.env`)
 - `pnpm dev:https` — same on `0.0.0.0` over self-signed TLS, which is the only

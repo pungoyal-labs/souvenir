@@ -2,7 +2,7 @@
 
 FROM node:24-alpine AS deps
 WORKDIR /app
-RUN npm i -g pnpm@11
+RUN npm i -g pnpm@12
 # HUSKY=0 skips git-hook installation (there is no .git in the image).
 ENV HUSKY=0
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
@@ -10,7 +10,7 @@ RUN pnpm install --frozen-lockfile
 
 FROM node:24-alpine AS build
 WORKDIR /app
-RUN npm i -g pnpm@11
+RUN npm i -g pnpm@12
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 # The commit this image is built from: the build id, and what /privacy names.
